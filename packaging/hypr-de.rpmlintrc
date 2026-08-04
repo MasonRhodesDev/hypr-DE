@@ -1,3 +1,5 @@
 # rpmlint filters for hypr-de. Lets CI gate on rpmlint without tripping over
 # domain vocabulary (Hyprland, waybar, swaync, lmtt, compositor terms).
 addFilter("spelling-error")
+# notify-send ships in the libnotify package on Fedora — the dep is on the tool
+addFilter("explicit-lib-dependency libnotify")
