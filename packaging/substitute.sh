@@ -19,8 +19,8 @@ find "$STAGE" -type f | while read -r f; do
     fi
 done
 
-# Gate: no unsubstituted tokens may survive
-if LEFT=$(grep -rn "@[A-Z_]\+@" "$STAGE" --include='*' -l 2>/dev/null | head -5) && [ -n "$LEFT" ]; then
+# Gate: none of OUR tokens may survive (@DEFAULT_AUDIO_SINK@ etc. are wpctl's)
+if LEFT=$(grep -rn "@\(BINDIR\|DATADIR\|LIBEXECDIR\|WAYBAR_CFFI\|UNITDIR\|PRESETDIR\|ENVGENDIR\|XDGCONFDIR\|SESSIONDIR\|SKELDIR\)@" "$STAGE" -l 2>/dev/null | head -5) && [ -n "$LEFT" ]; then
     echo "ERROR: unsubstituted tokens remain in: $LEFT" >&2
     exit 1
 fi

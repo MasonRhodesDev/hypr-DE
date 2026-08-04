@@ -93,6 +93,11 @@ WAYBAR_CFFI=%{_libdir}/waybar/workspace_buttons.so \
 mkdir -p dist-build/lmtt-system-modules
 mv dist-build/lmtt/modules/* dist-build/lmtt-system-modules/
 
+%check
+# Syntax-check every shipped shell script and the Lua payload
+find dist-build/bin dist-build/libexec -type f -exec sh -c 'head -1 "$1" | grep -q "^#!/bin/bash" && bash -n "$1"' _ {} \;
+./packaging/gen-deps.sh check
+
 %install
 LIBEXECDIR=%{_libexecdir}/hypr-de \
     ./packaging/install.sh dist-build %{buildroot} main

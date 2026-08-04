@@ -29,7 +29,6 @@
 
 set -u
 
-SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 APPS_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/hypr-de/notify-plugins"
 CTX_DIR="${XDG_RUNTIME_DIR:-/tmp}/swaync-context"
 
