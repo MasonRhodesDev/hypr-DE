@@ -109,12 +109,13 @@
         },
         "custom/updates": {
             "format": "󰅢   {}",
+            "return-type": "json",
             "interval": 28800,
             "exec": "@LIBEXECDIR@/waybar-updates-check count",
             "exec-if": "exit 0",
             "on-click": "@LIBEXECDIR@/waybar-updates-check upgrade; pkill -SIGRTMIN+8 waybar",
             "signal": 8,
-            "tooltip": false
+            "tooltip": true
         },
         "custom/expand": {
             "format": "",

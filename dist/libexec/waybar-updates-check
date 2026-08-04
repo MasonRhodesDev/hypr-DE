@@ -6,16 +6,29 @@ set -u
 
 TERM_CMD="${TERMINAL:-kitty}"
 
+# Emits waybar JSON: {"text": N, "class": "de-update"?, "tooltip": ...}.
+# The class highlights the module (see lmtt waybar template) when hypr-de
+# itself is among the pending updates.
 count() {
+    local out n cls="" tip
     if command -v dnf >/dev/null 2>&1; then
-        timeout 30 sh -c 'dnf list --upgradable 2>/dev/null | tail -n +2 | wc -l'
+        out=$(timeout 30 dnf list --upgradable 2>/dev/null | tail -n +2)
     elif command -v yay >/dev/null 2>&1; then
-        timeout 30 sh -c 'yay -Qu 2>/dev/null | wc -l'
+        out=$(timeout 30 yay -Qu 2>/dev/null)
     elif command -v checkupdates >/dev/null 2>&1; then
-        timeout 30 sh -c 'checkupdates 2>/dev/null | wc -l'
+        out=$(timeout 30 checkupdates 2>/dev/null)
     else
-        echo 0
+        out=""
     fi
+    n=$(printf '%s' "$out" | grep -c .)
+    tip="$n updates pending"
+    # hypr-de.noarch (dnf) / "hypr-de " (arch); also matches hypr-de-gaming
+    if printf '%s\n' "$out" | grep -q '^hypr-de'; then
+        cls="de-update"
+        tip="hypr-DE update available — $tip"
+    fi
+    jq -cn --arg text "$n" --arg class "$cls" --arg tooltip "$tip" \
+        '{text: $text, class: $class, tooltip: $tooltip}'
 }
 
 upgrade() {

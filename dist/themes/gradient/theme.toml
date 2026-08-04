@@ -1,0 +1,38 @@
+# hypr-DE example theme — the packaged default look, and a reference for
+# theme authors. Everything below [meta] is a strict subset of lmtt's
+# config schema and is merged into ~/.config/lmtt/config.toml with
+# line-tagged edits (see `man` section in the README).
+#
+# @THEMEDIR@ expands to this theme's installed directory at apply time.
+
+[meta]
+name = "gradient"
+description = "The hypr-DE default: dark radial gradient, tonal-spot Material You"
+author = "hypr-DE"
+version = "1"
+
+[general]
+# Wallpaper is applied via hypr-de-set-wallpaper (the single writer for
+# hyprlock/swaybg/lmtt) — reference any image, or drop one in this directory.
+wallpaper = "@DATADIR@/wallpapers/default.png"
+scheme_type = "scheme-tonal-spot"
+use_matugen = true
+# To pin exact palettes instead of extracting from the wallpaper:
+# use_matugen = false
+# default_dark_colors = "@THEMEDIR@/colors-dark.json"
+# default_light_colors = "@THEMEDIR@/colors-light.json"
+
+[colors]
+# Per-token accent pins, applied OVER the extracted/pinned palette:
+# primary = "#88c0d0"
+# error = "#bf616a"
+
+[theme_profiles.dark]
+# gtk_theme = "Adwaita-dark"
+# gtk_icon_theme = "breeze-dark"
+# cursor_theme = "Adwaita"
+# cursor_size = 24
+
+[theme_profiles.light]
+# gtk_theme = "Adwaita"
+# gtk_icon_theme = "breeze"

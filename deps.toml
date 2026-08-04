@@ -24,7 +24,7 @@ fedora = ["SwayNotificationCenter"]
 arch = ["swaync"]
 
 [launcher]
-reason = "fuzzel (SUPER+R bind, power-menu.sh dmenu backend, networkmanager-dmenu)"
+reason = "fuzzel (SUPER+R bind, power-menu.sh + cheatsheet dmenu backend, networkmanager-dmenu)"
 fedora = ["fuzzel"]
 arch = ["fuzzel"]
 
@@ -45,7 +45,7 @@ fedora_weak = ["gpu-screen-recorder"]
 arch = ["grim", "slurp", "swappy", "hyprpicker", "wl-clipboard", "gpu-screen-recorder"]
 
 [script-runtime]
-reason = "socat (configreload-listener), playerctl (media-osd, waybar media), brightnessctl (brightness-osd), jq (swaync focus-sender, snip), libnotify (OSD notify-send), python3+dbus+gobject (notification-focus-proxy, waybar-mediaplayer)"
+reason = "socat (configreload-listener), playerctl (media-osd, waybar media), brightnessctl (brightness-osd), jq (swaync focus-sender, snip, cheatsheet, updates JSON), libnotify (OSD + welcome notify-send), python3+dbus+gobject (notification-focus-proxy, waybar-mediaplayer, hypr-de-theme)"
 fedora = ["socat", "playerctl", "brightnessctl", "jq", "/usr/bin/notify-send", "python3", "python3-dbus", "python3-gobject"]
 arch = ["socat", "playerctl", "brightnessctl", "jq", "libnotify", "python", "python-dbus", "python-gobject"]
 

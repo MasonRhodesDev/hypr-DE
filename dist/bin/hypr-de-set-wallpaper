@@ -1,8 +1,9 @@
 #!/bin/bash
-# Set the hypr-DE wallpaper. Single owner of both wallpaper consumers:
+# Set the hypr-DE wallpaper. Single owner of all three wallpaper consumers:
 #   ~/.config/hypr-de/wallpaper.conf          ($WALLPAPER for hyprlock)
 #   ~/.config/environment.d/wallpaper.conf    (WALLPAPER_PATH for swaybg.service)
-# then applies live (systemd user env + swaybg restart).
+#   ~/.config/lmtt/config.toml general.wallpaper  (lmtt palette extraction)
+# then applies live (systemd user env + swaybg restart + lmtt re-render).
 set -euo pipefail
 
 usage() { echo "usage: hypr-de-set-wallpaper <image-path>" >&2; exit 2; }
@@ -17,9 +18,35 @@ mkdir -p "$CONFIG/hypr-de" "$CONFIG/environment.d"
 printf '$WALLPAPER = %s\n' "$WP" > "$CONFIG/hypr-de/wallpaper.conf"
 printf 'WALLPAPER_PATH=%s\n' "$WP" > "$CONFIG/environment.d/wallpaper.conf"
 
+# lmtt reads the wallpaper ONLY from config.general.wallpaper (no env
+# fallback). Surgical section-scoped edit — never via lmtt itself, whose
+# Config::save() rewrites the whole file and drops comments/unknown keys.
+LMTT_CFG="$CONFIG/lmtt/config.toml"
+mkdir -p "$CONFIG/lmtt"
+if [ ! -e "$LMTT_CFG" ]; then
+    printf '[general]\nwallpaper = "%s"\n' "$WP" > "$LMTT_CFG"
+else
+    TMP=$(mktemp "$LMTT_CFG.XXXXXX")
+    awk -v wp="$WP" '
+        function emit() { print "wallpaper = \"" wp "\""; done = 1 }
+        /^\[general\]/ { ingen = 1; print; next }
+        /^\[/          { if (ingen && !done) emit(); ingen = 0; print; next }
+        ingen && !done && /^[[:space:]]*wallpaper[[:space:]]*=/ { emit(); next }
+        { print }
+        END { if (!done) { if (!ingen) print "[general]"; emit() } }
+    ' "$LMTT_CFG" > "$TMP" && mv "$TMP" "$LMTT_CFG"
+fi
+
 if [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ] || [ -n "${XDG_RUNTIME_DIR:-}" ]; then
     systemctl --user set-environment "WALLPAPER_PATH=$WP" 2>/dev/null || true
     systemctl --user try-restart swaybg.service 2>/dev/null || true
+    # Re-render the theme from the new wallpaper in the CURRENT mode.
+    # NEVER bare `lmtt switch` — that toggles light/dark.
+    if command -v lmtt >/dev/null 2>&1; then
+        MODE=$(lmtt status 2>/dev/null | sed -n 's/^Current theme: //p')
+        case "$MODE" in light|dark) ;; *) MODE=dark ;; esac
+        lmtt switch "$MODE" >/dev/null 2>&1 || true
+    fi
 fi
 
-echo "Wallpaper set: $WP (lockscreen picks it up on next lock)"
+echo "Wallpaper set: $WP (palette re-rendered; lockscreen picks it up on next lock)"

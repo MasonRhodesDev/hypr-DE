@@ -29,6 +29,8 @@ if [ -e "$STUB_DST" ] && ! cmp -s "$STUB_SRC" "$STUB_DST"; then
         cp -a "$STUB_DST" "$BK/hyprland.lua"
         cp "$STUB_SRC" "$STUB_DST"
         say "hyprland.lua replaced with stub (old file: $BK/hyprland.lua)"
+        # Migrating an existing config: skip the first-login greeting
+        "@LIBEXECDIR@/hypr-de-welcome" --adopt
     else
         say "hyprland.lua exists and differs from the stub — leaving it alone (use --adopt to replace with backup)"
     fi
@@ -44,10 +46,16 @@ if [ ! -e "$CONFIG/hypr/xdph.conf" ]; then
     say "xdph.conf seeded"
 fi
 
-# Wallpaper fallback (hyprlock sources this; never allowed to dangle)
-if [ ! -e "$CONFIG/hypr-de/wallpaper.conf" ]; then
-    printf '$WALLPAPER = %s\n' "$DATADIR/wallpapers/default.png" > "$CONFIG/hypr-de/wallpaper.conf"
-    say "wallpaper.conf seeded with default wallpaper"
+# Wallpaper: hyprlock/swaybg/lmtt must agree, and set-wallpaper is the single
+# writer for all three. Align when the hyprlock file is missing OR lmtt's
+# configured wallpaper doesn't resolve (fresh lmtt defaults to a nonexistent
+# path, silently falling back to the built-in palette).
+CUR_WP=$(sed -n 's/^\$WALLPAPER = //p' "$CONFIG/hypr-de/wallpaper.conf" 2>/dev/null)
+[ -n "$CUR_WP" ] && [ -r "$CUR_WP" ] || CUR_WP="$DATADIR/wallpapers/default.png"
+LMTT_WP=$(lmtt status 2>/dev/null | sed -n 's/^Wallpaper: //p'); LMTT_WP="${LMTT_WP/#\~/$HOME}"
+if [ ! -e "$CONFIG/hypr-de/wallpaper.conf" ] || [ ! -r "$LMTT_WP" ]; then
+    "@BINDIR@/hypr-de-set-wallpaper" "$CUR_WP" >/dev/null
+    say "wallpaper aligned across hyprlock/swaybg/lmtt ($CUR_WP)"
 fi
 
 # DE user units (covers Arch and pre-existing users; preset files handle new

@@ -32,6 +32,11 @@ main)
             inst "$STAGE/matugen/$f" "$DATADIR/matugen/${f#./}"
         done
     fi
+    if [ -d "$STAGE/themes" ]; then
+        (cd "$STAGE/themes" && find . -type f) | while read -r f; do
+            inst "$STAGE/themes/$f" "$DATADIR/themes/${f#./}"
+        done
+    fi
 
     # binaries + libexec helpers
     for f in "$STAGE"/bin/*; do

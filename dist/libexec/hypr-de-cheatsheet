@@ -1,0 +1,24 @@
+#!/bin/bash
+# Searchable keybind reference (SUPER+/): hyprctl binds -j -> fuzzel dmenu.
+# Descriptions come from the `desc = "Category: text"` opt on every hl.bind;
+# typing a category word filters to that group. Binds without a description
+# (user's local.lua) appear last as "(custom)". Selection just dismisses.
+set -euo pipefail
+
+hyprctl binds -j | jq -r '
+  # jq has no bitwise ops; test bit b via floor-div parity.
+  # modmask bits: SHIFT=1 CAPS=2 CTRL=4 ALT=8 SUPER=64 MOD5=128
+  def hasmod(b): ((.modmask / b) | floor) % 2 == 1;
+  [ .[]
+    | select(.submap == "")
+    | { combo: ([ (if hasmod(64) then "SUPER" else empty end),
+                  (if hasmod(4)  then "CTRL"  else empty end),
+                  (if hasmod(8)  then "ALT"   else empty end),
+                  (if hasmod(1)  then "SHIFT" else empty end),
+                  (if .key != "" then .key else "code:\(.keycode)" end) ] | join("+")),
+        desc:  (if .has_description then .description else "(custom): unlabeled bind" end),
+        rank:  (if .has_description then 0 else 1 end) } ]
+  | sort_by(.rank, .desc, .combo) | .[] | [.combo, .desc] | @tsv' \
+| column -t -s "$(printf '\t')" -o '   ' \
+| fuzzel --dmenu --config @DATADIR@/fuzzel/fuzzel.ini \
+    --prompt 'Keys: ' --width 90 --lines 24 >/dev/null || true

@@ -1,0 +1,317 @@
+#!/usr/bin/python3
+"""hypr-DE theme manager.
+
+A theme is a directory:
+    themes/<name>/
+      theme.toml            [meta] + a strict subset of lmtt's config:
+                            [general] (wallpaper/scheme_type/use_matugen/
+                            default_light_colors/default_dark_colors),
+                            [colors], [theme_profiles.light|dark]
+      wallpaper.*           optional image (reference via @THEMEDIR@)
+      colors-{light,dark}.json  optional pinned palettes
+      modules/*.toml        optional lmtt custom modules
+      templates/*.hbs       optional, referenced by modules via @THEMEDIR@
+
+Applying merges the theme's knobs into ~/.config/lmtt/config.toml with
+line-tagged surgical edits: every line we write ends with `# hypr-de-theme`,
+which doubles as the ownership record — a later apply/reset strips exactly
+those lines and nothing else. lmtt's own Config::save() is never used (it
+drops user comments and unknown keys). Theme knobs REPLACE conflicting
+untagged user lines (applying a theme is an explicit request for them); a
+timestamped backup is taken first.
+
+Wallpaper is deliberately excluded from the merge: hypr-de-set-wallpaper is
+the single writer for all wallpaper consumers (hyprlock/swaybg/lmtt).
+"""
+
+import os
+import re
+import shutil
+import subprocess
+import sys
+import time
+import tomllib
+
+TAG = "# hypr-de-theme"
+CONFIG = os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config"))
+DATA_HOME = os.environ.get("XDG_DATA_HOME", os.path.expanduser("~/.local/share"))
+USER_THEMES = os.path.join(DATA_HOME, "hypr-de", "themes")
+SYSTEM_THEMES = "@DATADIR@/themes"
+LMTT_CFG = os.path.join(CONFIG, "lmtt", "config.toml")
+LMTT_MODULES = os.path.join(CONFIG, "lmtt", "modules")
+RECORD = os.path.join(CONFIG, "hypr-de", "theme")
+MERGE_SECTIONS = ("general", "colors", "theme_profiles.light", "theme_profiles.dark")
+GENERAL_KEYS = ("scheme_type", "use_matugen", "default_light_colors", "default_dark_colors")
+
+
+def die(msg, code=1):
+    print(f"hypr-de-theme: {msg}", file=sys.stderr)
+    sys.exit(code)
+
+
+def theme_dirs():
+    dirs = {}
+    for root in (SYSTEM_THEMES, USER_THEMES):  # user shadows system by name
+        if os.path.isdir(root):
+            for name in sorted(os.listdir(root)):
+                if os.path.isfile(os.path.join(root, name, "theme.toml")):
+                    dirs[name] = os.path.join(root, name)
+    return dirs
+
+
+def load_theme(path):
+    with open(os.path.join(path, "theme.toml"), "rb") as f:
+        data = tomllib.load(f)
+    if "meta" not in data or "name" not in data["meta"]:
+        die(f"{path}/theme.toml: missing [meta] name")
+    return data
+
+
+def expand(value, themedir):
+    if isinstance(value, str):
+        return value.replace("@THEMEDIR@", themedir)
+    return value
+
+
+def toml_value(v):
+    """Minimal explicit emitter — json.dumps would write True, not true."""
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (int, float)):
+        return str(v)
+    if isinstance(v, str):
+        return '"' + v.replace("\\", "\\\\").replace('"', '\\"') + '"'
+    die(f"unsupported TOML value type: {type(v).__name__}")
+
+
+def flatten(theme, themedir):
+    """Yield (section, key, value) for the mergeable subset."""
+    general = theme.get("general", {})
+    for k in GENERAL_KEYS:
+        if k in general:
+            yield ("general", k, expand(general[k], themedir))
+    for k, v in theme.get("colors", {}).items():
+        yield ("colors", k, expand(v, themedir))
+    for mode in ("light", "dark"):
+        for k, v in theme.get("theme_profiles", {}).get(mode, {}).items():
+            yield (f"theme_profiles.{mode}", k, expand(v, themedir))
+
+
+TAGGED_RE = re.compile(r"#\s*hypr-de-theme")
+WAS_RE = re.compile(r"#\s*hypr-de-theme \(was: (.*)\)\s*$")
+
+
+def strip_tagged(lines):
+    """Remove every tagged line — restoring any replaced original recorded in
+    the tag — then drop tagged headers whose section emptied."""
+    kept = []
+    for ln in lines:
+        if TAGGED_RE.search(ln) and not ln.lstrip().startswith("["):
+            m = WAS_RE.search(ln)
+            if m:
+                kept.append(m.group(1) + "\n")  # restore the replaced user line
+            continue
+        kept.append(ln)
+    out = []
+    i = 0
+    while i < len(kept):
+        ln = kept[i]
+        if TAGGED_RE.search(ln) and ln.lstrip().startswith("["):
+            # tagged header: keep only if any non-blank, non-header line follows
+            # before the next header
+            j = i + 1
+            has_content = False
+            while j < len(kept) and not kept[j].lstrip().startswith("["):
+                if kept[j].strip():
+                    has_content = True
+                    break
+                j += 1
+            if not has_content:
+                i += 1
+                continue
+            ln = TAGGED_RE.split(ln)[0].rstrip().rstrip("#").rstrip() + "\n"  # keep header, drop tag
+        out.append(ln)
+        i += 1
+    return out
+
+
+def section_spans(lines):
+    """Map section name -> (header_idx, end_idx_exclusive)."""
+    spans, current, start = {}, None, 0
+    for i, ln in enumerate(lines):
+        m = re.match(r"^\[([^\]]+)\]", ln.strip())
+        if m:
+            if current is not None:
+                spans[current] = (start, i)
+            current, start = m.group(1), i
+    if current is not None:
+        spans[current] = (start, len(lines))
+    return spans
+
+
+def merge(lines, entries):
+    lines = strip_tagged(lines)
+    for section, key, value in entries:
+        spans = section_spans(lines)
+        rendered = f"{key} = {toml_value(value)}  {TAG}\n"
+        if section in spans:
+            hdr, end = spans[section]
+            key_re = re.compile(rf"^\s*{re.escape(key)}\s*=")
+            for i in range(hdr + 1, end):
+                if key_re.match(lines[i]):
+                    # theme wins over the untagged user line, but record it in
+                    # the tag so reset/re-apply can restore it
+                    orig = lines[i].rstrip("\n")
+                    lines[i] = f"{key} = {toml_value(value)}  {TAG} (was: {orig})\n"
+                    break
+            else:
+                lines.insert(hdr + 1, rendered)
+        else:
+            if lines and lines[-1].strip():
+                lines.append("\n")
+            lines.append(f"[{section}]  {TAG}\n")
+            lines.append(rendered)
+    return lines
+
+
+def backup(path):
+    ts = time.strftime("%Y%m%d-%H%M%S")
+    bdir = os.path.join(CONFIG, "hypr-de", f"backup-{ts}")
+    os.makedirs(bdir, exist_ok=True)
+    if os.path.exists(path):
+        shutil.copy2(path, os.path.join(bdir, os.path.basename(path)))
+    return bdir
+
+
+def write_validated(path, lines):
+    text = "".join(lines)
+    try:
+        tomllib.loads(text)
+    except tomllib.TOMLDecodeError as e:
+        die(f"merge produced invalid TOML ({e}); config left untouched")
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        f.write(text)
+    os.replace(tmp, path)
+
+
+def current_mode():
+    try:
+        out = subprocess.run(["lmtt", "status"], capture_output=True, text=True, timeout=10).stdout
+        m = re.search(r"^Current theme: (light|dark)$", out, re.M)
+        return m.group(1) if m else "dark"
+    except Exception:
+        return "dark"
+
+
+def clear_theme_modules():
+    if os.path.isdir(LMTT_MODULES):
+        for f in os.listdir(LMTT_MODULES):
+            if f.startswith("hypr-de-theme-"):
+                os.unlink(os.path.join(LMTT_MODULES, f))
+
+
+def cmd_list():
+    current = None
+    if os.path.exists(RECORD):
+        current = open(RECORD).read().split("\n")[0].strip()
+    for name, path in theme_dirs().items():
+        meta = load_theme(path).get("meta", {})
+        marker = "*" if name == current else " "
+        print(f"{marker} {name:20s} {meta.get('description', '')}  [{path}]")
+
+
+def cmd_current():
+    if not os.path.exists(RECORD):
+        print("(no theme applied)")
+        return
+    print(open(RECORD).read().strip())
+
+
+def cmd_install(src):
+    src = os.path.abspath(src)
+    if not os.path.isfile(os.path.join(src, "theme.toml")):
+        die(f"{src}: no theme.toml")
+    theme = load_theme(src)
+    name = theme["meta"]["name"]
+    dst = os.path.join(USER_THEMES, name)
+    os.makedirs(USER_THEMES, exist_ok=True)
+    if os.path.exists(dst):
+        shutil.rmtree(dst)
+    shutil.copytree(src, dst)
+    print(f"installed: {name} -> {dst}  (apply with: hypr-de-theme apply {name})")
+
+
+def cmd_apply(name):
+    dirs = theme_dirs()
+    if name not in dirs:
+        die(f"unknown theme '{name}' (hypr-de-theme list)")
+    themedir = dirs[name]
+    theme = load_theme(themedir)
+
+    bdir = backup(LMTT_CFG)
+
+    # theme-supplied lmtt modules (prefixed for ownership)
+    clear_theme_modules()
+    moddir = os.path.join(themedir, "modules")
+    if os.path.isdir(moddir):
+        os.makedirs(LMTT_MODULES, exist_ok=True)
+        for f in sorted(os.listdir(moddir)):
+            if f.endswith(".toml"):
+                content = open(os.path.join(moddir, f)).read().replace("@THEMEDIR@", themedir)
+                with open(os.path.join(LMTT_MODULES, f"hypr-de-theme-{f}"), "w") as out:
+                    out.write(content)
+
+    os.makedirs(os.path.dirname(LMTT_CFG), exist_ok=True)
+    lines = open(LMTT_CFG).readlines() if os.path.exists(LMTT_CFG) else []
+    lines = merge(lines, flatten(theme, themedir))
+    write_validated(LMTT_CFG, lines)
+
+    os.makedirs(os.path.dirname(RECORD), exist_ok=True)
+    with open(RECORD, "w") as f:
+        f.write(f"{name}\n{themedir}\n")
+
+    wallpaper = theme.get("general", {}).get("wallpaper")
+    if wallpaper:
+        # single sync point for hyprlock/swaybg/lmtt + re-render
+        subprocess.run(["@BINDIR@/hypr-de-set-wallpaper", expand(wallpaper, themedir)], check=False)
+    else:
+        subprocess.run(["lmtt", "switch", current_mode()], check=False,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    print(f"theme applied: {name}  (backup: {bdir})")
+
+
+def cmd_reset():
+    bdir = backup(LMTT_CFG)
+    clear_theme_modules()
+    if os.path.exists(LMTT_CFG):
+        lines = strip_tagged(open(LMTT_CFG).readlines())
+        write_validated(LMTT_CFG, lines)
+    if os.path.exists(RECORD):
+        os.unlink(RECORD)
+    subprocess.run(["lmtt", "switch", current_mode()], check=False,
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    print(f"theme reset  (backup: {bdir})")
+
+
+def main():
+    args = sys.argv[1:]
+    if not args:
+        die("usage: hypr-de-theme list | current | install <dir> | apply <name> | reset", 2)
+    cmd = args[0]
+    if cmd == "list":
+        cmd_list()
+    elif cmd == "current":
+        cmd_current()
+    elif cmd == "install" and len(args) == 2:
+        cmd_install(args[1])
+    elif cmd == "apply" and len(args) == 2:
+        cmd_apply(args[1])
+    elif cmd == "reset":
+        cmd_reset()
+    else:
+        die("usage: hypr-de-theme list | current | install <dir> | apply <name> | reset", 2)
+
+
+if __name__ == "__main__":
+    main()

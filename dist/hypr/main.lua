@@ -224,10 +224,12 @@ local mainMod = "SUPER"
 local meh     = "CTRL + ALT + SHIFT"
 local hyper   = "SUPER + ALT + SHIFT"
 
--- Apps / window management
-hl.bind(mainMod .. " + Q", hl.dsp.exec_cmd("uwsm app -- kitty"))
-hl.bind(mainMod .. " + C", hl.dsp.window.close())
-hl.bind(mainMod .. " + E", hl.dsp.exec_cmd("uwsm app -- thunar"))
+-- Apps / window management. Every bind carries desc = "Category: text" —
+-- the cheatsheet (SUPER+/) groups and filters on the category prefix, and
+-- hyprctl binds gains readable output. Follow the convention in local.lua.
+hl.bind(mainMod .. " + Q", hl.dsp.exec_cmd("uwsm app -- kitty"),  { desc = "Apps: Terminal" })
+hl.bind(mainMod .. " + C", hl.dsp.window.close(),                 { desc = "Windows: Close window" })
+hl.bind(mainMod .. " + E", hl.dsp.exec_cmd("uwsm app -- thunar"), { desc = "Apps: File manager" })
 hl.bind(mainMod .. " + V", function()
     -- Hyprland bug workaround: unfloating a pinned window only clears the pin
     -- (window stays floating) AND skips the window-rule re-evaluation, leaving
@@ -238,96 +240,98 @@ hl.bind(mainMod .. " + V", function()
         hl.dispatch(hl.dsp.window.pin())
     end
     hl.dispatch(hl.dsp.window.float({ action = "toggle" }))
-end)
-hl.bind(mainMod .. " + SHIFT + V", hl.dsp.window.pin())  -- toggle pin (show on all workspaces)
-hl.bind(mainMod .. " + R", hl.dsp.exec_cmd("pkill fuzzel || uwsm app -- fuzzel --config @DATADIR@/fuzzel/fuzzel.ini"))
-hl.bind(mainMod .. " + P", hl.dsp.window.pseudo())
-hl.bind(mainMod .. " + J", hl.dsp.layout("togglesplit"))
-hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen()) -- defaults: mode=fullscreen, action=toggle
+end, { desc = "Windows: Toggle floating" })
+hl.bind(mainMod .. " + SHIFT + V", hl.dsp.window.pin(),  { desc = "Windows: Pin (show on all workspaces)" })
+hl.bind(mainMod .. " + R", hl.dsp.exec_cmd("pkill fuzzel || uwsm app -- fuzzel --config @DATADIR@/fuzzel/fuzzel.ini"), { desc = "Apps: App launcher" })
+hl.bind(mainMod .. " + P", hl.dsp.window.pseudo(),       { desc = "Windows: Pseudo-tile" })
+hl.bind(mainMod .. " + J", hl.dsp.layout("togglesplit"), { desc = "Windows: Toggle split direction" })
+hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen(),   { desc = "Windows: Fullscreen" }) -- defaults: mode=fullscreen, action=toggle
 
 -- Focus movement
-hl.bind(mainMod .. " + left",  hl.dsp.focus({ direction = "left" }))
-hl.bind(mainMod .. " + right", hl.dsp.focus({ direction = "right" }))
-hl.bind(mainMod .. " + up",    hl.dsp.focus({ direction = "up" }))
-hl.bind(mainMod .. " + down",  hl.dsp.focus({ direction = "down" }))
-hl.bind(meh .. " + h", hl.dsp.focus({ direction = "left" }))
-hl.bind(meh .. " + j", hl.dsp.focus({ direction = "down" }))
-hl.bind(meh .. " + k", hl.dsp.focus({ direction = "up" }))
-hl.bind(meh .. " + l", hl.dsp.focus({ direction = "right" }))
+hl.bind(mainMod .. " + left",  hl.dsp.focus({ direction = "left" }),  { desc = "Focus: Focus left" })
+hl.bind(mainMod .. " + right", hl.dsp.focus({ direction = "right" }), { desc = "Focus: Focus right" })
+hl.bind(mainMod .. " + up",    hl.dsp.focus({ direction = "up" }),    { desc = "Focus: Focus up" })
+hl.bind(mainMod .. " + down",  hl.dsp.focus({ direction = "down" }),  { desc = "Focus: Focus down" })
+hl.bind(meh .. " + h", hl.dsp.focus({ direction = "left" }),  { desc = "Focus: Focus left (vim)" })
+hl.bind(meh .. " + j", hl.dsp.focus({ direction = "down" }),  { desc = "Focus: Focus down (vim)" })
+hl.bind(meh .. " + k", hl.dsp.focus({ direction = "up" }),    { desc = "Focus: Focus up (vim)" })
+hl.bind(meh .. " + l", hl.dsp.focus({ direction = "right" }), { desc = "Focus: Focus right (vim)" })
 
 -- Move window within layout
-hl.bind(mainMod .. " + SHIFT + left",  hl.dsp.window.move({ direction = "left" }))
-hl.bind(mainMod .. " + SHIFT + right", hl.dsp.window.move({ direction = "right" }))
-hl.bind(mainMod .. " + SHIFT + up",    hl.dsp.window.move({ direction = "up" }))
-hl.bind(mainMod .. " + SHIFT + down",  hl.dsp.window.move({ direction = "down" }))
+hl.bind(mainMod .. " + SHIFT + left",  hl.dsp.window.move({ direction = "left" }),  { desc = "Windows: Move window left" })
+hl.bind(mainMod .. " + SHIFT + right", hl.dsp.window.move({ direction = "right" }), { desc = "Windows: Move window right" })
+hl.bind(mainMod .. " + SHIFT + up",    hl.dsp.window.move({ direction = "up" }),    { desc = "Windows: Move window up" })
+hl.bind(mainMod .. " + SHIFT + down",  hl.dsp.window.move({ direction = "down" }),  { desc = "Windows: Move window down" })
 
 -- Workspace switching
 for i = 1, 9 do
-    hl.bind(mainMod .. " + " .. i, hl.dsp.focus({ workspace = i }))
+    hl.bind(mainMod .. " + " .. i, hl.dsp.focus({ workspace = i }), { desc = "Workspaces: Go to workspace " .. i })
 end
-hl.bind(mainMod .. " + 0", hl.dsp.workspace.toggle_special("magic"))
+hl.bind(mainMod .. " + 0", hl.dsp.workspace.toggle_special("magic"), { desc = "Workspaces: Toggle scratchpad" })
 
 -- Move active window to workspace
 for i = 1, 9 do
-    hl.bind(mainMod .. " + SHIFT + " .. i, hl.dsp.window.move({ workspace = i }))
+    hl.bind(mainMod .. " + SHIFT + " .. i, hl.dsp.window.move({ workspace = i }), { desc = "Workspaces: Move window to workspace " .. i })
 end
-hl.bind(mainMod .. " + SHIFT + 0", hl.dsp.window.move({ workspace = 10 }))
+hl.bind(mainMod .. " + SHIFT + 0", hl.dsp.window.move({ workspace = 10 }), { desc = "Workspaces: Move window to workspace 10" })
 
 -- Special "magic" scratchpad
-hl.bind(mainMod .. " + S",         hl.dsp.workspace.toggle_special("magic"))
-hl.bind(mainMod .. " + SHIFT + S", hl.dsp.window.move({ workspace = "special:magic" }))
+hl.bind(mainMod .. " + S",         hl.dsp.workspace.toggle_special("magic"),          { desc = "Workspaces: Toggle scratchpad" })
+hl.bind(mainMod .. " + SHIFT + S", hl.dsp.window.move({ workspace = "special:magic" }), { desc = "Workspaces: Move window to scratchpad" })
 
 -- workspace-zones plugin: first-party Lua functions (hl.plugin.zones.*),
 -- registered by the plugin via addLuaFunction. Closures resolve at keypress
 -- time, so plugin load order doesn't matter; if the plugin is missing the
 -- press logs a Lua error instead of silently doing nothing.
-hl.bind("SUPER + ALT + S",        function() hl.plugin.zones.toggle() end)
-hl.bind(hyper .. " + S",          function() hl.plugin.zones.move() end)
-hl.bind("SUPER + CTRL + ALT + S", function() hl.plugin.zones.movesilent() end)
+hl.bind("SUPER + ALT + S",        function() hl.plugin.zones.toggle() end,     { desc = "Workspaces: Toggle zone" })
+hl.bind(hyper .. " + S",          function() hl.plugin.zones.move() end,       { desc = "Workspaces: Move window to zone" })
+hl.bind("SUPER + CTRL + ALT + S", function() hl.plugin.zones.movesilent() end, { desc = "Workspaces: Move window to zone (silent)" })
 
 -- Move current workspace between monitors (relative monitor selectors)
-hl.bind(mainMod .. " + SHIFT + minus", hl.dsp.workspace.move({ monitor = "-1" }))
-hl.bind(mainMod .. " + SHIFT + equal", hl.dsp.workspace.move({ monitor = "+1" }))
+hl.bind(mainMod .. " + SHIFT + minus", hl.dsp.workspace.move({ monitor = "-1" }), { desc = "Workspaces: Move workspace to previous monitor" })
+hl.bind(mainMod .. " + SHIFT + equal", hl.dsp.workspace.move({ monitor = "+1" }), { desc = "Workspaces: Move workspace to next monitor" })
 
 -- Scroll through workspaces
-hl.bind(mainMod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }))
-hl.bind(mainMod .. " + mouse_up",   hl.dsp.focus({ workspace = "e-1" }))
+hl.bind(mainMod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }), { desc = "Workspaces: Next workspace (scroll)" })
+hl.bind(mainMod .. " + mouse_up",   hl.dsp.focus({ workspace = "e-1" }), { desc = "Workspaces: Previous workspace (scroll)" })
 
 -- Screenshots
-hl.bind("Print",         hl.dsp.exec_cmd("@BINDIR@/hypr-de-snip"))
-hl.bind("SHIFT + Print", hl.dsp.exec_cmd("@BINDIR@/hypr-de-record"))
+hl.bind("Print",         hl.dsp.exec_cmd("@BINDIR@/hypr-de-snip"),   { desc = "Screenshots: Region screenshot + annotate" })
+hl.bind("SHIFT + Print", hl.dsp.exec_cmd("@BINDIR@/hypr-de-record"), { desc = "Screenshots: Screen recording" })
 
 -- Utilities
-hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("hyprlock -c @DATADIR@/hypr/hyprlock-base.conf"))
-hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("@LIBEXECDIR@/power-menu.sh"))
-hl.bind(mainMod .. " + T", hl.dsp.exec_cmd("lmtt switch"))
-hl.bind(mainMod .. " + N", hl.dsp.exec_cmd("swaync-client -t -sw"))
-hl.bind(mainMod .. " + D", hl.dsp.exec_cmd([[wl-copy --clear && notify-send -t 2000 "Clipboard cleared" "Ready for drag-and-drop"]]))
-hl.bind(meh .. " + v", hl.dsp.exec_cmd("voice-dictation toggle"))
+hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("hyprlock -c @DATADIR@/hypr/hyprlock-base.conf"), { desc = "System: Lock screen" })
+hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("@LIBEXECDIR@/power-menu.sh"), { desc = "System: Power menu" })
+hl.bind(mainMod .. " + T", hl.dsp.exec_cmd("lmtt switch"),                { desc = "System: Toggle light/dark theme" })
+hl.bind(mainMod .. " + N", hl.dsp.exec_cmd("swaync-client -t -sw"),       { desc = "System: Notification center" })
+hl.bind(mainMod .. " + slash",         hl.dsp.exec_cmd("@LIBEXECDIR@/hypr-de-cheatsheet"), { desc = "Help: Show keybinds" })
+hl.bind(mainMod .. " + SHIFT + slash", hl.dsp.exec_cmd("@LIBEXECDIR@/hypr-de-cheatsheet"), { desc = "Help: Show keybinds" })
+hl.bind(mainMod .. " + D", hl.dsp.exec_cmd([[wl-copy --clear && notify-send -t 2000 "Clipboard cleared" "Ready for drag-and-drop"]]), { desc = "System: Clear clipboard (drag-and-drop prep)" })
+hl.bind(meh .. " + v", hl.dsp.exec_cmd("voice-dictation toggle"), { desc = "System: Voice dictation" })
 
 -- Cycle windows (floating), then raise (two dispatchers -> Lua fn calling both)
 hl.bind("ALT + Tab", function()
     hl.dispatch(hl.dsp.window.cycle_next())
     hl.dispatch(hl.dsp.window.bring_to_top())
-end)
-hl.bind("SHIFT + XF86AudioPlay", hl.dsp.exec_cmd("hyprpwcenter"))
+end, { desc = "Windows: Cycle floating windows" })
+hl.bind("SHIFT + XF86AudioPlay", hl.dsp.exec_cmd("hyprpwcenter"), { desc = "System: Audio patchbay" })
 
 -- Media / brightness (locked = active on lockscreen)
-hl.bind("XF86AudioPlay", hl.dsp.exec_cmd("@LIBEXECDIR@/osd/media-osd.sh play-pause"), { locked = true })
-hl.bind("XF86AudioStop", hl.dsp.exec_cmd("@LIBEXECDIR@/osd/media-osd.sh stop"),        { locked = true })
-hl.bind("XF86AudioMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"),                 { locked = true })
-hl.bind("XF86AudioNext", hl.dsp.exec_cmd("@LIBEXECDIR@/osd/media-osd.sh next"),        { locked = true })
-hl.bind("XF86AudioPrev", hl.dsp.exec_cmd("@LIBEXECDIR@/osd/media-osd.sh previous"),    { locked = true })
+hl.bind("XF86AudioPlay", hl.dsp.exec_cmd("@LIBEXECDIR@/osd/media-osd.sh play-pause"), { locked = true, desc = "Media: Play/pause" })
+hl.bind("XF86AudioStop", hl.dsp.exec_cmd("@LIBEXECDIR@/osd/media-osd.sh stop"),        { locked = true, desc = "Media: Stop" })
+hl.bind("XF86AudioMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"),                 { locked = true, desc = "Media: Mute" })
+hl.bind("XF86AudioNext", hl.dsp.exec_cmd("@LIBEXECDIR@/osd/media-osd.sh next"),        { locked = true, desc = "Media: Next track" })
+hl.bind("XF86AudioPrev", hl.dsp.exec_cmd("@LIBEXECDIR@/osd/media-osd.sh previous"),    { locked = true, desc = "Media: Previous track" })
 
 -- Volume / brightness (locked + repeating)
-hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-volume -l 1.5 @DEFAULT_AUDIO_SINK@ 1%+"), { locked = true, repeating = true })
-hl.bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("wpctl set-volume -l 1.5 @DEFAULT_AUDIO_SINK@ 1%-"), { locked = true, repeating = true })
-hl.bind("XF86MonBrightnessUp",   hl.dsp.exec_cmd("@LIBEXECDIR@/osd/brightness-osd.sh up"),   { locked = true, repeating = true })
-hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("@LIBEXECDIR@/osd/brightness-osd.sh down"), { locked = true, repeating = true })
+hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-volume -l 1.5 @DEFAULT_AUDIO_SINK@ 1%+"), { locked = true, repeating = true, desc = "Media: Volume up" })
+hl.bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("wpctl set-volume -l 1.5 @DEFAULT_AUDIO_SINK@ 1%-"), { locked = true, repeating = true, desc = "Media: Volume down" })
+hl.bind("XF86MonBrightnessUp",   hl.dsp.exec_cmd("@LIBEXECDIR@/osd/brightness-osd.sh up"),   { locked = true, repeating = true, desc = "Media: Brightness up" })
+hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("@LIBEXECDIR@/osd/brightness-osd.sh down"), { locked = true, repeating = true, desc = "Media: Brightness down" })
 
 -- Mouse move/resize
-hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(),   { mouse = true })
-hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
+hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(),   { mouse = true, desc = "Windows: Drag window (mouse)" })
+hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true, desc = "Windows: Resize window (mouse)" })
 
 ----------------------------------------------------------------------
 -- WINDOW / WORKSPACE RULES ------------------------------------------
@@ -369,4 +373,5 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("dbus-update-activation-environment --all")
     hl.exec_cmd("sleep 1 & dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP")
     hl.exec_cmd("lmtt switch dark")
+    hl.exec_cmd("@LIBEXECDIR@/hypr-de-welcome")  -- one-time greeting; marker-gated
 end)

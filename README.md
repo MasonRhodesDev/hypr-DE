@@ -14,7 +14,10 @@ wallpaper, and whatever you choose to override.
 > **Compositor caveat:** hypr-DE's configuration uses Hyprland's Lua config
 > API, which is newer than what distro packages currently ship. Until a
 > Lua-capable `hyprland` package is published here, you need a Hyprland
-> build from recent `main`. This is the gate for hypr-DE 1.0.
+> build from recent `main`. This is the gate for hypr-DE 1.0. (The Lua
+> config is being adopted across the ecosystem — end_4's illogical-impulse
+> already requires Hyprland ≥ 0.55 — so a stable upstream release may close
+> this gap before a bespoke package does.)
 
 ## Install
 
@@ -49,6 +52,45 @@ hypr-de-setup          # seeds the entry stub, presets user units, primes themin
 ```
 
 Log out and pick the **hypr-DE** session at your greeter.
+
+## Keybinds
+
+Press **SUPER + /** for a searchable cheatsheet of every bind (grouped by
+category — type a category word like `Windows` or `Media` to filter). The
+list is generated live from the compositor, so binds you add in
+`~/.config/hypr/local.lua` appear too; give them a
+`{ desc = "Category: text" }` option to label them (undescribed binds show
+as `(custom)`).
+
+## Themes
+
+A hypr-DE theme is a directory: `theme.toml` (metadata + a subset of
+[lmtt](https://github.com/MasonRhodesDev/linux-multi-theme-toggle)'s config —
+wallpaper, matugen scheme type, pinned palettes, accent pins, GTK/cursor/font
+knobs) plus optional wallpaper, palette JSONs, and lmtt template modules. The
+shipped `gradient` theme (`/usr/share/hypr-de/themes/gradient/`) is a
+commented reference for authors.
+
+```bash
+hypr-de-theme list                 # shipped + installed themes
+hypr-de-theme apply gradient       # apply (backs up lmtt config first)
+hypr-de-theme install ./my-theme   # copy into ~/.local/share/hypr-de/themes
+hypr-de-theme reset                # remove all theme edits, restore your values
+```
+
+Applying merges the theme's knobs into `~/.config/lmtt/config.toml` as
+individually tagged lines (`# hypr-de-theme`); your own edits and comments
+are preserved, replaced values are recorded in the tag and restored by
+`reset`, and a timestamped backup lands in `~/.config/hypr-de/` either way.
+
+## Pre-update snapshots (recommended)
+
+On Fedora with btrfs, `dnf install snapper python3-dnf-plugin-snapper` and
+`sudo snapper create-config /` make every dnf transaction — including hypr-DE
+updates — automatically snapshotted and rollback-able. On Arch, `snap-pac`
+provides the same for pacman (or use Timeshift). hypr-DE deliberately ships
+no bespoke updater: updates arrive through the package manager, so your
+existing snapshot/rollback tooling covers them.
 
 ## Customizing
 

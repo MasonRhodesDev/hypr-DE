@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.1.4
+Version:        0.2.0
 Release:        1%{?dist}
 Summary:        Opinionated Hyprland desktop environment
 
@@ -129,6 +129,7 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_bindir}/hypr-de-set-wallpaper
 %{_bindir}/hypr-de-snip
 %{_bindir}/hypr-de-record
+%{_bindir}/hypr-de-theme
 %{_libexecdir}/hypr-de/
 %exclude %{_libexecdir}/hypr-de/bp-game-focus.py
 %exclude %{_libexecdir}/hypr-de/steam-clean-shutdown.sh
@@ -158,6 +159,13 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Tue Aug 04 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.0-1
+- Keybind cheatsheet (SUPER+slash) with descriptions on every bind
+- First-login welcome notification (hypr-de-welcome)
+- Waybar updates module highlights pending hypr-DE releases
+- hypr-de-theme: install/apply/reset themes (tagged lmtt config merge); gradient example
+- hypr-de-set-wallpaper now syncs lmtt palette extraction (wallpaper changes retheme)
+
 * Tue Aug 04 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.1.4-1
 - Require hyprpwcenter (bound to SHIFT+XF86AudioPlay)
 
