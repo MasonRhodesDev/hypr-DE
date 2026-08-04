@@ -26,7 +26,7 @@ _depends_main=(
 _depends_gaming=(python)
 
 build() {
-  cd "hypr-DE-$pkgver"
+  cd "$srcdir"; cd "hypr-DE-$pkgver" 2>/dev/null || cd "$pkgbase-$pkgver"  # GH tarball vs CI snapshot prefix
   cp -a dist dist-build
   LIBEXECDIR=/usr/lib/hypr-de \
   WAYBAR_CFFI=/usr/lib/waybar/workspace_buttons.so \
@@ -39,7 +39,7 @@ package_hypr-de() {
               'thunar: file manager bound to SUPER+E')
   install=hypr-de.install
 
-  cd "hypr-DE-$pkgver"
+  cd "$srcdir"; cd "hypr-DE-$pkgver" 2>/dev/null || cd "$pkgbase-$pkgver"  # GH tarball vs CI snapshot prefix
   LIBEXECDIR=/usr/lib/hypr-de \
     ./packaging/install.sh dist-build "$pkgdir" main
   # lmtt modules under the generic system module dir
@@ -53,7 +53,7 @@ package_hypr-de-gaming() {
   depends=('hypr-de' "${_depends_gaming[@]}")
   optdepends=('steam' 'gamemode')
 
-  cd "hypr-DE-$pkgver"
+  cd "$srcdir"; cd "hypr-DE-$pkgver" 2>/dev/null || cd "$pkgbase-$pkgver"  # GH tarball vs CI snapshot prefix
   LIBEXECDIR=/usr/lib/hypr-de \
     ./packaging/install.sh dist-build "$pkgdir" gaming
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/hypr-de-gaming/LICENSE"
