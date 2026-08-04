@@ -50,9 +50,9 @@ fedora = ["socat", "playerctl", "brightnessctl", "jq", "/usr/bin/notify-send", "
 arch = ["socat", "playerctl", "brightnessctl", "jq", "libnotify", "python", "python-dbus", "python-gobject"]
 
 [audio]
-reason = "wpctl binds + volume-osd + waybar pulseaudio module + pavucontrol on-click"
-fedora = ["wireplumber", "pavucontrol"]
-arch = ["wireplumber", "pavucontrol"]
+reason = "wpctl binds + volume-osd + waybar pulseaudio module + pavucontrol on-click; hyprpwcenter bound to SHIFT+XF86AudioPlay"
+fedora = ["wireplumber", "pavucontrol", "hyprpwcenter"]
+arch = ["wireplumber", "pavucontrol", "hyprpwcenter"]
 
 [theming]
 reason = "lmtt renders all styles (SUPER+T, autostart); matugen palette extraction; hyprstate monitor profiles/power; voice-dictation bind; logind-idle-control"

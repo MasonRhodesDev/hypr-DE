@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.1.3
+Version:        0.1.4
 Release:        1%{?dist}
 Summary:        Opinionated Hyprland desktop environment
 
@@ -28,6 +28,7 @@ Requires:       hyprland-voice-dictation
 Requires:       hyprlock
 Requires:       hyprpicker
 Requires:       hyprpolkitagent
+Requires:       hyprpwcenter
 Requires:       hyprstate
 Requires:       jetbrains-mono-fonts
 Requires:       jq
@@ -157,6 +158,9 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Tue Aug 04 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.1.4-1
+- Require hyprpwcenter (bound to SHIFT+XF86AudioPlay)
+
 * Tue Aug 04 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.1.3-1
 - hypridle drop-in + hyprlock -c against packaged configs; xdph.conf seeding;
   waybar restart drop-in no longer overrides ExecStart
