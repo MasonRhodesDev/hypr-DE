@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.1.0
+Version:        0.1.1
 Release:        1%{?dist}
 Summary:        Opinionated Hyprland desktop environment
 
@@ -157,5 +157,8 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Tue Aug 04 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.1.1-1
+- hypr-de-setup bootstraps rendered stylesheets from templates (pre-lmtt-patch safety)
+
 * Tue Aug 04 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.1.0-1
 - Initial package: DE extracted from personal dotfiles

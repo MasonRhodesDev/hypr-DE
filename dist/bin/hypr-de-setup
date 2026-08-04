@@ -56,6 +56,18 @@ if systemctl --user is-enabled default.target >/dev/null 2>&1 || [ -n "${DBUS_SE
     say "DE user units preset"
 fi
 
+# Bootstrap the rendered stylesheets waybar/swaync launch against. The
+# packaged .hbs templates are valid CSS (handlebars tokens only appear in
+# comments), so a plain copy keeps first launch styled even before lmtt
+# (with system-module support) has rendered them properly. lmtt overwrites
+# these on the next `lmtt switch`.
+for t in waybar swaync; do
+    if [ ! -e "$CONFIG/hypr-de/$t.css" ]; then
+        cp "$DATADIR/lmtt/templates/$t.css.hbs" "$CONFIG/hypr-de/$t.css"
+        say "$t.css bootstrapped from template"
+    fi
+done
+
 # Prime themed styles so first launch isn't unstyled
 if command -v lmtt >/dev/null 2>&1; then
     lmtt switch dark >/dev/null 2>&1 || true
