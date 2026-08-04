@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.1.2
+Version:        0.1.3
 Release:        1%{?dist}
 Summary:        Opinionated Hyprland desktop environment
 
@@ -157,6 +157,10 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Tue Aug 04 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.1.3-1
+- hypridle drop-in + hyprlock -c against packaged configs; xdph.conf seeding;
+  waybar restart drop-in no longer overrides ExecStart
+
 * Tue Aug 04 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.1.2-1
 - gpu-screen-recorder becomes a weak dep on Fedora (no repo package exists yet)
 

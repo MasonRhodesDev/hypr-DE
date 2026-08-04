@@ -37,6 +37,13 @@ else
     say "hyprland.lua stub in place"
 fi
 
+# Screen-share portal config: xdph only reads ~/.config/hypr/xdph.conf and
+# hyprlang `source=` support there is unverified, so seed a copy (not a stub).
+if [ ! -e "$CONFIG/hypr/xdph.conf" ]; then
+    cp "$DATADIR/hypr/xdph.conf" "$CONFIG/hypr/xdph.conf"
+    say "xdph.conf seeded"
+fi
+
 # Wallpaper fallback (hyprlock sources this; never allowed to dangle)
 if [ ! -e "$CONFIG/hypr-de/wallpaper.conf" ]; then
     printf '$WALLPAPER = %s\n' "$DATADIR/wallpapers/default.png" > "$CONFIG/hypr-de/wallpaper.conf"

@@ -4,7 +4,7 @@
 # (packaging/gen-deps.sh check) gates drift against these arrays.
 pkgbase=hypr-de
 pkgname=('hypr-de' 'hypr-de-gaming')
-pkgver=0.1.2
+pkgver=0.1.3
 pkgrel=1
 pkgdesc="Opinionated Hyprland desktop environment"
 arch=('any')

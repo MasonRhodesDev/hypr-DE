@@ -298,7 +298,7 @@ hl.bind("Print",         hl.dsp.exec_cmd("@BINDIR@/hypr-de-snip"))
 hl.bind("SHIFT + Print", hl.dsp.exec_cmd("@BINDIR@/hypr-de-record"))
 
 -- Utilities
-hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("hyprlock"))
+hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("hyprlock -c @DATADIR@/hypr/hyprlock-base.conf"))
 hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("@LIBEXECDIR@/power-menu.sh"))
 hl.bind(mainMod .. " + T", hl.dsp.exec_cmd("lmtt switch"))
 hl.bind(mainMod .. " + N", hl.dsp.exec_cmd("swaync-client -t -sw"))
