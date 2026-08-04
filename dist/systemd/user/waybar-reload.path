@@ -1,0 +1,8 @@
+[Unit]
+Description=Watch Waybar files for changes
+
+[Path]
+PathModified=%h/.config/hypr-de/waybar.css
+
+[Install]
+WantedBy=default.target

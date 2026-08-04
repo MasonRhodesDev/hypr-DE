@@ -1,0 +1,6 @@
+[Unit]
+Description=Repoint systemd user env at a live Wayland socket
+
+[Service]
+Type=oneshot
+ExecStart=@LIBEXECDIR@/wayland-env-guard

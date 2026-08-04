@@ -1,0 +1,65 @@
+#!/bin/bash
+# hypr-DE per-user setup. Idempotent: seeds the minimal user-side files the
+# packaged DE needs, enables the DE user units, and primes the themed styles.
+# Everything else is package-owned — this script deliberately seeds only:
+#   ~/.config/hypr/hyprland.lua          (3-line entry stub, stable forever)
+#   ~/.config/hypr-de/wallpaper.conf     (hyprlock $WALLPAPER, default fallback)
+#   ~/.config/hypr/profiles/             (empty dir; hyprstate fills it)
+#
+# --adopt: overwrite an existing hyprland.lua with the stub, backing the old
+# file up to ~/.config/hypr-de/backup-<date>/.
+set -euo pipefail
+
+CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}"
+DATADIR="@DATADIR@"
+ADOPT=0
+[ "${1:-}" = "--adopt" ] && ADOPT=1
+
+say() { printf '== %s\n' "$*"; }
+
+mkdir -p "$CONFIG/hypr/profiles" "$CONFIG/hypr-de"
+
+# Entry stub
+STUB_SRC="$DATADIR/hypr/hyprland.lua.stub"
+STUB_DST="$CONFIG/hypr/hyprland.lua"
+if [ -e "$STUB_DST" ] && ! cmp -s "$STUB_SRC" "$STUB_DST"; then
+    if [ "$ADOPT" = 1 ]; then
+        BK="$CONFIG/hypr-de/backup-$(date +%Y%m%d-%H%M%S)"
+        mkdir -p "$BK"
+        cp -a "$STUB_DST" "$BK/hyprland.lua"
+        cp "$STUB_SRC" "$STUB_DST"
+        say "hyprland.lua replaced with stub (old file: $BK/hyprland.lua)"
+    else
+        say "hyprland.lua exists and differs from the stub — leaving it alone (use --adopt to replace with backup)"
+    fi
+else
+    cp "$STUB_SRC" "$STUB_DST"
+    say "hyprland.lua stub in place"
+fi
+
+# Wallpaper fallback (hyprlock sources this; never allowed to dangle)
+if [ ! -e "$CONFIG/hypr-de/wallpaper.conf" ]; then
+    printf '$WALLPAPER = %s\n' "$DATADIR/wallpapers/default.png" > "$CONFIG/hypr-de/wallpaper.conf"
+    say "wallpaper.conf seeded with default wallpaper"
+fi
+
+# DE user units (covers Arch and pre-existing users; preset files handle new
+# Fedora users via %systemd_user_post)
+if systemctl --user is-enabled default.target >/dev/null 2>&1 || [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
+    systemctl --user daemon-reload || true
+    systemctl --user preset \
+        hypridle.service hyprpolkitagent.service swaync.service waybar.service \
+        swaybg.service waybar-reload.path waybar-watchdog.timer \
+        wayland-env-guard.path wayland-env-guard.timer \
+        hyprland-configreload-listener.service notification-focus-proxy.service \
+        udiskie.service 2>/dev/null || true
+    say "DE user units preset"
+fi
+
+# Prime themed styles so first launch isn't unstyled
+if command -v lmtt >/dev/null 2>&1; then
+    lmtt switch dark >/dev/null 2>&1 || true
+    say "lmtt theme primed"
+fi
+
+say "hypr-DE setup complete. Log into the hypr-DE session (or hyprctl reload)."

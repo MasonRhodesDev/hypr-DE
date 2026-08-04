@@ -1,0 +1,25 @@
+#!/bin/bash
+# Set the hypr-DE wallpaper. Single owner of both wallpaper consumers:
+#   ~/.config/hypr-de/wallpaper.conf          ($WALLPAPER for hyprlock)
+#   ~/.config/environment.d/wallpaper.conf    (WALLPAPER_PATH for swaybg.service)
+# then applies live (systemd user env + swaybg restart).
+set -euo pipefail
+
+usage() { echo "usage: hypr-de-set-wallpaper <image-path>" >&2; exit 2; }
+[ $# -eq 1 ] || usage
+
+WP=$(readlink -f "$1")
+[ -r "$WP" ] || { echo "hypr-de-set-wallpaper: cannot read $WP" >&2; exit 1; }
+
+CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}"
+mkdir -p "$CONFIG/hypr-de" "$CONFIG/environment.d"
+
+printf '$WALLPAPER = %s\n' "$WP" > "$CONFIG/hypr-de/wallpaper.conf"
+printf 'WALLPAPER_PATH=%s\n' "$WP" > "$CONFIG/environment.d/wallpaper.conf"
+
+if [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ] || [ -n "${XDG_RUNTIME_DIR:-}" ]; then
+    systemctl --user set-environment "WALLPAPER_PATH=$WP" 2>/dev/null || true
+    systemctl --user try-restart swaybg.service 2>/dev/null || true
+fi
+
+echo "Wallpaper set: $WP (lockscreen picks it up on next lock)"

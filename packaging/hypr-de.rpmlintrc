@@ -1,0 +1,8 @@
+# hypr-de rpmlint filters — domain-term noise only; real errors must gate.
+# noarch package shipping only configs/scripts/units.
+addFilter(r'spelling-error .* (hypr|Hyprland|hyprland|waybar|swaync|fuzzel|lmtt|uwsm|hyprstate|hyprlock|hypridle|dwindle|scratchpad|compositor|wayland|Wayland|lockscreen|systemd|dofile|Lua|lua)')
+addFilter(r'no-manual-page-for-binary')
+# Session env files are intentionally %config(noreplace) under /etc/xdg
+addFilter(r'non-etc-or-var-file-marked-as-conffile')
+# skel ships a dotfile by design
+addFilter(r'hidden-file-or-dir .*/etc/skel/\.config')

@@ -1,0 +1,75 @@
+# Declarative runtime-dependency manifest. THE source of truth for package
+# dependencies: packaging/gen-deps.sh renders these into the spec and PKGBUILD
+# and CI fails when they drift. Every entry names the component that needs it
+# so deps can be dropped when their component goes.
+
+[compositor]
+reason = "the compositor itself (NOTE: needs Lua-config-capable build; stock packages are pre-Lua — see README caveat)"
+fedora = ["hyprland"]
+arch = ["hyprland"]
+
+[lock-idle]
+reason = "hyprlock (lock_cmd, SUPER+L), hypridle (idle policy in hypr/hypridle.conf)"
+fedora = ["hyprlock", "hypridle"]
+arch = ["hyprlock", "hypridle"]
+
+[bar]
+reason = "waybar + CFFI workspace buttons module (waybar/config.jsonc)"
+fedora = ["waybar", "waybar-workspace-buttons"]
+arch = ["waybar", "waybar-workspace-buttons"]
+
+[notifications]
+reason = "swaync daemon (swaync/config.json, recovery framework, waybar module)"
+fedora = ["SwayNotificationCenter"]
+arch = ["swaync"]
+
+[launcher]
+reason = "fuzzel (SUPER+R bind, power-menu.sh dmenu backend, networkmanager-dmenu)"
+fedora = ["fuzzel"]
+arch = ["fuzzel"]
+
+[portal-polkit]
+reason = "screen sharing portal (hypr/xdph.conf) + polkit agent (preset unit)"
+fedora = ["xdg-desktop-portal-hyprland", "hyprpolkitagent"]
+arch = ["xdg-desktop-portal-hyprland", "hyprpolkitagent"]
+
+[session]
+reason = "uwsm session management (wayland-sessions entry, uwsm env files) + swaybg wallpaper unit"
+fedora = ["uwsm", "swaybg"]
+arch = ["uwsm", "swaybg"]
+
+[screenshot]
+reason = "hypr-de-snip/record: grim, slurp, swappy annotation, hyprpicker freeze, wl-clipboard, gpu-screen-recorder"
+fedora = ["grim", "slurp", "swappy", "hyprpicker", "wl-clipboard", "gpu-screen-recorder"]
+arch = ["grim", "slurp", "swappy", "hyprpicker", "wl-clipboard", "gpu-screen-recorder"]
+
+[script-runtime]
+reason = "socat (configreload-listener), playerctl (media-osd, waybar media), brightnessctl (brightness-osd), jq (swaync focus-sender, snip), libnotify (OSD notify-send), python3+dbus+gobject (notification-focus-proxy, waybar-mediaplayer)"
+fedora = ["socat", "playerctl", "brightnessctl", "jq", "libnotify", "python3", "python3-dbus", "python3-gobject"]
+arch = ["socat", "playerctl", "brightnessctl", "jq", "libnotify", "python", "python-dbus", "python-gobject"]
+
+[audio]
+reason = "wpctl binds + volume-osd + waybar pulseaudio module + pavucontrol on-click"
+fedora = ["wireplumber", "pavucontrol"]
+arch = ["wireplumber", "pavucontrol"]
+
+[theming]
+reason = "lmtt renders all styles (SUPER+T, autostart); matugen palette extraction; hyprstate monitor profiles/power; voice-dictation bind; logind-idle-control"
+fedora = ["lmtt", "matugen", "hyprstate", "hyprland-voice-dictation", "logind-idle-control"]
+arch = ["lmtt", "matugen", "hyprstate", "hyprland-voice-dictation", "logind-idle-control"]
+
+[desktop-misc]
+reason = "udiskie automount (preset unit), kitty (SUPER+Q terminal, updates-check), thunar (SUPER+E), networkmanager-dmenu backend is a shipped script"
+fedora = ["udiskie", "kitty", "network-manager-applet"]
+arch = ["udiskie", "kitty", "network-manager-applet"]
+
+[fonts]
+reason = "waybar/swaync stylesheets (JetBrainsMono Nerd Font, Symbols Nerd Font), hyprlock labels (Noto Sans)"
+fedora = ["jetbrains-mono-fonts", "google-noto-sans-fonts", "fira-code-fonts"]
+arch = ["ttf-jetbrains-mono-nerd", "noto-fonts", "ttf-firacode-nerd"]
+
+[gaming]
+reason = "hypr-de-gaming subpackage: bp-game-focus (hyprland socket events), steam scope cleanup"
+subpackage = "gaming"
+fedora = ["python3"]
+arch = ["python"]

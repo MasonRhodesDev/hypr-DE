@@ -1,0 +1,19 @@
+# Shipped by hypr-de (installed under /usr/share/lmtt/modules/). Requires
+# lmtt with [template] path support + system module search path. Override by
+# creating ~/.config/lmtt/modules/hypr-de-swaync.toml (same filename wins).
+# The palette import inside the rendered file comes from lmtt's built-in
+# swaync module (~/.config/swaync/lmtt-colors.css) which computes the derived
+# hover/darker shades handlebars can't.
+name = "hypr-de-swaync"
+description = "hypr-DE swaync stylesheet (rendered from packaged template)"
+priority = 110
+
+[output]
+path = "~/.config/hypr-de/swaync.css"
+
+[template]
+path = "@DATADIR@/lmtt/templates/swaync.css.hbs"
+
+[reload]
+command = "swaync-client --reload-css || true"
+timeout = 5000

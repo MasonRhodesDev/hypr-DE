@@ -1,0 +1,14 @@
+post_install() {
+    cat <<'EOF'
+==> hypr-DE installed. Per user, run:
+      hypr-de-setup          # seeds the entry stub, presets DE user units,
+                             # primes the lmtt theme
+    then pick the "hypr-DE" session at your greeter.
+    Overrides: ~/.config/hypr/local.lua, ~/.config/lmtt/modules/, systemd
+    user drop-ins. See /usr/share/hypr-de/hypr/local.lua.example.
+EOF
+}
+
+post_upgrade() {
+    :
+}

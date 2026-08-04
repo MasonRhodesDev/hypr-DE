@@ -1,0 +1,16 @@
+# Shipped by hypr-de (installed under /usr/share/lmtt/modules/). Requires
+# lmtt with [template] path support + system module search path. Override by
+# creating ~/.config/lmtt/modules/hypr-de-waybar.toml (same filename wins).
+name = "hypr-de-waybar"
+description = "hypr-DE waybar stylesheet (rendered from packaged template)"
+priority = 110
+
+[output]
+path = "~/.config/hypr-de/waybar.css"
+
+[template]
+path = "@DATADIR@/lmtt/templates/waybar.css.hbs"
+
+[reload]
+command = "pkill -SIGUSR2 waybar || true"
+timeout = 5000

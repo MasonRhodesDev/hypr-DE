@@ -1,0 +1,35 @@
+#!/bin/bash
+# waybar updates module backend: counts pending updates, or runs the upgrade
+# in a terminal. Detects the package manager at runtime so one packaged config
+# serves Fedora and Arch.
+set -u
+
+TERM_CMD="${TERMINAL:-kitty}"
+
+count() {
+    if command -v dnf >/dev/null 2>&1; then
+        timeout 30 sh -c 'dnf list --upgradable 2>/dev/null | tail -n +2 | wc -l'
+    elif command -v yay >/dev/null 2>&1; then
+        timeout 30 sh -c 'yay -Qu 2>/dev/null | wc -l'
+    elif command -v checkupdates >/dev/null 2>&1; then
+        timeout 30 sh -c 'checkupdates 2>/dev/null | wc -l'
+    else
+        echo 0
+    fi
+}
+
+upgrade() {
+    if command -v dnf >/dev/null 2>&1; then
+        exec "$TERM_CMD" sh -c 'sudo dnf upgrade; echo "Done - Press enter to exit"; read'
+    elif command -v yay >/dev/null 2>&1; then
+        exec "$TERM_CMD" sh -c 'yay -Syu; echo "Done - Press enter to exit"; read'
+    else
+        exec "$TERM_CMD" sh -c 'sudo pacman -Syu; echo "Done - Press enter to exit"; read'
+    fi
+}
+
+case "${1:-count}" in
+    count)   count ;;
+    upgrade) upgrade ;;
+    *) echo "usage: $0 {count|upgrade}" >&2; exit 2 ;;
+esac

@@ -1,0 +1,25 @@
+-- hypr-DE user overrides — copy to ~/.config/hypr/local.lua and edit.
+-- Runs after @DATADIR@/hypr/main.lua; anything you set here wins (last-wins).
+--
+-- EXCEPTION — monitors: layouts belong in ~/.config/hypr/profiles/*.lua
+-- (hyprstate picks the profile matching the connected outputs; `hyprstate
+-- profile save` captures the current layout). Monitor rules here would
+-- override both the active profile and hyprstate's lid/dock handling.
+
+-- Autostart your daily apps (examples):
+-- hl.on("hyprland.start", function()
+--     hl.exec_cmd("uwsm app -- slack")
+--     hl.exec_cmd("uwsm app -- discord")
+--     hl.exec_cmd("uwsm app -- steam -cef-force-glx")
+-- end)
+
+-- Gaming rules (hypr-de-gaming package): routes games to a chrome-less
+-- workspace 7 with idle inhibit. Opt in with:
+-- dofile("@DATADIR@/gaming/game-rules.lua")
+
+-- Extra window rules (examples):
+-- hl.window_rule({ name = "keep-tile", match = { title = "^(keep.google.com_/)$" }, tile = true })
+-- hl.window_rule({ name = "android-emulator", match = { class = "^(Emulator)$" }, float = true })
+
+-- Rebind or add keys (same bind API as main.lua):
+-- hl.bind("SUPER + B", hl.dsp.exec_cmd("uwsm app -- firefox"))

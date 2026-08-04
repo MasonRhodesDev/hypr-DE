@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: |
+          sudo apt-get install -y shellcheck
+          shellcheck packaging/*.sh dist/bin/hypr-de-* dist/libexec/*.sh dist/libexec/osd/*.sh dist/libexec/waybar-updates-check
+      - name: no literal install paths in dist sources
+        run: |
+          ! grep -rn "/usr/share/hypr-de\|/usr/libexec/hypr-de\|/usr/lib/hypr-de" dist/ \
+            || { echo "dist/ must use @TOKENS@ (see packaging/paths.conf)"; exit 1; }
+      - name: deps.toml in sync with spec + PKGBUILD
+        run: ./packaging/gen-deps.sh check
