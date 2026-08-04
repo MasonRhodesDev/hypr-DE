@@ -33,9 +33,9 @@ check() {
     for part in main gaming; do
         want=$(deps fedora "$part")
         if [ "$part" = main ]; then
-            have=$(awk '/^%package gaming/{exit} /^Requires:/{print $2}' "$SPEC" | sort -u)
+            have=$(awk '/^%package gaming/{exit} /^Requires:/{print $2}' "$SPEC" | LC_ALL=C sort -u)
         else
-            have=$(awk '/^%package gaming/{g=1} g&&/^%description/{exit} g&&/^Requires:/{if ($2 !~ /^hypr-de/) print $2}' "$SPEC" | sort -u)
+            have=$(awk '/^%package gaming/{g=1} g&&/^%description/{exit} g&&/^Requires:/{if ($2 !~ /^hypr-de/) print $2}' "$SPEC" | LC_ALL=C sort -u)
         fi
         if ! diff <(echo "$want") <(echo "$have") >/dev/null; then
             echo "DRIFT (spec, $part): deps.toml vs spec Requires:" >&2
@@ -47,7 +47,7 @@ check() {
     for part in main gaming; do
         want=$(deps arch "$part")
         var=$([ "$part" = main ] && echo "_depends_main" || echo "_depends_gaming")
-        have=$(bash -c "source '$PKGBUILD' >/dev/null 2>&1; printf '%s\n' \"\${$var[@]}\"" | grep -v '^hypr-de' | sort -u)
+        have=$(bash -c "source '$PKGBUILD' >/dev/null 2>&1; printf '%s\n' \"\${${var}[@]}\"" | grep -v '^hypr-de' | LC_ALL=C sort -u)
         if ! diff <(echo "$want") <(echo "$have") >/dev/null; then
             echo "DRIFT (PKGBUILD, $part): deps.toml vs $var:" >&2
             diff <(echo "$want") <(echo "$have") >&2 || true

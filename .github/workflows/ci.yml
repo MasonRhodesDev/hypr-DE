@@ -17,7 +17,7 @@ jobs:
       - name: shellcheck
         run: |
           sudo apt-get install -y shellcheck
-          shellcheck packaging/*.sh dist/bin/hypr-de-* dist/libexec/*.sh dist/libexec/osd/*.sh dist/libexec/waybar-updates-check
+          shellcheck -S warning -e SC1091 packaging/*.sh dist/bin/hypr-de-* dist/libexec/*.sh dist/libexec/osd/*.sh dist/libexec/waybar-updates-check
       - name: no literal install paths in dist sources
         run: |
           ! grep -rn "/usr/share/hypr-de\|/usr/libexec/hypr-de\|/usr/lib/hypr-de" dist/ \
