@@ -22,7 +22,7 @@ for section in data.values():
     sub = section.get("subpackage", "main")
     if sub != part:
         continue
-    out.update(section.get(distro, []))
+    out.update(section.get(distro, []) if distro.endswith("_weak") else section.get(distro, []))
 print("\n".join(sorted(out)))
 EOF
 }
@@ -43,6 +43,14 @@ check() {
             fail=1
         fi
     done
+    # spec Recommends (main) must exactly match fedora_weak
+    want=$(deps fedora_weak main)
+    have=$(awk '/^%package gaming/{exit} /^Recommends:/{print $2}' "$SPEC" | LC_ALL=C sort -u)
+    if ! diff <(echo "$want") <(echo "$have") >/dev/null; then
+        echo "DRIFT (spec Recommends): deps.toml fedora_weak vs spec:" >&2
+        diff <(echo "$want") <(echo "$have") >&2 || true
+        fail=1
+    fi
     # PKGBUILD: depends arrays from .SRCINFO-style print
     for part in main gaming; do
         want=$(deps arch "$part")

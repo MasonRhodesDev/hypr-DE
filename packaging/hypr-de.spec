@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.1.1
+Version:        0.1.2
 Release:        1%{?dist}
 Summary:        Opinionated Hyprland desktop environment
 
@@ -20,7 +20,7 @@ Requires:       brightnessctl
 Requires:       fira-code-fonts
 Requires:       fuzzel
 Requires:       google-noto-sans-fonts
-Requires:       gpu-screen-recorder
+Recommends:     gpu-screen-recorder
 Requires:       grim
 Requires:       hypridle
 Requires:       hyprland
@@ -157,6 +157,9 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Tue Aug 04 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.1.2-1
+- gpu-screen-recorder becomes a weak dep on Fedora (no repo package exists yet)
+
 * Tue Aug 04 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.1.1-1
 - hypr-de-setup bootstraps rendered stylesheets from templates (pre-lmtt-patch safety)
 

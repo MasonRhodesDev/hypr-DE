@@ -39,8 +39,9 @@ fedora = ["uwsm", "swaybg"]
 arch = ["uwsm", "swaybg"]
 
 [screenshot]
-reason = "hypr-de-snip/record: grim, slurp, swappy annotation, hyprpicker freeze, wl-clipboard, gpu-screen-recorder"
-fedora = ["grim", "slurp", "swappy", "hyprpicker", "wl-clipboard", "gpu-screen-recorder"]
+reason = "hypr-de-snip/record: grim, slurp, swappy annotation, hyprpicker freeze, wl-clipboard; gpu-screen-recorder is weak on Fedora (no repo package — hand-build or flatpak; packaging it is a 1.0-gate item like hyprland)"
+fedora = ["grim", "slurp", "swappy", "hyprpicker", "wl-clipboard"]
+fedora_weak = ["gpu-screen-recorder"]
 arch = ["grim", "slurp", "swappy", "hyprpicker", "wl-clipboard", "gpu-screen-recorder"]
 
 [script-runtime]
@@ -73,3 +74,9 @@ reason = "hypr-de-gaming subpackage: bp-game-focus (hyprland socket events), ste
 subpackage = "gaming"
 fedora = ["python3"]
 arch = ["python"]
+
+[optional-extras]
+reason = "nice-to-haves referenced by docs/optdepends only"
+fedora = []
+arch = []
+fedora_weak = ["satty", "thunar"]
