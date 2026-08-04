@@ -30,7 +30,7 @@ Requires:       hyprstate
 Requires:       jetbrains-mono-fonts
 Requires:       jq
 Requires:       kitty
-Requires:       libnotify
+Requires:       /usr/bin/notify-send
 Requires:       lmtt
 Requires:       logind-idle-control
 Requires:       matugen

@@ -45,7 +45,7 @@ arch = ["grim", "slurp", "swappy", "hyprpicker", "wl-clipboard", "gpu-screen-rec
 
 [script-runtime]
 reason = "socat (configreload-listener), playerctl (media-osd, waybar media), brightnessctl (brightness-osd), jq (swaync focus-sender, snip), libnotify (OSD notify-send), python3+dbus+gobject (notification-focus-proxy, waybar-mediaplayer)"
-fedora = ["socat", "playerctl", "brightnessctl", "jq", "libnotify", "python3", "python3-dbus", "python3-gobject"]
+fedora = ["socat", "playerctl", "brightnessctl", "jq", "/usr/bin/notify-send", "python3", "python3-dbus", "python3-gobject"]
 arch = ["socat", "playerctl", "brightnessctl", "jq", "libnotify", "python", "python-dbus", "python-gobject"]
 
 [audio]
