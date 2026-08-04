@@ -5,7 +5,7 @@
 #   usage: install.sh <staged-dist-dir> <destdir> {main|gaming}
 set -euo pipefail
 
-STAGE="${1:?usage: install.sh <staged-dist-dir> <destdir> {main|gaming}}"
+STAGE="${1:?usage: install.sh <staged-dist-dir> <destdir> main|gaming}"
 DEST="${2:?destdir required}"
 PART="${3:?part required: main|gaming}"
 . "$(dirname "$0")/paths.conf"
