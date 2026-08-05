@@ -300,7 +300,10 @@ hl.bind("Print",         hl.dsp.exec_cmd("@BINDIR@/hypr-de-snip"),   { desc = "S
 hl.bind("SHIFT + Print", hl.dsp.exec_cmd("@BINDIR@/hypr-de-record"), { desc = "Screenshots: Screen recording" })
 
 -- Utilities
-hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("hyprlock -c @DATADIR@/hypr/hyprlock-base.conf"), { desc = "System: Lock screen" })
+-- Through logind, not a hardcoded locker: hypridle's lock_cmd answers the
+-- Lock signal, so Meta+L, idle timeout, and suspend all produce the SAME
+-- lock screen (they diverged once: hyprlock here, vigil-lock on suspend).
+hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("loginctl lock-session"), { desc = "System: Lock screen" })
 hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("@LIBEXECDIR@/power-menu.sh"), { desc = "System: Power menu" })
 hl.bind(mainMod .. " + T", hl.dsp.exec_cmd("lmtt switch"),                { desc = "System: Toggle light/dark theme" })
 hl.bind(mainMod .. " + N", hl.dsp.exec_cmd("swaync-client -t -sw"),       { desc = "System: Notification center" })
