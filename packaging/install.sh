@@ -53,11 +53,12 @@ main)
     done
     inst "$STAGE/systemd/user-preset/90-hypr-de.preset" "$PRESETDIR/90-hypr-de.preset"
 
-    # session env + entry + skel
+    # session env + skel (no wayland-session entry: hypr-DE *distributes*
+    # the uwsm-managed Hyprland session, it is not an alternative to it —
+    # a second entry just makes the greeter ask a question with no answer)
     inst "$STAGE/uwsm/env"          "$XDGCONFDIR/uwsm/env"
     inst "$STAGE/uwsm/env-hyprland" "$XDGCONFDIR/uwsm/env-hyprland"
     inst "$STAGE/environment.d/60-hypr-de.conf" "$ENVGENDIR/60-hypr-de.conf"
-    inst "$STAGE/wayland-sessions/hypr-de.desktop" "$SESSIONDIR/hypr-de.desktop"
     inst "$STAGE/skel/.config/hypr/hyprland.lua" "$SKELDIR/.config/hypr/hyprland.lua"
     ;;
 gaming)

@@ -1,6 +1,0 @@
-[Desktop Entry]
-Name=hypr-DE
-Comment=Opinionated Hyprland desktop environment (uwsm-managed)
-Exec=uwsm start -N Hyprland -- Hyprland
-Type=Application
-DesktopNames=Hyprland
