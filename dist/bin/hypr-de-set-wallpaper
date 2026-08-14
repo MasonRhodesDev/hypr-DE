@@ -2,7 +2,7 @@
 # Set the hypr-DE wallpaper. Single owner of all three wallpaper consumers:
 #   ~/.config/hypr-de/wallpaper.conf          ($WALLPAPER for hyprlock)
 #   ~/.config/environment.d/wallpaper.conf    (WALLPAPER_PATH for swaybg.service)
-#   ~/.config/lmtt/config.toml general.wallpaper  (lmtt palette extraction)
+#   ~/.config/appearance-profiles/default.toml   (shared wallpaper registry)
 # then applies live (systemd user env + swaybg restart + lmtt re-render).
 set -euo pipefail
 
@@ -18,23 +18,27 @@ mkdir -p "$CONFIG/hypr-de" "$CONFIG/environment.d"
 printf '$WALLPAPER = %s\n' "$WP" > "$CONFIG/hypr-de/wallpaper.conf"
 printf 'WALLPAPER_PATH=%s\n' "$WP" > "$CONFIG/environment.d/wallpaper.conf"
 
-# lmtt reads the wallpaper ONLY from config.general.wallpaper (no env
-# fallback). Surgical section-scoped edit — never via lmtt itself, whose
-# Config::save() rewrites the whole file and drops comments/unknown keys.
-LMTT_CFG="$CONFIG/lmtt/config.toml"
-mkdir -p "$CONFIG/lmtt"
-if [ ! -e "$LMTT_CFG" ]; then
-    printf '[general]\nwallpaper = "%s"\n' "$WP" > "$LMTT_CFG"
+# LMTT implements the appearance-profiles standard and publishes a
+# greeter-readable copy for Vigil. Keep the old config writer only as a
+# transition fallback when an older lmtt is installed.
+if command -v lmtt >/dev/null 2>&1 && lmtt wallpaper set "$WP"; then
+    :
 else
-    TMP=$(mktemp "$LMTT_CFG.XXXXXX")
-    awk -v wp="$WP" '
-        function emit() { print "wallpaper = \"" wp "\""; done = 1 }
-        /^\[general\]/ { ingen = 1; print; next }
-        /^\[/          { if (ingen && !done) emit(); ingen = 0; print; next }
-        ingen && !done && /^[[:space:]]*wallpaper[[:space:]]*=/ { emit(); next }
-        { print }
-        END { if (!done) { if (!ingen) print "[general]"; emit() } }
-    ' "$LMTT_CFG" > "$TMP" && mv "$TMP" "$LMTT_CFG"
+    LMTT_CFG="$CONFIG/lmtt/config.toml"
+    mkdir -p "$CONFIG/lmtt"
+    if [ ! -e "$LMTT_CFG" ]; then
+        printf '[general]\nwallpaper = "%s"\n' "$WP" > "$LMTT_CFG"
+    else
+        TMP=$(mktemp "$LMTT_CFG.XXXXXX")
+        awk -v wp="$WP" '
+            function emit() { print "wallpaper = \"" wp "\""; done = 1 }
+            /^\[general\]/ { ingen = 1; print; next }
+            /^\[/          { if (ingen && !done) emit(); ingen = 0; print; next }
+            ingen && !done && /^[[:space:]]*wallpaper[[:space:]]*=/ { emit(); next }
+            { print }
+            END { if (!done) { if (!ingen) print "[general]"; emit() } }
+        ' "$LMTT_CFG" > "$TMP" && mv "$TMP" "$LMTT_CFG"
+    fi
 fi
 
 if [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ] || [ -n "${XDG_RUNTIME_DIR:-}" ]; then
