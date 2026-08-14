@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.0
+Version:        0.2.1
 Release:        1%{?dist}
 Summary:        Opinionated Hyprland desktop environment
 
@@ -158,6 +158,9 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Fri Aug 14 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.1-1
+- Route wallpaper changes through the shared appearance-profiles registry.
+
 * Tue Aug 04 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.0-1
 - Keybind cheatsheet (SUPER+slash) with descriptions on every bind
 - First-login welcome notification (hypr-de-welcome)
