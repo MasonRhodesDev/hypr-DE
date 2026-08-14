@@ -12,7 +12,7 @@ url="https://github.com/MasonRhodesDev/hypr-DE"
 license=('MIT')
 makedepends=('file')
 source=("$pkgbase-$pkgver.tar.gz::https://github.com/MasonRhodesDev/hypr-DE/archive/v$pkgver.tar.gz")
-sha256sums=('SKIP')
+sha256sums=('402afa6bd546b287d1491ad6cd665ea17b6a19d9f0468602b60528d2323be65c')
 
 _depends_main=(
   brightnessctl fuzzel gpu-screen-recorder grim hypridle hyprland
