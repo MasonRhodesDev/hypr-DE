@@ -16,6 +16,7 @@ BuildRequires:  python3
 # Runtime deps are generated from deps.toml — edit THAT file and re-run
 # packaging/gen-deps.sh print fedora main; CI (gen-deps.sh check) gates drift.
 Requires:       SwayNotificationCenter
+Requires:       blueman
 Requires:       brightnessctl
 Requires:       fira-code-fonts
 Requires:       fuzzel
@@ -25,7 +26,6 @@ Requires:       grim
 Requires:       hypridle
 Requires:       hyprland
 Requires:       hyprland-voice-dictation
-Requires:       hyprlock
 Requires:       hyprpicker
 Requires:       hyprpolkitagent
 Requires:       hyprpwcenter
@@ -44,11 +44,13 @@ Requires:       python3
 Requires:       python3-dbus
 Requires:       python3-gobject
 Requires:       slurp
+Requires:       sni-watcher
 Requires:       socat
 Requires:       swappy
 Requires:       swaybg
 Requires:       udiskie
 Requires:       uwsm
+Requires:       vigil
 Requires:       waybar
 Requires:       waybar-workspace-buttons
 Requires:       wireplumber
@@ -155,6 +157,7 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/systemd/user/bp-game-focus.service
 %{_prefix}/lib/systemd/user/steam-clean-shutdown.service
 %{_prefix}/lib/systemd/user/app-.scope.d/
+%{_prefix}/lib/systemd/user-preset/90-hypr-de-gaming.preset
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog

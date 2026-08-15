@@ -1,3 +1,4 @@
+enable sni-watcher.service
 enable hypridle.service
 enable hyprpolkitagent.service
 enable swaync.service
@@ -10,3 +11,6 @@ enable wayland-env-guard.timer
 enable hyprland-configreload-listener.service
 enable notification-focus-proxy.service
 enable udiskie.service
+enable hyprstate.service
+enable logind-idle-control.service
+enable voice-dictation.service

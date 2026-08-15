@@ -9,14 +9,24 @@ fedora = ["hyprland"]
 arch = ["hyprland"]
 
 [lock-idle]
-reason = "hyprlock (lock_cmd, SUPER+L), hypridle (idle policy in hypr/hypridle.conf)"
-fedora = ["hyprlock", "hypridle"]
-arch = ["hyprlock", "hypridle"]
+reason = "vigil (vigil-lock lock_cmd / before_sleep_cmd), hypridle (idle policy in hypr/hypridle.conf); SUPER+L is loginctl lock-session which hypridle answers"
+fedora = ["vigil", "hypridle"]
+arch = ["vigil", "hypridle"]
 
 [bar]
 reason = "waybar + CFFI workspace buttons module (waybar/config.jsonc)"
 fedora = ["waybar", "waybar-workspace-buttons"]
 arch = ["waybar", "waybar-workspace-buttons"]
+
+[tray]
+reason = "sni-watcher owns org.kde.StatusNotifierWatcher (Type=dbus, Before=waybar.service) so Waybar's tray module attaches as host-only"
+fedora = ["sni-watcher"]
+arch = ["sni-watcher"]
+
+[bluetooth]
+reason = "waybar bluetooth on-click-right launches blueman-manager; Blueman is the external Bluetooth UI (provider=blueman, seam=waybar on-click-right, no in-tree fallback)"
+fedora = ["blueman"]
+arch = ["blueman"]
 
 [notifications]
 reason = "swaync daemon (swaync/config.json, recovery framework, waybar module)"
@@ -24,7 +34,7 @@ fedora = ["SwayNotificationCenter"]
 arch = ["swaync"]
 
 [launcher]
-reason = "fuzzel (SUPER+R bind, power-menu.sh + cheatsheet dmenu backend, networkmanager-dmenu)"
+reason = "fuzzel (SUPER+R bind, power-menu.sh + cheatsheet dmenu backend)"
 fedora = ["fuzzel"]
 arch = ["fuzzel"]
 
@@ -60,12 +70,12 @@ fedora = ["lmtt", "matugen", "hyprstate", "hyprland-voice-dictation", "logind-id
 arch = ["lmtt", "matugen", "hyprstate", "hyprland-voice-dictation", "logind-idle-control"]
 
 [desktop-misc]
-reason = "udiskie automount (preset unit), kitty (SUPER+Q terminal, updates-check), thunar (SUPER+E), networkmanager-dmenu backend is a shipped script"
+reason = "udiskie automount (preset unit), kitty (SUPER+Q terminal, updates-check), thunar (SUPER+E)"
 fedora = ["udiskie", "kitty", "network-manager-applet"]
 arch = ["udiskie", "kitty", "network-manager-applet"]
 
 [fonts]
-reason = "waybar/swaync stylesheets (JetBrainsMono Nerd Font, Symbols Nerd Font), hyprlock labels (Noto Sans)"
+reason = "waybar/swaync stylesheets (JetBrainsMono Nerd Font, Symbols Nerd Font), lock/UI labels (Noto Sans)"
 fedora = ["jetbrains-mono-fonts", "google-noto-sans-fonts", "fira-code-fonts"]
 arch = ["ttf-jetbrains-mono-nerd", "noto-fonts", "ttf-firacode-nerd"]
 

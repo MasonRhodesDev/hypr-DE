@@ -64,7 +64,7 @@
             "tooltip-format-disconnected": "Error",
             "tooltip-format-wifi": "{essid} ({signalStrength}%) ",
             "tooltip-format-ethernet": "{ifname} 🖧 ",
-            "on-click": "networkmanager-dmenu"
+            "on-click": "command -v networkmanager-dmenu >/dev/null && networkmanager-dmenu"
         },
         "bluetooth": {
             "format-on": "󰂯",

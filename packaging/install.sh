@@ -68,6 +68,7 @@ gaming)
     instx "$STAGE/gaming/steam-set-launch-options" "$BINDIR/steam-set-launch-options"
     inst  "$STAGE/gaming/bp-game-focus.service" "$UNITDIR/bp-game-focus.service"
     inst  "$STAGE/gaming/steam-clean-shutdown.service" "$UNITDIR/steam-clean-shutdown.service"
+    inst  "$STAGE/gaming/90-hypr-de-gaming.preset" "$PRESETDIR/90-hypr-de-gaming.preset"
     inst  "$STAGE/gaming/app-scope-steam-clean-shutdown.conf" "$UNITDIR/app-.scope.d/steam-clean-shutdown.conf"
     inst  "$STAGE/gaming/gaming.conf" "$ENVGENDIR/70-hypr-de-gaming.conf"
     ;;

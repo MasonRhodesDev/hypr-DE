@@ -15,12 +15,12 @@ source=("$pkgbase-$pkgver.tar.gz::https://github.com/MasonRhodesDev/hypr-DE/arch
 sha256sums=('402afa6bd546b287d1491ad6cd665ea17b6a19d9f0468602b60528d2323be65c')
 
 _depends_main=(
-  brightnessctl fuzzel gpu-screen-recorder grim hypridle hyprland
-  hyprland-voice-dictation hyprlock hyprpicker hyprpolkitagent hyprstate jq
-  hyprpwcenter kitty libnotify lmtt logind-idle-control matugen network-manager-applet
+  blueman brightnessctl fuzzel gpu-screen-recorder grim hypridle hyprland
+  hyprland-voice-dictation hyprpicker hyprpolkitagent hyprpwcenter hyprstate jq
+  kitty libnotify lmtt logind-idle-control matugen network-manager-applet
   noto-fonts pavucontrol playerctl python python-dbus python-gobject slurp
-  socat swappy swaybg swaync ttf-firacode-nerd ttf-jetbrains-mono-nerd
-  udiskie uwsm waybar waybar-workspace-buttons wireplumber wl-clipboard
+  sni-watcher socat swappy swaybg swaync ttf-firacode-nerd ttf-jetbrains-mono-nerd
+  udiskie uwsm vigil waybar waybar-workspace-buttons wireplumber wl-clipboard
   xdg-desktop-portal-hyprland
 )
 _depends_gaming=(python)
@@ -37,6 +37,8 @@ package_hypr-de() {
   depends=("${_depends_main[@]}")
   optdepends=('satty: alternative screenshot annotation'
               'thunar: file manager bound to SUPER+E')
+  backup=('etc/xdg/uwsm/env'
+          'etc/xdg/uwsm/env-hyprland')
   install=hypr-de.install
 
   cd "$srcdir"; cd "hypr-DE-$pkgver" 2>/dev/null || cd "$pkgbase-$pkgver"  # GH tarball vs CI snapshot prefix
