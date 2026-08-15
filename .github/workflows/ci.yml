@@ -17,7 +17,17 @@ jobs:
       - name: shellcheck
         run: |
           sudo apt-get install -y shellcheck
-          shellcheck -S warning -e SC1091 packaging/*.sh dist/bin/hypr-de-* dist/libexec/*.sh dist/libexec/osd/*.sh dist/libexec/waybar-updates-check
+          # dist/bin/hypr-de-* includes Python (hypr-de-theme, hypr-de-help).
+          # Only pass files whose shebang is a shell.
+          mapfile -t scripts < <(
+            for f in packaging/*.sh dist/bin/hypr-de-* dist/libexec/*.sh \
+                     dist/libexec/osd/*.sh dist/libexec/waybar-updates-check \
+                     dist/libexec/hypr-de-prime-theme get-hypr-de.sh; do
+              [ -f "$f" ] || continue
+              head -n1 "$f" | grep -qE '^#!/((usr/)?bin/(env )?)?(ba)?sh' && printf '%s\n' "$f"
+            done
+          )
+          shellcheck -S warning -e SC1091 "${scripts[@]}"
       - name: no literal install paths in dist sources
         run: |
           ! grep -rn "/usr/share/hypr-de\|/usr/libexec/hypr-de\|/usr/lib/hypr-de" dist/ \
