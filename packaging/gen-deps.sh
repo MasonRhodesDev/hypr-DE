@@ -33,9 +33,9 @@ check() {
     for part in main gaming; do
         want=$(deps fedora "$part")
         if [ "$part" = main ]; then
-            have=$(awk '/^%package gaming/{exit} /^Requires:/{print $2}' "$SPEC" | LC_ALL=C sort -u)
+            have=$(awk '/^%package gaming/{exit} /^Requires:/{sub(/^Requires:[[:space:]]*/, ""); print}' "$SPEC" | LC_ALL=C sort -u)
         else
-            have=$(awk '/^%package gaming/{g=1} g&&/^%description/{exit} g&&/^Requires:/{if ($2 !~ /^hypr-de/) print $2}' "$SPEC" | LC_ALL=C sort -u)
+            have=$(awk '/^%package gaming/{g=1} g&&/^%description/{exit} g&&/^Requires:/{sub(/^Requires:[[:space:]]*/, ""); if ($0 !~ /^hypr-de/) print}' "$SPEC" | LC_ALL=C sort -u)
         fi
         if ! diff <(echo "$want") <(echo "$have") >/dev/null; then
             echo "DRIFT (spec, $part): deps.toml vs spec Requires:" >&2
@@ -45,7 +45,7 @@ check() {
     done
     # spec Recommends (main) must exactly match fedora_weak
     want=$(deps fedora_weak main)
-    have=$(awk '/^%package gaming/{exit} /^Recommends:/{print $2}' "$SPEC" | LC_ALL=C sort -u)
+    have=$(awk '/^%package gaming/{exit} /^Recommends:/{sub(/^Recommends:[[:space:]]*/, ""); print}' "$SPEC" | LC_ALL=C sort -u)
     if ! diff <(echo "$want") <(echo "$have") >/dev/null; then
         echo "DRIFT (spec Recommends): deps.toml fedora_weak vs spec:" >&2
         diff <(echo "$want") <(echo "$have") >&2 || true

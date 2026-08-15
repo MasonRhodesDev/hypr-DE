@@ -1,0 +1,10 @@
+#!/bin/bash
+# Render LMTT styles before waybar/swaync start. Preserves the current
+# light/dark mode; never bare `lmtt switch` (that toggles).
+set -euo pipefail
+mode=$(lmtt status 2>/dev/null | sed -n 's/^Current theme: //p') || true
+case "$mode" in
+    light|dark) ;;
+    *) mode=dark ;;
+esac
+exec lmtt switch "$mode"

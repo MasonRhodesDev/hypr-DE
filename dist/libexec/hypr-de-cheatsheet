@@ -1,5 +1,5 @@
 #!/bin/bash
-# Searchable keybind reference (SUPER+/): hyprctl binds -j -> fuzzel dmenu.
+# Searchable keybind reference (SUPER+SHIFT+/): hyprctl binds -j -> fuzzel dmenu.
 # Descriptions come from the `desc = "Category: text"` opt on every hl.bind;
 # typing a category word filters to that group. Binds without a description
 # (user's local.lua) appear last as "(custom)". Selection just dismisses.

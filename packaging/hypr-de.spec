@@ -1,7 +1,7 @@
 Name:           hypr-de
 Version:        0.2.1
 Release:        1%{?dist}
-Summary:        Alpha Hyprland desktop environment (not ready)
+Summary:        Alpha Hyprland config set (not ready)
 
 License:        MIT
 URL:            https://github.com/MasonRhodesDev/hypr-DE
@@ -16,33 +16,48 @@ BuildRequires:  python3
 # Runtime deps are generated from deps.toml — edit THAT file and re-run
 # packaging/gen-deps.sh print fedora main; CI (gen-deps.sh check) gates drift.
 Requires:       SwayNotificationCenter
-Requires:       blueman
+Requires:       bluez
+Requires:       bluez-obexd
 Requires:       brightnessctl
 Requires:       fira-code-fonts
 Requires:       fuzzel
+Requires:       gnome-keyring
 Requires:       google-noto-sans-fonts
 Recommends:     gpu-screen-recorder
 Requires:       grim
+Requires:       gtk4
 Requires:       hypridle
-Requires:       hyprland
+Requires:       hyprland >= 0.55
+Requires:       hyprland-guiutils
+Requires:       hyprland-qt-support
 Requires:       hyprland-voice-dictation
 Requires:       hyprpicker
 Requires:       hyprpolkitagent
 Requires:       hyprpwcenter
+Requires:       hyprshutdown
 Requires:       hyprstate
+Requires:       hyprstate-gui
 Requires:       jetbrains-mono-fonts
 Requires:       jq
 Requires:       kitty
+Requires:       libadwaita
 Requires:       /usr/bin/notify-send
 Requires:       lmtt
 Requires:       logind-idle-control
 Requires:       matugen
+Requires:       nautilus
+Requires:       NetworkManager
 Requires:       network-manager-applet
+Requires:       overskride
 Requires:       pavucontrol
+Requires:       pipewire
+Requires:       pipewire-alsa
+Requires:       pipewire-pulseaudio
 Requires:       playerctl
 Requires:       python3
 Requires:       python3-dbus
 Requires:       python3-gobject
+Requires:       qt6ct
 Requires:       slurp
 Requires:       sni-watcher
 Requires:       socat
@@ -55,20 +70,23 @@ Requires:       waybar
 Requires:       waybar-workspace-buttons
 Requires:       wireplumber
 Requires:       wl-clipboard
+Requires:       xdg-desktop-portal
+Requires:       xdg-desktop-portal-gtk
 Requires:       xdg-desktop-portal-hyprland
 
+Recommends:     hyprsunset
 Recommends:     satty
-Recommends:     thunar
 
 %description
 hypr-DE is alpha and not ready. It composes supporting tools that need to
 stabilize first.
 
-hypr-DE is an opinionated Hyprland desktop composition:
-compositor configuration (Lua), waybar, swaync with notification recovery,
+hypr-DE is a packaged Hyprland configuration and the runtime packages it
+needs: compositor Lua config, waybar, swaync with notification recovery,
 fuzzel, Material You theming via lmtt, monitor profiles via hyprstate,
-screenshot/recording tooling, and a uwsm-managed wayland session — installed
-system-wide with a thin per-user override surface (~/.config/hypr/local.lua,
+screenshot/recording tooling. It is not a greeter session. Log into
+Hyprland (uwsm) from the Hyprland package; hypr-DE supplies /etc/xdg and
+/usr defaults plus a thin per-user override surface (~/.config/hypr/local.lua,
 lmtt module shadowing, systemd drop-ins).
 
 NOTE: requires a Lua-config-capable Hyprland build; distro packages older
@@ -102,8 +120,9 @@ mkdir -p dist-build/lmtt-system-modules
 mv dist-build/lmtt/modules/* dist-build/lmtt-system-modules/
 
 %check
-# Syntax-check every shipped shell script and the Lua payload
+# Syntax-check every shipped shell script, the Lua payload, and Python helpers
 find dist-build/bin dist-build/libexec -type f -exec sh -c 'head -1 "$1" | grep -q "^#!/bin/bash" && bash -n "$1"' _ {} \;
+find dist-build/bin dist-build/libexec -type f -exec sh -c 'head -1 "$1" | grep -q python && python3 -m py_compile "$1"' _ {} \;
 ./packaging/gen-deps.sh check
 
 %install
@@ -116,10 +135,11 @@ install -d %{buildroot}%{_datadir}/lmtt/modules
 install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt/modules/
 
 %post
-%systemd_user_post swaybg.service waybar-reload.path waybar-reload.service waybar-watchdog.service waybar-watchdog.timer wayland-env-guard.path wayland-env-guard.service wayland-env-guard.timer hyprland-configreload-listener.service notification-focus-proxy.service
+%systemd_user_post swaybg.service waybar-reload.path waybar-reload.service waybar-watchdog.service waybar-watchdog.timer wayland-env-guard.path wayland-env-guard.service wayland-env-guard.timer hyprland-configreload-listener.service notification-focus-proxy.service hypr-de-prime-theme.service
+%{_libexecdir}/hypr-de/hypr-de-sys-setup >/dev/null 2>&1 || :
 
 %preun
-%systemd_user_preun swaybg.service waybar-reload.path waybar-reload.service waybar-watchdog.service waybar-watchdog.timer wayland-env-guard.path wayland-env-guard.service wayland-env-guard.timer hyprland-configreload-listener.service notification-focus-proxy.service
+%systemd_user_preun swaybg.service waybar-reload.path waybar-reload.service waybar-watchdog.service waybar-watchdog.timer wayland-env-guard.path wayland-env-guard.service wayland-env-guard.timer hyprland-configreload-listener.service notification-focus-proxy.service hypr-de-prime-theme.service
 
 %post gaming
 %systemd_user_post bp-game-focus.service steam-clean-shutdown.service
@@ -135,6 +155,9 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_bindir}/hypr-de-snip
 %{_bindir}/hypr-de-record
 %{_bindir}/hypr-de-theme
+%{_bindir}/hypr-de-help
+%{_mandir}/man1/hypr-de-help.1*
+%{_mandir}/man7/hypr-de.7*
 %{_libexecdir}/hypr-de/
 %exclude %{_libexecdir}/hypr-de/bp-game-focus.py
 %exclude %{_libexecdir}/hypr-de/steam-clean-shutdown.sh
@@ -150,7 +173,7 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/60-hypr-de.conf
 %config(noreplace) %{_sysconfdir}/xdg/uwsm/env
 %config(noreplace) %{_sysconfdir}/xdg/uwsm/env-hyprland
-%{_sysconfdir}/skel/.config/hypr/hyprland.lua
+%{_sysconfdir}/xdg/hypr/hyprland.lua
 
 %files gaming
 %{_datadir}/hypr-de/gaming/

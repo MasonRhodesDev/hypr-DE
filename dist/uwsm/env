@@ -1,12 +1,14 @@
-# hypr-DE session environment (uwsm sources env files across the whole XDG
-# config hierarchy, user files win — put personal vars in ~/.config/uwsm/env).
+# uwsm sources env files across the whole XDG config hierarchy for the
+# stock Hyprland (uwsm) session (user files win — put personal vars in
+# ~/.config/uwsm/env).
 
 # GNOME Keyring environment variables for automatic unlock
 export GNOME_KEYRING_CONTROL=${XDG_RUNTIME_DIR}/keyring
 
-# Theme and toolkit variables
+# Theme and toolkit variables (LMTT portal appearance + qt6ct)
 export QT_QPA_PLATFORMTHEME=qt6ct
+export QT_QPA_PLATFORM=wayland
+export GTK_USE_PORTAL=1
 export MOZ_ENABLE_WAYLAND=1
 export ELECTRON_OZONE_PLATFORM_HINT=wayland
-export QT_QPA_PLATFORM=wayland
 export XCURSOR_SIZE=24

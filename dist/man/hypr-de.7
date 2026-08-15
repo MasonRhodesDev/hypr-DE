@@ -1,0 +1,124 @@
+.TH HYPR-DE 7 "2026-08-15" "hypr-DE" "hypr-DE"
+.SH NAME
+hypr-de \- packaged Hyprland desktop configuration
+.SH DESCRIPTION
+hypr-DE is a packaged Hyprland configuration and the runtime packages that
+session needs. It is not a greeter session and does not register a desktop
+environment. Log into
+.B Hyprland (uwsm)
+from the Hyprland package.
+.PP
+Configs and styles are package-owned under
+.I /usr
+and
+.IR /etc/xdg .
+Home carries only what you own:
+.IR ~/.config/hypr/local.lua ,
+monitor profiles, wallpaper, and optional module or unit overrides.
+.SH SESSION
+.TP
+.B Login
+Pick Hyprland (uwsm) at the greeter. hypr-DE supplies
+.I /etc/xdg/uwsm
+env files and user units; it does not add a competing session entry.
+.TP
+.B Config load order
+.I /etc/xdg/hypr/hyprland.lua
+dofiles the packaged
+.I @DATADIR@/hypr/main.lua ,
+then pcall's
+.I ~/.config/hypr/local.lua
+(last-wins). Monitor layouts belong in
+.I ~/.config/hypr/profiles/
+(hyprstate selects the matching profile). Putting monitors in local.lua
+clobbers that.
+.TP
+.B Theme
+.B SUPER+T
+runs
+.B lmtt switch
+(see
+.BR lmtt (1)).
+GTK follows the XDG appearance portal. Qt apps that use qt6ct get an
+LMTT-owned color scheme at
+.I ~/.config/qt6ct/colors/lmtt.conf
+and a merged
+.B [Appearance]
+section; Fonts and other qt6ct keys stay yours.
+.TP
+.B Bar
+Waybar is the shell. Workspace buttons come from waybar-workspace-buttons.
+.TP
+.B Lock
+.B SUPER+L
+is
+.B loginctl lock-session .
+hypridle's lock_cmd answers that signal, so the key, idle timeout, and
+suspend share one lock screen (vigil-lock).
+.TP
+.B Files
+.B SUPER+E
+opens Nautilus.
+.TP
+.B Bluetooth
+Waybar's bluetooth module is the indicator (no tray applet). Left-click
+opens Overskride; right-click toggles adapter power.
+.TP
+.B Audio
+Volume keys use
+.B wpctl .
+pavucontrol is the app mixer; hyprpwcenter (SHIFT+XF86AudioPlay) is the
+patchbay.
+.SH SCRATCHPAD AND ZONES
+.B SUPER+S
+and
+.B SUPER+0
+toggle the named scratchpad
+.I special:magic .
+That is built-in Hyprland and needs no plugin.
+.PP
+Each numeric workspace can also own
+.I special:N
+via the workspace-zones plugin. See
+.BR workspace-zones (7).
+.B SUPER+ALT+S
+toggles the focused workspace's zone;
+.B SUPER+ALT+SHIFT+S
+moves the focused window into it;
+.B SUPER+CTRL+ALT+S
+stashes without following. If the plugin is not loaded, those binds log a
+Lua error instead of silently doing nothing.
+.SH KEYBINDS
+.B SUPER+/
+opens
+.BR hypr-de-help (1),
+which lists every bind from the running compositor (including local.lua)
+and explains the session.
+.B SUPER+SHIFT+/
+opens the same list as a fuzzel dmenu for quick search.
+.PP
+Every packaged bind carries
+.B desc = "Category: text"
+so the help window and cheatsheet can group and filter. Follow that
+convention in local.lua; undescribed binds show as (custom).
+.SH FILES
+.TP
+.I /etc/xdg/hypr/hyprland.lua
+XDG entry that loads the packaged config.
+.TP
+.I @DATADIR@/hypr/main.lua
+Packaged binds, rules, and autostart.
+.TP
+.I @DATADIR@/hypr/local.lua.example
+Template for
+.IR ~/.config/hypr/local.lua .
+.TP
+.I ~/.config/hypr/local.lua
+User overrides (last-wins).
+.TP
+.I ~/.config/hypr/profiles/
+hyprstate monitor profiles.
+.SH SEE ALSO
+.BR hypr-de-help (1),
+.BR workspace-zones (7),
+.BR lmtt (1)

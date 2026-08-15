@@ -10,6 +10,15 @@
 # and device ACLs are granted on every login. The greeter keeps using seatd.
 export LIBSEAT_BACKEND=logind
 
+# NVIDIA is not a hypr-DE dependency. If the proprietary module is already
+# loaded, apply the Hyprland wiki session vars; otherwise leave Mesa alone.
+# Hybrid GPU pick stays hyprstate's AQ_DRM_DEVICES selector below.
+if [ -d /sys/module/nvidia ]; then
+    export LIBVA_DRIVER_NAME=nvidia
+    export __GLX_VENDOR_LIBRARY_NAME=nvidia
+    export NVD_BACKEND=direct
+fi
+
 # Dynamic GPU selection (multi-GPU machines only). hyprstate prints a
 # colon-separated DRM device list (primary first) or nothing when unmanaged
 # (single GPU, override "off", or any error). Charset + shape guards: anything

@@ -1,49 +1,58 @@
 # hypr-DE
 
-**Alpha. Not ready.** This repo composes the rest of the stack into a
-packaged Hyprland session. It stays alpha until those supporting tools
-reach stability and quality first: [vigil](https://github.com/MasonRhodesDev/vigil),
+**Alpha. Not ready.** This repo is a packaged Hyprland configuration plus
+the other `[mason]` packages it needs. It is not a greeter session and
+does not register a desktop environment. It stays alpha until those
+supporting tools reach stability and quality first: [vigil](https://github.com/MasonRhodesDev/vigil),
 [hyprstate](https://github.com/MasonRhodesDev/hyprstate),
 [lmtt](https://github.com/MasonRhodesDev/linux-multi-theme-toggle),
 [sni-watcher](https://github.com/MasonRhodesDev/sni-watcher),
 [logind-idle-control](https://github.com/MasonRhodesDev/logind-idle-control),
-and the rest of the `[mason]` set.
+and the rest of the set.
 
-An opinionated Hyprland desktop composition for **Fedora** and **Arch**:
-compositor config (Lua), waybar, swaync with click-to-focus notification
-recovery, fuzzel, Material You theming via lmtt, monitor profiles via
-hyprstate, screenshot/recording tooling, and a uwsm-managed session entry.
+An opinionated Hyprland config set for **Fedora** and **Arch**: compositor
+Lua config, waybar, swaync with click-to-focus notification recovery,
+fuzzel, Material You theming via lmtt, monitor profiles via hyprstate, and
+screenshot/recording tooling. Log into **Hyprland (uwsm)** from the
+Hyprland package.
 
-Configs and styles are **package-owned** and live in system paths; your home
-directory carries only a 3-line entry stub, your monitor profiles, your
-wallpaper, and whatever you choose to override.
+Configs and styles are **package-owned** and live in `/usr` and `/etc/xdg`.
+Home carries only what you own: `~/.config/hypr/local.lua`, monitor
+profiles, wallpaper, and optional module/unit overrides.
 
-> **Compositor caveat:** hypr-DE's configuration uses Hyprland's Lua config
-> API, which is newer than what distro packages currently ship. Until a
-> Lua-capable `hyprland` package is published here, you need a Hyprland
-> build from recent `main`. This is the gate for hypr-DE 1.0. (The Lua
-> config is being adopted across the ecosystem — end_4's illogical-impulse
-> already requires Hyprland ≥ 0.55 — so a stable upstream release may close
-> this gap before a bespoke package does.)
+> **Compositor:** hypr-DE requires Hyprland **0.55 or newer** (Lua config
+> API). extra/COPR `hyprland` 0.56+ qualifies. `hyprland-git` qualifies when
+> it `Provides: hyprland=0.55` or higher — install the git stack first so
+> `hypr-de` does not pull extra Hyprland. Mixing extra and `-git` hyprwm
+> packages is unsupported.
 
 ## Install
 
 Expect breakage. Prefer installing the supporting tools on their own until
 this is out of alpha.
 
-**Fedora**
+```bash
+curl -fsSL https://raw.githubusercontent.com/MasonRhodesDev/hypr-DE/main/get-hypr-de.sh | sudo sh
+```
+
+Same script via wget: `wget -qO- … | sudo sh`. Pass `--gaming` after `sh -s --`
+to also install `hypr-de-gaming`. The script adds the package repo (Arch
+`[mason]`, Fedora COPRs), installs `hypr-de`, and runs `hypr-de-setup` for
+the sudo-invoking user.
+
+**Fedora** (manual)
 
 ```bash
 sudo dnf copr enable solaris765/hypr-de solaris765/hyprstate solaris765/lmtt \
     solaris765/logind-idle-control solaris765/hyprland-voice-dictation \
-    solaris765/waybar-workspace-buttons
-sudo dnf copr enable solopasha/hyprland heus-sueh/packages   # hyprland stack, matugen
+    solaris765/waybar-workspace-buttons solaris765/vigil solaris765/sni-watcher \
+    solaris765/hyprstate-gui solaris765/hypr-de-extras
+sudo dnf copr enable nett00n/hyprland heus-sueh/packages   # hyprland 0.55+ stack, matugen
 sudo dnf install hypr-de            # + hypr-de-gaming if you want the gaming layer
 ```
 
-**Arch** — add the [`[mason]` repo](https://masonrhodesdev.github.io/arch-repo/)
-to `/etc/pacman.conf`, then install with an AUR helper (matugen resolves from
-the AUR):
+**Arch** (manual) — add the [`[mason]` repo](https://masonrhodesdev.github.io/arch-repo/)
+to `/etc/pacman.conf`:
 
 ```ini
 [mason]
@@ -53,25 +62,30 @@ Server = https://masonrhodesdev.github.io/arch-repo/x86_64
 ```
 
 ```bash
-paru -S hypr-de        # + hypr-de-gaming
+sudo pacman -Syu hypr-de        # + hypr-de-gaming
 ```
 
 **Then, per user:**
 
 ```bash
-hypr-de-setup          # seeds the entry stub, presets user units, primes theming
+hypr-de-setup          # presets user units; seeds xdph.conf (XDPH is home-only)
 ```
 
-Log out and pick the **hypr-DE** session at your greeter.
+Log out and pick **Hyprland (uwsm)** at the vigil greeter.
+
+If you still have a leftover `~/.config/hypr/hyprland.lua` stub from an
+older hypr-DE, `hypr-de-setup --adopt` backs it up and removes it so the
+packaged `/etc/xdg/hypr/hyprland.lua` is used. Put personal binds in
+`~/.config/hypr/local.lua`.
 
 ## Keybinds
 
-Press **SUPER + /** for a searchable cheatsheet of every bind (grouped by
-category — type a category word like `Windows` or `Media` to filter). The
-list is generated live from the compositor, so binds you add in
-`~/.config/hypr/local.lua` appear too; give them a
-`{ desc = "Category: text" }` option to label them (undescribed binds show
-as `(custom)`).
+Press **SUPER + /** for the help window: how the session works, plus every
+bind loaded live from the compositor. **SUPER + SHIFT + /** is a fuzzel
+quick-search of the same list. Binds you add in `~/.config/hypr/local.lua`
+appear too; give them a `{ desc = "Category: text" }` option to label them
+(undescribed binds show as `(custom)`). `man hypr-de` and
+`man workspace-zones` are the prose versions.
 
 ## Themes
 

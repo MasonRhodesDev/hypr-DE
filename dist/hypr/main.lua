@@ -1,8 +1,7 @@
--- hypr-DE: Hyprland Lua configuration (system default).
--- Loaded by the user's ~/.config/hypr/hyprland.lua stub:
---     dofile("@DATADIR@/hypr/main.lua")
---     pcall(dofile, os.getenv("HOME") .. "/.config/hypr/local.lua")
--- Overrides go in ~/.config/hypr/local.lua (last-wins) — EXCEPT monitor
+-- hypr-DE: packaged Hyprland Lua configuration.
+-- Loaded from /etc/xdg/hypr/hyprland.lua (XDG_CONFIG_DIRS) unless the user
+-- has their own ~/.config/hypr/hyprland.lua. That entry dofiles this file,
+-- then pcall's ~/.config/hypr/local.lua (last-wins) — EXCEPT monitor
 -- config, which belongs in ~/.config/hypr/profiles/ (hyprstate selects the
 -- matching profile; local.lua runs after the profile and the edp-off marker
 -- and would clobber both).
@@ -12,6 +11,10 @@
 -- boots before those files exist.
 
 local HOME = os.getenv("HOME")
+local CONFIG = os.getenv("XDG_CONFIG_HOME")
+if not CONFIG or CONFIG == "" then
+    CONFIG = HOME .. "/.config"
+end
 
 local function file_exists(p)
     local f = io.open(p, "r")
@@ -25,7 +28,7 @@ end
 -- it returns a table of pre-formatted Hyprland color values. Fallback below
 -- keeps borders sane on first boot before lmtt has run.
 ----------------------------------------------------------------------
-local colors_path = HOME .. "/.config/hypr/lmtt-colors.lua"
+local colors_path = CONFIG .. "/hypr/lmtt-colors.lua"
 local c = {
     primary         = "rgb(ffb77a)",
     secondary       = "rgb(e3c0a5)",
@@ -109,7 +112,7 @@ end
 -- lowest-priority profile plays that role), not here and not in local.lua.
 hl.monitor({ output = "", mode = "preferred", position = "auto", scale = 1 })
 
-local active_profile = HOME .. "/.config/hypr/profiles/.active.lua"
+local active_profile = CONFIG .. "/hypr/profiles/.active.lua"
 if file_exists(active_profile) then
     pcall(dofile, active_profile)
 end
@@ -118,7 +121,7 @@ end
 -- it wins over both the fallback and the profile. Runtime state owned by the
 -- hyprstate daemon (paths::edp_off_marker); deliberately unmanaged.
 -- Absent marker = panel enabled, the fail-safe boot default.
-if file_exists(HOME .. "/.config/hypr/edp-off") then
+if file_exists(CONFIG .. "/hypr/edp-off") then
     hl.monitor({ output = "eDP-2", disabled = true })
 end
 
@@ -225,11 +228,11 @@ local meh     = "CTRL + ALT + SHIFT"
 local hyper   = "SUPER + ALT + SHIFT"
 
 -- Apps / window management. Every bind carries desc = "Category: text" —
--- the cheatsheet (SUPER+/) groups and filters on the category prefix, and
--- hyprctl binds gains readable output. Follow the convention in local.lua.
+-- hypr-de-help (SUPER+/) and the fuzzel cheatsheet (SUPER+SHIFT+/) group
+-- and filter on the category prefix. Follow the convention in local.lua.
 hl.bind(mainMod .. " + Q", hl.dsp.exec_cmd("uwsm app -- kitty"),  { desc = "Apps: Terminal" })
 hl.bind(mainMod .. " + C", hl.dsp.window.close(),                 { desc = "Windows: Close window" })
-hl.bind(mainMod .. " + E", hl.dsp.exec_cmd("uwsm app -- thunar"), { desc = "Apps: File manager" })
+hl.bind(mainMod .. " + E", hl.dsp.exec_cmd("uwsm app -- nautilus"), { desc = "Apps: File manager" })
 hl.bind(mainMod .. " + V", function()
     -- Hyprland bug workaround: unfloating a pinned window only clears the pin
     -- (window stays floating) AND skips the window-rule re-evaluation, leaving
@@ -307,8 +310,8 @@ hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("loginctl lock-session"), { desc = "S
 hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("@LIBEXECDIR@/power-menu.sh"), { desc = "System: Power menu" })
 hl.bind(mainMod .. " + T", hl.dsp.exec_cmd("lmtt switch"),                { desc = "System: Toggle light/dark theme" })
 hl.bind(mainMod .. " + N", hl.dsp.exec_cmd("swaync-client -t -sw"),       { desc = "System: Notification center" })
-hl.bind(mainMod .. " + slash",         hl.dsp.exec_cmd("@LIBEXECDIR@/hypr-de-cheatsheet"), { desc = "Help: Show keybinds" })
-hl.bind(mainMod .. " + SHIFT + slash", hl.dsp.exec_cmd("@LIBEXECDIR@/hypr-de-cheatsheet"), { desc = "Help: Show keybinds" })
+hl.bind(mainMod .. " + slash",         hl.dsp.exec_cmd("@BINDIR@/hypr-de-help"), { desc = "Help: Welcome and keybinds" })
+hl.bind(mainMod .. " + SHIFT + slash", hl.dsp.exec_cmd("@LIBEXECDIR@/hypr-de-cheatsheet"), { desc = "Help: Search keybinds" })
 hl.bind(mainMod .. " + D", hl.dsp.exec_cmd([[wl-copy --clear && notify-send -t 2000 "Clipboard cleared" "Ready for drag-and-drop"]]), { desc = "System: Clear clipboard (drag-and-drop prep)" })
 hl.bind(meh .. " + v", hl.dsp.exec_cmd("voice-dictation toggle"), { desc = "System: Voice dictation" })
 
@@ -362,6 +365,8 @@ hl.window_rule({ name = "voice-dictation",  match = { class = "^(dev.mason.dicta
 hl.window_rule({ name = "pre-sleep",        match = { title = "^(PRE_SLEEP_WINDOW)$" }, float = true, move = "-2000 -2000", size = "10000 10000", opacity = "0.95 override 0.95 override 0.95 override", xray = false })
 hl.window_rule({ name = "google-signin",    match = { title = "^(Sign in - Google Accounts.*)$" }, float = true })
 hl.window_rule({ name = "hyprpwcenter",     match = { class = "^(hyprpwcenter)$" }, float = true, center = true, size = "1000 600", stay_focused = true, pin = true })
+hl.window_rule({ name = "overskride",       match = { class = "^(io\\.github\\.kaii_lb\\.Overskride)$" }, float = true, center = true, stay_focused = true })
+hl.window_rule({ name = "hypr-de-help",     match = { class = "^(dev\\.mason\\.hypr-de-help)$" }, float = true, center = true, size = "860 600", stay_focused = true })
 hl.window_rule({ name = "satty",            match = { class = "^(com.gabm.satty)$" }, float = true, pin = true, center = true, stay_focused = true })
 hl.window_rule({ name = "steam-main",       match = { class = "^(steam)$", title = "^(Steam)$" }, workspace = "special:magic silent", no_initial_focus = true, focus_on_activate = false })
 hl.window_rule({ name = "steam-empty",      match = { class = "^(steam)$", title = "^()$" }, stay_focused = true, min_size = "1 1" })
@@ -375,6 +380,5 @@ hl.window_rule({ name = "zoom-annotate",    match = { class = "^(zoom)$", title 
 hl.on("hyprland.start", function()
     hl.exec_cmd("dbus-update-activation-environment --all")
     hl.exec_cmd("sleep 1 & dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP")
-    hl.exec_cmd("lmtt switch dark")
-    hl.exec_cmd("@LIBEXECDIR@/hypr-de-welcome")  -- one-time greeting; marker-gated
+    hl.exec_cmd("@LIBEXECDIR@/hypr-de-welcome")  -- one-time help window; marker-gated
 end)

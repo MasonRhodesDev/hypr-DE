@@ -10,7 +10,9 @@ enable wayland-env-guard.path
 enable wayland-env-guard.timer
 enable hyprland-configreload-listener.service
 enable notification-focus-proxy.service
+enable hypr-de-prime-theme.service
 enable udiskie.service
 enable hyprstate.service
 enable logind-idle-control.service
 enable voice-dictation.service
+enable obex.service

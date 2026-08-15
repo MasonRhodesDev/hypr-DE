@@ -1,0 +1,11 @@
+#!/bin/bash
+# Toggle the BlueZ adapter. Waybar bluetooth on-click-right.
+set -euo pipefail
+if ! command -v bluetoothctl >/dev/null; then
+    exit 1
+fi
+if timeout 2 bluetoothctl show 2>/dev/null | grep -q 'Powered: yes'; then
+    bluetoothctl power off
+else
+    bluetoothctl power on
+fi

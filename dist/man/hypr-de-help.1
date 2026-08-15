@@ -1,0 +1,28 @@
+.TH HYPR-DE-HELP 1 "2026-08-15" "hypr-DE" "hypr-DE"
+.SH NAME
+hypr-de-help \- welcome and help window for hypr-DE
+.SH SYNOPSIS
+.B hypr-de-help
+.RI [ --welcome ]
+.SH DESCRIPTION
+Opens the hypr-DE help window: a Welcome page, a How it works explanation
+of the session, and a live keybind list loaded from
+.B hyprctl binds -j .
+.PP
+.B SUPER+/
+is bound to this command.
+.B SUPER+SHIFT+/
+opens the fuzzel cheatsheet of the same binds.
+.PP
+.B --welcome
+selects the Welcome page. First login runs
+.B hypr-de-welcome ,
+which is marker-gated and then execs
+.B hypr-de-help --welcome .
+.SH OPTIONS
+.TP
+.B --welcome
+Show the first-run Welcome page instead of Keybinds.
+.SH SEE ALSO
+.BR hypr-de (7),
+.BR workspace-zones (7)

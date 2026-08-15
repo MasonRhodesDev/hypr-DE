@@ -1,0 +1,279 @@
+#!/usr/bin/env python3
+"""Welcome / help window: session explanation plus live Hyprland binds."""
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+
+DATADIR = "@DATADIR@"
+APP_ID = "dev.mason.hypr-de-help"
+
+HOW_IT_WORKS = """\
+<b>hypr-DE</b> is packaged Hyprland configuration plus the packages that \
+session needs. Log into <b>Hyprland (uwsm)</b> — there is no separate greeter session.
+
+<b>Config</b>
+Packaged Lua loads first; your overrides win last.
+• system: /etc/xdg/hypr/hyprland.lua
+• package: @DATADIR@/hypr/main.lua
+• you: ~/.config/hypr/local.lua  (copy the example; last-wins)
+Monitor layouts belong in ~/.config/hypr/profiles/ (hyprstate), not local.lua.
+
+<b>Theme</b>
+SUPER+T runs <tt>lmtt switch</tt>. GTK follows the appearance portal. Qt apps \
+using qt6ct get an LMTT-owned palette (~/.config/qt6ct/colors/lmtt.conf); Fonts \
+in qt6ct.conf stay yours.
+
+<b>Bar, lock, files, bluetooth</b>
+Waybar is the shell. SUPER+L locks via loginctl (hypridle answers with the \
+same lock as idle/suspend). SUPER+E opens Nautilus. The waybar bluetooth \
+module is the indicator — left-click Overskride, right-click adapter power.
+
+<b>Scratchpad vs workspace zones</b>
+SUPER+S / SUPER+0 toggles the named scratchpad <tt>special:magic</tt> (works \
+with stock Hyprland). SUPER+ALT+S toggles this workspace's zone \
+(<tt>special:N</tt> on workspace N) and needs the workspace-zones plugin \
+(<tt>man workspace-zones</tt>). Named scratchpads are never those zones.
+
+<b>Keys</b>
+This window (SUPER+/) lists every bind from the running compositor, including \
+local.lua. SUPER+SHIFT+/ is a fuzzel quick-search of the same list. \
+<tt>man hypr-de</tt> is the prose version of this page.
+"""
+
+
+def config_home() -> str:
+    return os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+
+
+def hasmod(modmask: int, bit: int) -> bool:
+    return ((modmask // bit) % 2) == 1
+
+
+def combo_of(bind: dict) -> str:
+    parts: list[str] = []
+    mask = int(bind.get("modmask") or 0)
+    if hasmod(mask, 64):
+        parts.append("SUPER")
+    if hasmod(mask, 4):
+        parts.append("CTRL")
+    if hasmod(mask, 8):
+        parts.append("ALT")
+    if hasmod(mask, 1):
+        parts.append("SHIFT")
+    key = bind.get("key") or ""
+    if key:
+        parts.append(key)
+    else:
+        parts.append(f"code:{bind.get('keycode', 0)}")
+    return "+".join(parts)
+
+
+def load_binds() -> tuple[list[tuple[str, str]], str | None]:
+    try:
+        raw = subprocess.check_output(
+            ["hyprctl", "binds", "-j"], text=True, timeout=3
+        )
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as err:
+        return [], f"Could not read binds ({err}). They appear here inside a Hyprland session."
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return [], "hyprctl returned invalid JSON."
+    rows: list[tuple[str, str, int]] = []
+    for bind in data:
+        if bind.get("submap"):
+            continue
+        desc = bind.get("description") if bind.get("has_description") else "(custom): unlabeled bind"
+        rank = 0 if bind.get("has_description") else 1
+        rows.append((combo_of(bind), desc, rank))
+    rows.sort(key=lambda item: (item[2], item[1], item[0]))
+    return [(combo, desc) for combo, desc, _rank in rows], None
+
+
+def launch(argv: list[str]) -> None:
+    if shutil.which("uwsm"):
+        subprocess.Popen(["uwsm", "app", "--", *argv], start_new_session=True)
+        return
+    subprocess.Popen(argv, start_new_session=True)
+
+
+def open_local_lua() -> None:
+    dest_dir = os.path.join(config_home(), "hypr")
+    dest = os.path.join(dest_dir, "local.lua")
+    example = os.path.join(DATADIR, "hypr", "local.lua.example")
+    os.makedirs(dest_dir, exist_ok=True)
+    if not os.path.exists(dest) and os.path.isfile(example):
+        shutil.copyfile(example, dest)
+    editor = os.environ.get("EDITOR") or "nano"
+    terminal = shutil.which("kitty") or shutil.which("xdg-terminal-exec")
+    if terminal and os.path.basename(terminal) == "kitty":
+        launch([terminal, "-e", editor, dest])
+    elif terminal:
+        launch([terminal, editor, dest])
+    else:
+        launch([editor, dest])
+
+
+def open_man(page: str) -> None:
+    terminal = shutil.which("kitty") or shutil.which("xdg-terminal-exec")
+    if terminal and os.path.basename(terminal) == "kitty":
+        launch([terminal, "-e", "man", page])
+    elif terminal:
+        launch([terminal, "man", page])
+    else:
+        launch(["man", page])
+
+
+def notify_fallback(body: str) -> None:
+    subprocess.run(
+        ["notify-send", "-a", "hypr-DE", "Welcome to hypr-DE", body],
+        check=False,
+    )
+
+
+def build_ui(app, first_run: bool) -> None:
+    from gi.repository import Adw, Gtk, Pango
+
+    win = Adw.ApplicationWindow(application=app, title="hypr-DE help")
+    win.set_default_size(820, 560)
+    win.set_content(Adw.ToolbarView())
+    view = win.get_content()
+
+    stack = Adw.ViewStack()
+    switcher = Adw.ViewSwitcher(stack=stack, policy=Adw.ViewSwitcherPolicy.WIDE)
+    header = Adw.HeaderBar()
+    header.set_title_widget(switcher)
+    view.add_top_bar(header)
+    view.set_content(stack)
+
+    welcome = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+    welcome.set_margin_top(24)
+    welcome.set_margin_bottom(24)
+    welcome.set_margin_start(24)
+    welcome.set_margin_end(24)
+    title = Gtk.Label(label="Welcome to hypr-DE")
+    title.add_css_class("title-1")
+    title.set_xalign(0)
+    blurb = Gtk.Label(
+        label="This is a packaged Hyprland config set, not a custom login session. "
+        "SUPER+/ opens this window anytime. Personal overrides live in ~/.config/hypr/local.lua."
+    )
+    blurb.set_wrap(True)
+    blurb.set_xalign(0)
+    buttons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+    btn_lua = Gtk.Button(label="Edit local.lua")
+    btn_lua.add_css_class("suggested-action")
+    btn_lua.connect("clicked", lambda *_: open_local_lua())
+    btn_man = Gtk.Button(label="man hypr-de")
+    btn_man.connect("clicked", lambda *_: open_man("hypr-de"))
+    btn_zones = Gtk.Button(label="man workspace-zones")
+    btn_zones.connect("clicked", lambda *_: open_man("workspace-zones"))
+    buttons.append(btn_lua)
+    buttons.append(btn_man)
+    buttons.append(btn_zones)
+    welcome.append(title)
+    welcome.append(blurb)
+    welcome.append(buttons)
+    stack.add_titled(welcome, "welcome", "Welcome")
+
+    how_label = Gtk.Label()
+    how_label.set_markup(HOW_IT_WORKS)
+    how_label.set_wrap(True)
+    how_label.set_xalign(0)
+    how_label.set_yalign(0)
+    how_label.set_selectable(True)
+    how_label.set_margin_top(16)
+    how_label.set_margin_bottom(16)
+    how_label.set_margin_start(20)
+    how_label.set_margin_end(20)
+    how_scroll = Gtk.ScrolledWindow()
+    how_scroll.set_child(how_label)
+    how_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+    stack.add_titled(how_scroll, "how", "How it works")
+
+    binds_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+    binds_box.set_margin_top(12)
+    binds_box.set_margin_bottom(12)
+    binds_box.set_margin_start(12)
+    binds_box.set_margin_end(12)
+    search = Gtk.SearchEntry()
+    search.set_placeholder_text("Filter by key or category (Windows, Media, Workspaces…)")
+    listbox = Gtk.ListBox()
+    listbox.set_selection_mode(Gtk.SelectionMode.NONE)
+    listbox.add_css_class("boxed-list")
+    binds, err = load_binds()
+    if err:
+        empty = Gtk.Label(label=err)
+        empty.set_wrap(True)
+        empty.set_xalign(0)
+        binds_box.append(empty)
+    for combo, desc in binds:
+        row = Gtk.ListBoxRow()
+        row.haystack = f"{combo} {desc}".lower()
+        inner = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
+        inner.set_margin_top(8)
+        inner.set_margin_bottom(8)
+        inner.set_margin_start(12)
+        inner.set_margin_end(12)
+        combo_l = Gtk.Label(label=combo)
+        combo_l.set_xalign(0)
+        combo_l.set_width_chars(28)
+        combo_l.set_ellipsize(Pango.EllipsizeMode.END)
+        combo_l.add_css_class("monospace")
+        desc_l = Gtk.Label(label=desc)
+        desc_l.set_xalign(0)
+        desc_l.set_hexpand(True)
+        desc_l.set_ellipsize(Pango.EllipsizeMode.END)
+        inner.append(combo_l)
+        inner.append(desc_l)
+        row.set_child(inner)
+        listbox.append(row)
+
+    def matches(row, *_args) -> bool:
+        needle = search.get_text().strip().lower()
+        if not needle:
+            return True
+        return needle in getattr(row, "haystack", "")
+
+    listbox.set_filter_func(matches)
+    search.connect("search-changed", lambda *_: listbox.invalidate_filter())
+    scroll = Gtk.ScrolledWindow()
+    scroll.set_child(listbox)
+    scroll.set_vexpand(True)
+    binds_box.append(search)
+    binds_box.append(scroll)
+    stack.add_titled(binds_box, "binds", "Keybinds")
+
+    if first_run:
+        stack.set_visible_child_name("welcome")
+    else:
+        stack.set_visible_child_name("binds")
+    win.present()
+
+
+def main() -> int:
+    first_run = "--welcome" in sys.argv[1:]
+    try:
+        import gi
+
+        gi.require_version("Gtk", "4.0")
+        gi.require_version("Adw", "1")
+        from gi.repository import Adw
+    except (ImportError, ValueError) as err:
+        notify_fallback(
+            "Press SUPER+/ for help once GTK is available. "
+            f"({err}) Personal overrides: ~/.config/hypr/local.lua"
+        )
+        return 0
+
+    app = Adw.Application(application_id=APP_ID)
+    app.connect("activate", lambda a: build_ui(a, first_run))
+    return app.run([])
+
+
+if __name__ == "__main__":
+    sys.exit(main())

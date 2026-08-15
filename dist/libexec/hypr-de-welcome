@@ -15,24 +15,6 @@ fi
 
 [ -e "$MARKER" ] && exit 0
 mkdir -p "$CONFIG/hypr-de"
-touch "$MARKER"   # once-ever, regardless of how the notification ends
+touch "$MARKER"   # once-ever, regardless of how the window ends
 
-# swaync may still be starting alongside the compositor
-for _ in $(seq 1 15); do
-    busctl --user status org.freedesktop.Notifications >/dev/null 2>&1 && break
-    sleep 1
-done
-
-# -A implies --wait; the chosen action name arrives on stdout (empty on dismiss)
-ACTION=$(notify-send -a hypr-DE -t 0 \
-    -A keys="Show keybinds" -A customize="Customize" \
-    "Welcome to hypr-DE" \
-    "Press SUPER+/ anytime for the searchable keybind list. Personal overrides live in ~/.config/hypr/local.lua.") || exit 0
-
-case "$ACTION" in
-    keys)
-        exec @LIBEXECDIR@/hypr-de-cheatsheet ;;
-    customize)
-        [ -e "$CONFIG/hypr/local.lua" ] || cp @DATADIR@/hypr/local.lua.example "$CONFIG/hypr/local.lua"
-        exec uwsm app -- kitty -e "${EDITOR:-nano}" "$CONFIG/hypr/local.lua" ;;
-esac
+exec @BINDIR@/hypr-de-help --welcome

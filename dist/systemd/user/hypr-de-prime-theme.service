@@ -1,0 +1,13 @@
+[Unit]
+Description=Render hypr-DE styles before the bar and notification daemon
+PartOf=graphical-session.target
+Before=waybar.service swaync.service
+After=graphical-session-pre.target
+
+[Service]
+Type=oneshot
+ExecStart=@LIBEXECDIR@/hypr-de-prime-theme
+RemainAfterExit=yes
+
+[Install]
+WantedBy=graphical-session.target

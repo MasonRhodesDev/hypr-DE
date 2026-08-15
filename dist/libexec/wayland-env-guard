@@ -5,7 +5,7 @@
 # at every startup. Short-lived compositors — the greeter-canary's nested
 # Hyprland, game-mode sessions on other VTs — stamp their socket and leave it
 # dangling on exit, which breaks every D-Bus-activated GUI service afterwards
-# (blueman-applet's pairing agent being the recurring victim).
+# (D-Bus-activated GUI agents being the recurring victims).
 #
 # Also keeps the xdg-desktop-portal stack healthy: xdph that races a
 # compositor restart dies into start-limit-hit and stays dead until reset

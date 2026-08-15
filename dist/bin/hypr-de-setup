@@ -1,13 +1,16 @@
 #!/bin/bash
-# hypr-DE per-user setup. Idempotent: seeds the minimal user-side files the
-# packaged DE needs, enables the DE user units, and primes the themed styles.
-# Everything else is package-owned — this script deliberately seeds only:
-#   ~/.config/hypr/hyprland.lua          (3-line entry stub, stable forever)
-#   ~/.config/hypr-de/wallpaper.conf     ($WALLPAPER, default fallback)
-#   ~/.config/hypr/profiles/             (empty dir; hyprstate fills it)
+# hypr-DE per-user setup. Idempotent. Package-owned defaults live under
+# /usr and /etc/xdg; this script does not copy them into home.
 #
-# --adopt: overwrite an existing hyprland.lua with the stub, backing the old
-# file up to ~/.config/hypr-de/backup-<date>/.
+# It:
+#   - presets DE user units (Arch and existing Fedora users; new Fedora
+#     accounts get the preset via %systemd_user_post)
+#   - verifies those units are enabled (fail closed)
+#   - copies xdph.conf into ~/.config/hypr/ if missing (XDPH only reads
+#     that path; it does not search XDG_CONFIG_DIRS)
+#
+# --adopt: back up and remove ~/.config/hypr/hyprland.lua so Hyprland uses
+# the packaged /etc/xdg/hypr/hyprland.lua. Overrides belong in local.lua.
 set -euo pipefail
 
 CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}"
@@ -16,85 +19,127 @@ ADOPT=0
 [ "${1:-}" = "--adopt" ] && ADOPT=1
 
 say() { printf '== %s\n' "$*"; }
+warn() { printf '!! %s\n' "$*" >&2; }
 
-mkdir -p "$CONFIG/hypr/profiles" "$CONFIG/hypr-de"
+REQUIRED_UNITS=(
+    sni-watcher.service
+    hypridle.service
+    hyprpolkitagent.service
+    swaync.service
+    waybar.service
+    swaybg.service
+    waybar-reload.path
+    waybar-watchdog.timer
+    wayland-env-guard.path
+    wayland-env-guard.timer
+    hyprland-configreload-listener.service
+    notification-focus-proxy.service
+    hypr-de-prime-theme.service
+    udiskie.service
+    hyprstate.service
+    logind-idle-control.service
+    voice-dictation.service
+    obex.service
+)
 
-# Entry stub
-STUB_SRC="$DATADIR/hypr/hyprland.lua.stub"
-STUB_DST="$CONFIG/hypr/hyprland.lua"
-if [ -e "$STUB_DST" ] && ! cmp -s "$STUB_SRC" "$STUB_DST"; then
-    if [ "$ADOPT" = 1 ]; then
-        BK="$CONFIG/hypr-de/backup-$(date +%Y%m%d-%H%M%S)"
-        mkdir -p "$BK"
-        cp -a "$STUB_DST" "$BK/hyprland.lua"
-        cp "$STUB_SRC" "$STUB_DST"
-        say "hyprland.lua replaced with stub (old file: $BK/hyprland.lua)"
-        # Migrating an existing config: skip the first-login greeting
-        "@LIBEXECDIR@/hypr-de-welcome" --adopt
-    else
-        say "hyprland.lua exists and differs from the stub — leaving it alone (use --adopt to replace with backup)"
-    fi
-else
-    cp "$STUB_SRC" "$STUB_DST"
-    say "hyprland.lua stub in place"
-fi
+GAMING_UNITS=(
+    bp-game-focus.service
+    steam-clean-shutdown.service
+)
 
-# Screen-share portal config: xdph only reads ~/.config/hypr/xdph.conf and
-# hyprlang `source=` support there is unverified, so seed a copy (not a stub).
-if [ ! -e "$CONFIG/hypr/xdph.conf" ]; then
-    cp "$DATADIR/hypr/xdph.conf" "$CONFIG/hypr/xdph.conf"
-    say "xdph.conf seeded"
-fi
+user_systemd_ok() {
+    systemctl --user show-environment >/dev/null 2>&1
+}
 
-# Wallpaper: swaybg/lmtt must agree, and set-wallpaper is the single writer.
-# Align when the wallpaper file is missing OR lmtt's configured wallpaper
-# doesn't resolve (fresh lmtt defaults to a nonexistent path, silently
-# falling back to the built-in palette).
-CUR_WP=$(sed -n 's/^\$WALLPAPER = //p' "$CONFIG/hypr-de/wallpaper.conf" 2>/dev/null)
-[ -n "$CUR_WP" ] && [ -r "$CUR_WP" ] || CUR_WP="$DATADIR/wallpapers/default.png"
-LMTT_WP=$(lmtt status 2>/dev/null | sed -n 's/^Wallpaper: //p'); LMTT_WP="${LMTT_WP/#\~/$HOME}"
-if [ ! -e "$CONFIG/hypr-de/wallpaper.conf" ] || [ ! -r "$LMTT_WP" ]; then
-    "@BINDIR@/hypr-de-set-wallpaper" "$CUR_WP" >/dev/null
-    say "wallpaper aligned across swaybg/lmtt ($CUR_WP)"
-fi
+unit_exists() {
+    systemctl --user cat "$1" >/dev/null 2>&1
+}
 
-# DE user units (covers Arch and pre-existing users; preset files handle new
-# Fedora users via %systemd_user_post)
-if systemctl --user is-enabled default.target >/dev/null 2>&1 || [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
+unit_enabled() {
+    case "$(systemctl --user is-enabled "$1" 2>/dev/null || echo missing)" in
+        enabled|enabled-runtime|static|alias|indirect) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+preset_and_check() {
+    local fail=0 u
     systemctl --user daemon-reload || true
-    systemctl --user preset \
-        sni-watcher.service \
-        hypridle.service hyprpolkitagent.service swaync.service waybar.service \
-        swaybg.service waybar-reload.path waybar-watchdog.timer \
-        wayland-env-guard.path wayland-env-guard.timer \
-        hyprland-configreload-listener.service notification-focus-proxy.service \
-        udiskie.service \
-        hyprstate.service logind-idle-control.service voice-dictation.service \
-        bp-game-focus.service steam-clean-shutdown.service \
-        2>/dev/null || true
-    say "DE user units preset"
+    for u in "$@"; do
+        if ! unit_exists "$u"; then
+            warn "missing unit file: $u"
+            fail=1
+            continue
+        fi
+        if ! systemctl --user preset "$u" >/dev/null 2>&1; then
+            warn "preset failed: $u"
+            fail=1
+            continue
+        fi
+        if ! unit_enabled "$u"; then
+            warn "$u is $(systemctl --user is-enabled "$u" 2>/dev/null || echo missing) (expected enabled)"
+            fail=1
+        fi
+    done
+    return "$fail"
+}
+
+nvidia_notice() {
+    local hw=0 v
+    for v in /sys/bus/pci/devices/*/vendor; do
+        [ -f "$v" ] || continue
+        if [ "$(cat "$v" 2>/dev/null)" = "0x10de" ]; then
+            hw=1
+            break
+        fi
+    done
+    [ "$hw" = 1 ] || return 0
+    if [ -d /sys/module/nvidia ]; then
+        say "NVIDIA GPU + proprietary module detected; uwsm env-hyprland will apply wiki session vars"
+    else
+        say "NVIDIA GPU detected, proprietary module not loaded (not a hypr-DE dep)"
+        say "Arch: nvidia-dkms nvidia-utils libva-nvidia-driver — Fedora: akmod-nvidia"
+    fi
+}
+
+# Screen-share portal config: XDPH hardcodes ~/.config/hypr/xdph.conf.
+if [ ! -e "$CONFIG/hypr/xdph.conf" ]; then
+    mkdir -p "$CONFIG/hypr"
+    cp "$DATADIR/hypr/xdph.conf" "$CONFIG/hypr/xdph.conf"
+    say "xdph.conf seeded (XDPH has no system config path)"
+fi
+
+if [ "$ADOPT" = 1 ] && [ -e "$CONFIG/hypr/hyprland.lua" ]; then
+    BK="$CONFIG/hypr-de/backup-$(date +%Y%m%d-%H%M%S)"
+    mkdir -p "$BK"
+    cp -a "$CONFIG/hypr/hyprland.lua" "$BK/hyprland.lua"
+    rm -f "$CONFIG/hypr/hyprland.lua"
+    say "hyprland.lua moved to $BK/hyprland.lua (Hyprland will use /etc/xdg/hypr/hyprland.lua)"
+    "@LIBEXECDIR@/hypr-de-welcome" --adopt
+fi
+
+if ! user_systemd_ok; then
+    warn "no systemd user session (need DBUS/XDG_RUNTIME_DIR). Re-run hypr-de-setup after login."
+    exit 1
+fi
+
+units=("${REQUIRED_UNITS[@]}")
+for u in "${GAMING_UNITS[@]}"; do
+    unit_exists "$u" && units+=("$u")
+done
+
+if preset_and_check "${units[@]}"; then
+    say "DE user units preset and enabled"
+else
+    warn "one or more DE user units failed to enable"
+    exit 1
 fi
 
 if ! command -v sni-watcher >/dev/null 2>&1; then
-    say "sni-watcher missing — Waybar may claim org.kde.StatusNotifierWatcher"
+    warn "sni-watcher missing — Waybar may claim org.kde.StatusNotifierWatcher"
+    exit 1
 fi
 
-# Bootstrap the rendered stylesheets waybar/swaync launch against. The
-# packaged .hbs templates are valid CSS (handlebars tokens only appear in
-# comments), so a plain copy keeps first launch styled even before lmtt
-# (with system-module support) has rendered them properly. lmtt overwrites
-# these on the next `lmtt switch`.
-for t in waybar swaync; do
-    if [ ! -e "$CONFIG/hypr-de/$t.css" ]; then
-        cp "$DATADIR/lmtt/templates/$t.css.hbs" "$CONFIG/hypr-de/$t.css"
-        say "$t.css bootstrapped from template"
-    fi
-done
+nvidia_notice
 
-# Prime themed styles so first launch isn't unstyled
-if command -v lmtt >/dev/null 2>&1; then
-    lmtt switch dark >/dev/null 2>&1 || true
-    say "lmtt theme primed"
-fi
-
-say "hypr-DE setup complete. Log into the hypr-DE session (or hyprctl reload)."
+say "hypr-DE setup complete. Log into Hyprland (uwsm) from the greeter."

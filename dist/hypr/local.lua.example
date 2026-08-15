@@ -21,5 +21,15 @@
 -- hl.window_rule({ name = "keep-tile", match = { title = "^(keep.google.com_/)$" }, tile = true })
 -- hl.window_rule({ name = "android-emulator", match = { class = "^(Emulator)$" }, float = true })
 
--- Rebind or add keys (same bind API as main.lua):
--- hl.bind("SUPER + B", hl.dsp.exec_cmd("uwsm app -- firefox"))
+-- Night light (hyprsunset). Not started by default; install the package
+-- (optdepend / Recommends) then uncomment:
+-- hl.on("hyprland.start", function()
+--     hl.exec_cmd("uwsm app -- hyprsunset")
+-- end)
+
+-- Rebind or add keys (same bind API as main.lua). Give them a description
+-- so they show up labeled in hypr-de-help (SUPER+/) and the cheatsheet:
+-- hl.bind("SUPER + B", hl.dsp.exec_cmd("uwsm app -- firefox"), { desc = "Apps: Browser" })
+--
+-- SUPER+/ opens the help window (binds + how the session works).
+-- man hypr-de and man workspace-zones are the prose versions.

@@ -40,7 +40,6 @@ main)
 
     # binaries + libexec helpers
     for f in "$STAGE"/bin/*; do
-        [ "$(basename "$f")" = "hyprland.lua.stub" ] && continue
         instx "$f" "$BINDIR/$(basename "$f")"
     done
     (cd "$STAGE/libexec" && find . -type f) | while read -r f; do
@@ -53,13 +52,20 @@ main)
     done
     inst "$STAGE/systemd/user-preset/90-hypr-de.preset" "$PRESETDIR/90-hypr-de.preset"
 
-    # session env + skel (no wayland-session entry: hypr-DE *distributes*
-    # the uwsm-managed Hyprland session, it is not an alternative to it —
-    # a second entry just makes the greeter ask a question with no answer)
+    # uwsm env for the stock Hyprland (uwsm) session. No wayland-sessions
+    # entry: hypr-DE is configs + deps, not a competing greeter session.
     inst "$STAGE/uwsm/env"          "$XDGCONFDIR/uwsm/env"
     inst "$STAGE/uwsm/env-hyprland" "$XDGCONFDIR/uwsm/env-hyprland"
     inst "$STAGE/environment.d/60-hypr-de.conf" "$ENVGENDIR/60-hypr-de.conf"
-    inst "$STAGE/skel/.config/hypr/hyprland.lua" "$SKELDIR/.config/hypr/hyprland.lua"
+    inst "$STAGE/xdg/hypr/hyprland.lua" "$XDGCONFDIR/hypr/hyprland.lua"
+
+    if [ -d "$STAGE/man" ]; then
+        for f in "$STAGE"/man/*; do
+            [ -f "$f" ] || continue
+            sec="${f##*.}"
+            inst "$f" "$MANDIR/man${sec}/$(basename "$f")"
+        done
+    fi
     ;;
 gaming)
     inst  "$STAGE/gaming/game-rules.lua" "$DATADIR/gaming/game-rules.lua"

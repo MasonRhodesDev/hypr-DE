@@ -1,0 +1,30 @@
+#!/bin/bash
+# System-level setup run from the package install scriptlet. Idempotent.
+# Enables NetworkManager and bluetooth, and wires gnome-keyring into greetd
+# PAM when missing.
+set -euo pipefail
+
+systemctl enable NetworkManager.service >/dev/null 2>&1 || true
+systemctl enable bluetooth.service >/dev/null 2>&1 || true
+
+pam=/etc/pam.d/greetd
+if [ -f "$pam" ] && ! grep -q 'pam_gnome_keyring.so' "$pam"; then
+    tmp=$(mktemp)
+    awk '
+        { print }
+        /^auth[[:space:]]+include[[:space:]]+system-local-login/ && !auth {
+            print "-auth       optional    pam_gnome_keyring.so"
+            auth = 1
+        }
+        /^password[[:space:]]+include[[:space:]]+system-local-login/ && !password {
+            print "-password   optional    pam_gnome_keyring.so use_authtok"
+            password = 1
+        }
+        /^session[[:space:]]+include[[:space:]]+system-local-login/ && !session {
+            print "-session    optional    pam_gnome_keyring.so auto_start"
+            session = 1
+        }
+    ' "$pam" > "$tmp"
+    cat "$tmp" > "$pam"
+    rm -f "$tmp"
+fi

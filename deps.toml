@@ -4,9 +4,9 @@
 # so deps can be dropped when their component goes.
 
 [compositor]
-reason = "the compositor itself (NOTE: needs Lua-config-capable build; stock packages are pre-Lua — see README caveat)"
-fedora = ["hyprland"]
-arch = ["hyprland"]
+reason = "Hyprland Lua config API (hl.bind / hyprland.lua). Floor is 0.55; hyprland-git Provides hyprland= so a 0.55.x git build satisfies this."
+fedora = ["hyprland >= 0.55"]
+arch = ["hyprland>=0.55"]
 
 [lock-idle]
 reason = "vigil (vigil-lock lock_cmd / before_sleep_cmd), hypridle (idle policy in hypr/hypridle.conf); SUPER+L is loginctl lock-session which hypridle answers"
@@ -24,9 +24,9 @@ fedora = ["sni-watcher"]
 arch = ["sni-watcher"]
 
 [bluetooth]
-reason = "waybar bluetooth on-click-right launches blueman-manager; Blueman is the external Bluetooth UI (provider=blueman, seam=waybar on-click-right, no in-tree fallback)"
-fedora = ["blueman"]
-arch = ["blueman"]
+reason = "BlueZ daemon (enabled on install) + OBEX; waybar bluetooth module is the indicator (no tray applet); left-click opens Overskride (GTK4/libadwaita pairing/profiles/files); right-click toggles adapter power. PipeWire/WirePlumber own BT audio. Overskride is hosted on [mason] and solaris765/hypr-de-extras (not in extra/Fedora)."
+fedora = ["bluez", "bluez-obexd", "overskride"]
+arch = ["bluez", "bluez-obex", "bluez-utils", "overskride"]
 
 [notifications]
 reason = "swaync daemon (swaync/config.json, recovery framework, waybar module)"
@@ -34,17 +34,17 @@ fedora = ["SwayNotificationCenter"]
 arch = ["swaync"]
 
 [launcher]
-reason = "fuzzel (SUPER+R bind, power-menu.sh + cheatsheet dmenu backend)"
+reason = "fuzzel (SUPER+R bind, power-menu.sh + SUPER+SHIFT+/ cheatsheet dmenu backend)"
 fedora = ["fuzzel"]
 arch = ["fuzzel"]
 
 [portal-polkit]
-reason = "screen sharing portal (hypr/xdph.conf) + polkit agent (preset unit)"
-fedora = ["xdg-desktop-portal-hyprland", "hyprpolkitagent"]
-arch = ["xdg-desktop-portal-hyprland", "hyprpolkitagent"]
+reason = "portal frontend + xdph backend (hypr/xdph.conf) + gtk Settings backend (LMTT appearance) + polkit agent (preset unit)"
+fedora = ["xdg-desktop-portal", "xdg-desktop-portal-hyprland", "xdg-desktop-portal-gtk", "hyprpolkitagent"]
+arch = ["xdg-desktop-portal", "xdg-desktop-portal-hyprland", "xdg-desktop-portal-gtk", "hyprpolkitagent"]
 
 [session]
-reason = "uwsm session management (wayland-sessions entry, uwsm env files) + swaybg wallpaper unit"
+reason = "uwsm env files for the stock Hyprland (uwsm) session + swaybg wallpaper unit"
 fedora = ["uwsm", "swaybg"]
 arch = ["uwsm", "swaybg"]
 
@@ -55,24 +55,29 @@ fedora_weak = ["gpu-screen-recorder"]
 arch = ["grim", "slurp", "swappy", "hyprpicker", "wl-clipboard", "gpu-screen-recorder"]
 
 [script-runtime]
-reason = "socat (configreload-listener), playerctl (media-osd, waybar media), brightnessctl (brightness-osd), jq (swaync focus-sender, snip, cheatsheet, updates JSON), libnotify (OSD + welcome notify-send), python3+dbus+gobject (notification-focus-proxy, waybar-mediaplayer, hypr-de-theme)"
+reason = "socat (configreload-listener), playerctl (media-osd, waybar media), brightnessctl (brightness-osd), jq (swaync focus-sender, snip, cheatsheet, updates JSON), libnotify (OSD + help fallback), python3+dbus+gobject (notification-focus-proxy, waybar-mediaplayer, hypr-de-theme, hypr-de-help)"
 fedora = ["socat", "playerctl", "brightnessctl", "jq", "/usr/bin/notify-send", "python3", "python3-dbus", "python3-gobject"]
 arch = ["socat", "playerctl", "brightnessctl", "jq", "libnotify", "python", "python-dbus", "python-gobject"]
 
 [audio]
-reason = "wpctl binds + volume-osd + waybar pulseaudio module + pavucontrol on-click; hyprpwcenter bound to SHIFT+XF86AudioPlay"
-fedora = ["wireplumber", "pavucontrol", "hyprpwcenter"]
-arch = ["wireplumber", "pavucontrol", "hyprpwcenter"]
+reason = "PipeWire server + WirePlumber session + Pulse/ALSA compat; wpctl binds + volume-osd; waybar pulseaudio module; pavucontrol (app mixer); hyprpwcenter (patchbay, SHIFT+XF86AudioPlay); playerctl is MPRIS not routing"
+fedora = ["pipewire", "wireplumber", "pipewire-pulseaudio", "pipewire-alsa", "pavucontrol", "hyprpwcenter"]
+arch = ["pipewire", "wireplumber", "pipewire-pulse", "pipewire-alsa", "pavucontrol", "hyprpwcenter"]
 
 [theming]
-reason = "lmtt renders all styles (SUPER+T, autostart); matugen palette extraction; hyprstate monitor profiles/power; voice-dictation bind; logind-idle-control"
-fedora = ["lmtt", "matugen", "hyprstate", "hyprland-voice-dictation", "logind-idle-control"]
-arch = ["lmtt", "matugen", "hyprstate", "hyprland-voice-dictation", "logind-idle-control"]
+reason = "lmtt renders all styles (SUPER+T, autostart); matugen palette extraction; hyprstate monitor profiles/power; hyprstate-gui displays/power UI; voice-dictation bind; logind-idle-control; qt6ct (QT_QPA_PLATFORMTHEME); gnome-keyring (uwsm/env + greetd PAM)"
+fedora = ["lmtt", "matugen", "hyprstate", "hyprstate-gui", "hyprland-voice-dictation", "logind-idle-control", "qt6ct", "gnome-keyring"]
+arch = ["lmtt", "matugen", "hyprstate", "hyprstate-gui", "hyprland-voice-dictation", "logind-idle-control", "qt6ct", "gnome-keyring"]
+
+[hypr-ecosystem]
+reason = "Official hyprwm extras the session needs: hyprshutdown (power-menu.sh), hyprland-guiutils (hyprland-dialog), hyprland-qt-support (QML for hyprpolkitagent/hyprpwcenter). Not listed: hyprlock (vigil), hyprpaper (swaybg), hyprlauncher (fuzzel), hyprshot (grim/slurp/swappy), hyprsunset (optional night light). hyprqt6engine and hyprsysteminfo are -git/unofficial only, not extra/COPR. NVIDIA drivers are never a dep — session env applies only if the nvidia module is already loaded."
+fedora = ["hyprshutdown", "hyprland-guiutils", "hyprland-qt-support"]
+arch = ["hyprshutdown", "hyprland-guiutils", "hyprland-qt-support"]
 
 [desktop-misc]
-reason = "udiskie automount (preset unit), kitty (SUPER+Q terminal, updates-check), thunar (SUPER+E)"
-fedora = ["udiskie", "kitty", "network-manager-applet"]
-arch = ["udiskie", "kitty", "network-manager-applet"]
+reason = "udiskie automount (preset unit), kitty (SUPER+Q terminal, updates-check), nautilus (SUPER+E; GTK4/libadwaita follows LMTT portal appearance), gtk4+libadwaita (hypr-de-help), NetworkManager (enabled on install) + nm-applet"
+fedora = ["udiskie", "kitty", "NetworkManager", "network-manager-applet", "nautilus", "gtk4", "libadwaita"]
+arch = ["udiskie", "kitty", "networkmanager", "network-manager-applet", "nautilus", "gtk4", "libadwaita"]
 
 [fonts]
 reason = "waybar/swaync stylesheets (JetBrainsMono Nerd Font, Symbols Nerd Font), lock/UI labels (Noto Sans)"
@@ -86,7 +91,7 @@ fedora = ["python3"]
 arch = ["python"]
 
 [optional-extras]
-reason = "nice-to-haves referenced by docs/optdepends only"
+reason = "not started by default: hyprsunset (night light via local.lua), satty (alt snip annotator). NVIDIA packages are never pulled — detect-and-env only."
 fedora = []
 arch = []
-fedora_weak = ["satty", "thunar"]
+fedora_weak = ["hyprsunset", "satty"]
