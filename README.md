@@ -1,11 +1,18 @@
 # hypr-DE
 
-An opinionated, fully packaged Hyprland desktop environment for **Fedora**
-and **Arch**: compositor config (Lua), waybar, swaync with click-to-focus
-notification recovery, fuzzel, Material You theming via
-[lmtt](https://github.com/MasonRhodesDev/linux-multi-theme-toggle), monitor
-profiles via [hyprstate](https://github.com/MasonRhodesDev/hyprstate),
-screenshot/recording tooling, and a uwsm-managed session entry.
+**Alpha. Not ready.** This repo composes the rest of the stack into a
+packaged Hyprland session. It stays alpha until those supporting tools
+reach stability and quality first: [vigil](https://github.com/MasonRhodesDev/vigil),
+[hyprstate](https://github.com/MasonRhodesDev/hyprstate),
+[lmtt](https://github.com/MasonRhodesDev/linux-multi-theme-toggle),
+[sni-watcher](https://github.com/MasonRhodesDev/sni-watcher),
+[logind-idle-control](https://github.com/MasonRhodesDev/logind-idle-control),
+and the rest of the `[mason]` set.
+
+An opinionated Hyprland desktop composition for **Fedora** and **Arch**:
+compositor config (Lua), waybar, swaync with click-to-focus notification
+recovery, fuzzel, Material You theming via lmtt, monitor profiles via
+hyprstate, screenshot/recording tooling, and a uwsm-managed session entry.
 
 Configs and styles are **package-owned** and live in system paths; your home
 directory carries only a 3-line entry stub, your monitor profiles, your
@@ -20,6 +27,9 @@ wallpaper, and whatever you choose to override.
 > this gap before a bespoke package does.)
 
 ## Install
+
+Expect breakage. Prefer installing the supporting tools on their own until
+this is out of alpha.
 
 **Fedora**
 

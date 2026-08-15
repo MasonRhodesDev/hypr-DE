@@ -1,7 +1,7 @@
 Name:           hypr-de
 Version:        0.2.1
 Release:        1%{?dist}
-Summary:        Opinionated Hyprland desktop environment
+Summary:        Alpha Hyprland desktop environment (not ready)
 
 License:        MIT
 URL:            https://github.com/MasonRhodesDev/hypr-DE
@@ -61,7 +61,10 @@ Recommends:     satty
 Recommends:     thunar
 
 %description
-hypr-DE is an opinionated, fully packaged Hyprland desktop environment:
+hypr-DE is alpha and not ready. It composes supporting tools that need to
+stabilize first.
+
+hypr-DE is an opinionated Hyprland desktop composition:
 compositor configuration (Lua), waybar, swaync with notification recovery,
 fuzzel, Material You theming via lmtt, monitor profiles via hyprstate,
 screenshot/recording tooling, and a uwsm-managed wayland session — installed
