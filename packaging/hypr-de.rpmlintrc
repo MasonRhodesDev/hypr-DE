@@ -1,3 +1,7 @@
 # rpmlint filters for hypr-de. Lets CI gate on rpmlint without tripping over
 # domain vocabulary (Hyprland, waybar, swaync, lmtt, compositor terms).
 addFilter("spelling-error")
+
+# noarch scripts cannot auto-generate ELF lib Requires; hypr-de-help is GTK4
+# and needs libadwaita at runtime. Fedora flags any explicit lib* Requires.
+addFilter("explicit-lib-dependency libadwaita")

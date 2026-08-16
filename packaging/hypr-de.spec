@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.2
+Version:        0.2.3
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -187,6 +187,9 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Sun Aug 16 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.3-1
+- Filter rpmlint explicit-lib-dependency for libadwaita (noarch help UI).
+
 * Sun Aug 16 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.2-1
 - Skip DPMS-off while the session is locked; force DPMS on after lock.
 - Wake DPMS from mouse/key so VT return can modeset disabled outputs.
