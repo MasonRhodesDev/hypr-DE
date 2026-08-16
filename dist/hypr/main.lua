@@ -195,6 +195,11 @@ hl.config({
         disable_splash_rendering = false,
         force_default_wallpaper = 1,
         focus_on_activate       = true,
+        -- Direct setDPMS(true) on input. After VT return with outputs
+        -- DPMS-disabled, Aquamarine will not schedule frames (enabledState
+        -- false); this path modesets without waiting for a frame.
+        mouse_move_enables_dpms = true,
+        key_press_enables_dpms  = true,
     },
 
     cursor = {
