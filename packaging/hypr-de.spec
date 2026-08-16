@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.4
+Version:        0.2.5
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -187,6 +187,9 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Sun Aug 16 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.5-1
+- Init pacman-key before signing the [mason] extra repo in CI.
+
 * Sun Aug 16 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.4-1
 - Snapshot Arch sources on tag builds; pull [mason] during makepkg.
 - Lint RPMs with binaries, not the SRPM alone (libadwaita filter).
