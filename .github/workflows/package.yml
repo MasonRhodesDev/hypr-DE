@@ -11,8 +11,15 @@ concurrency:
 
 jobs:
   arch:
-    uses: MasonRhodesDev/packaging-workflows/.github/workflows/arch-package.yml@77a592545a6cf6b7cb1ddfc5ee07126037f4feb1
+    uses: MasonRhodesDev/packaging-workflows/.github/workflows/arch-package.yml@a1b85c42addd5e876f301886f5c6ea9d1cc9b168
+    with:
+      extra-repos: |
+        [mason]
+        SigLevel = Required DatabaseRequired
+        Server = https://masonrhodesdev.github.io/arch-repo/x86_64
+      extra-repo-key-url: https://masonrhodesdev.github.io/arch-repo/mason-repo.asc
+      extra-repo-key-fingerprint: 41450EEF8CEE7AB8CD3896221284404A6B70485C
   rpm:
-    uses: MasonRhodesDev/packaging-workflows/.github/workflows/rpm-check.yml@77a592545a6cf6b7cb1ddfc5ee07126037f4feb1
+    uses: MasonRhodesDev/packaging-workflows/.github/workflows/rpm-check.yml@a1b85c42addd5e876f301886f5c6ea9d1cc9b168
     with:
       spec-name: hypr-de

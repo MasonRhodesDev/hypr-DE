@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.3
+Version:        0.2.4
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -187,6 +187,10 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Sun Aug 16 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.4-1
+- Snapshot Arch sources on tag builds; pull [mason] during makepkg.
+- Lint RPMs with binaries, not the SRPM alone (libadwaita filter).
+
 * Sun Aug 16 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.3-1
 - Filter rpmlint explicit-lib-dependency for libadwaita (noarch help UI).
 

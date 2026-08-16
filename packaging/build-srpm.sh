@@ -46,7 +46,6 @@ git -C "$REPO" archive --format=tar.gz --prefix="$TARPREFIX-$VER/" \
 echo "==> building SRPM"
 SRPM=$(rpmbuild -bs "$SPEC" | sed -n 's/^Wrote: //p')
 echo "    $SRPM"
-rpmlint --rpmlintrc "$REPO/packaging/$NAME.rpmlintrc" "$SRPM"
 
 if [ "${1:-}" = "--copr" ]; then
     echo "==> submitting to COPR project $COPR_PROJECT"
