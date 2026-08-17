@@ -100,12 +100,16 @@ fi
 echo "== fonts / icons"
 # The waybar/swaync stylesheets request these families by name; without them
 # every glyph is tofu (Fedora shipped zero Nerd fonts before hypr-de-extras).
-if fc-list 2>/dev/null | grep -qi "JetBrainsMono Nerd Font"; then
+# Snapshot once. NOT `fc-list | grep -q`: under pipefail grep -q's early
+# exit SIGPIPEs fc-list and the pipeline "fails" whenever the font list is
+# long enough — an intermittent false negative.
+fonts=$(fc-list 2>/dev/null || true)
+if grep -qi "JetBrainsMono Nerd Font" <<<"$fonts"; then
     ok "JetBrainsMono Nerd Font present"
 else
     bad "JetBrainsMono Nerd Font missing"
 fi
-if fc-list 2>/dev/null | grep -qi "Symbols Nerd Font"; then
+if grep -qi "Symbols Nerd Font" <<<"$fonts"; then
     ok "Symbols Nerd Font present"
 else
     bad "Symbols Nerd Font missing"
