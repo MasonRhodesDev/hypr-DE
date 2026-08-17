@@ -29,11 +29,9 @@ loginctl enable-linger "$user" || true
 systemctl start "user@$uid.service" || true
 export SUDO_USER="$user"
 
-if [ -x /usr/local/sbin/get-hypr-de.sh ]; then
-    /usr/local/sbin/get-hypr-de.sh
-else
-    curl -fsSL https://raw.githubusercontent.com/MasonRhodesDev/hypr-DE/main/get-hypr-de.sh | sh
-fi
+# Published installer only — same command as the README. Packages come
+# from [mason] / COPR, never from a host checkout.
+curl -fsSL https://raw.githubusercontent.com/MasonRhodesDev/hypr-DE/main/get-hypr-de.sh | sh
 
 touch /var/lib/hypr-de-firstboot.done
 echo ok >/var/lib/hypr-de-firstboot.status

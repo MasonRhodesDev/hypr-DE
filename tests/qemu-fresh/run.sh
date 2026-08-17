@@ -1,21 +1,20 @@
 #!/bin/bash
-# Fresh-Arch QEMU harness. First boot runs get-hypr-de.sh the way a
-# third-party user would (curl | sudo sh). Images stay outside the repo.
+# Fresh-Arch QEMU harness. First boot runs the **published** installer
+# (same curl | sh a third party uses) and pacman packages from [mason].
+# This checkout is never copied into the guest.
 #
-#   tests/qemu-fresh/run.sh reset          # new overlay + boot
-#   tests/qemu-fresh/run.sh start          # boot existing overlay
-#   tests/qemu-fresh/run.sh reset --local  # bake this checkout's installer
-#   tests/qemu-fresh/run.sh wait           # wait for SSH + firstboot ok
-#   tests/qemu-fresh/run.sh reboot         # reboot guest, wait for SSH
-#   tests/qemu-fresh/run.sh check          # second-boot file/unit/greeter checks
-#   tests/qemu-fresh/run.sh test           # reset + wait + reboot + check
+#   tests/qemu-fresh/run.sh reset   # new overlay + boot
+#   tests/qemu-fresh/run.sh start   # boot existing overlay
+#   tests/qemu-fresh/run.sh wait    # wait for SSH + firstboot ok
+#   tests/qemu-fresh/run.sh reboot  # reboot guest, wait for SSH
+#   tests/qemu-fresh/run.sh check   # second-boot file/unit/greeter checks
+#   tests/qemu-fresh/run.sh test    # reset + wait + reboot + check
 #
 # Guest login: mason / hyprde (NOPASSWD sudo)
 # SSH: ssh -p 2222 -i ~/.ssh/id_ed25519 mason@127.0.0.1
 # Installer log in the guest: /var/log/get-hypr-de.log
 set -euo pipefail
 
-REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 WORKDIR="${HYPR_DE_QEMU_DIR:-$HOME/vms/hypr-de-fresh}"
 CLOUDIMG="$WORKDIR/Arch-Linux-x86_64-cloudimg.qcow2"
@@ -29,13 +28,11 @@ SSH_PORT="${HYPR_DE_SSH_PORT:-2222}"
 PASSWORD="${HYPR_DE_PASSWORD:-hyprde}"
 
 cmd=start
-LOCAL=0
 for arg in "$@"; do
     case "$arg" in
         reset|start|wait|reboot|check|test) cmd=$arg ;;
-        --local) LOCAL=1 ;;
         -h|--help)
-            sed -n '2,18p' "$0"
+            sed -n '2,16p' "$0"
             exit 0
             ;;
         *)
@@ -75,13 +72,10 @@ ensure_cloudimg() {
 
 write_cidata() {
     [ -f "$SSH_PUB" ] || { echo "no SSH pubkey at $SSH_PUB" >&2; exit 1; }
-    local pubkey hash firstboot_b64 installer_yaml=""
+    local pubkey hash firstboot_b64
     pubkey=$(tr -d '\n' <"$SSH_PUB")
     hash=$(openssl passwd -6 "$PASSWORD")
     firstboot_b64=$(base64 -w0 "$HERE/firstboot.sh")
-    if [ "$LOCAL" = 1 ]; then
-        installer_yaml=$(printf '\n  - path: /usr/local/sbin/get-hypr-de.sh\n    permissions: '\''0755'\''\n    encoding: b64\n    content: %s\n' "$(base64 -w0 "$REPO/get-hypr-de.sh")")
-    fi
 
     mkdir -p "$CIDATA_DIR"
     cat >"$CIDATA_DIR/meta-data" <<EOF
@@ -113,7 +107,7 @@ write_files:
   - path: /usr/local/sbin/hypr-de-firstboot.sh
     permissions: '0755'
     encoding: b64
-    content: $firstboot_b64$installer_yaml
+    content: $firstboot_b64
   - path: /etc/systemd/system/hypr-de-firstboot.service
     permissions: '0644'
     content: |
