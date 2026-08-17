@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.8
+Version:        0.2.9
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -189,6 +189,11 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Mon Aug 17 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.9-1
+- Ship /etc/greetd/vigil.toml defaulting the greeter to the uwsm-managed
+  Hyprland session: without it a fresh install logs into a bare compositor
+  (graphical-session.target never activates, so waybar and swaync never start)
+
 * Sun Aug 16 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.8-1
 - Depend on man-db so hypr-de-help man buttons work on a minimal install.
 - Load workspace-zones from the packaged plugin path, not ~/.local only.
