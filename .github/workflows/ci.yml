@@ -22,7 +22,8 @@ jobs:
           mapfile -t scripts < <(
             for f in packaging/*.sh dist/bin/hypr-de-* dist/libexec/*.sh \
                      dist/libexec/osd/*.sh dist/libexec/waybar-updates-check \
-                     dist/libexec/hypr-de-prime-theme get-hypr-de.sh; do
+                     dist/libexec/hypr-de-prime-theme get-hypr-de.sh \
+                     tests/qemu-fresh/*.sh; do
               [ -f "$f" ] || continue
               head -n1 "$f" | grep -qE '^#!/((usr/)?bin/(env )?)?(ba)?sh' && printf '%s\n' "$f"
             done
