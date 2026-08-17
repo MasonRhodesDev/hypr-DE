@@ -59,6 +59,14 @@ CIDATA_ISO="$WORKDIR/cidata.iso"
 SSH_PUB="${HYPR_DE_SSH_PUB:-$HOME/.ssh/id_ed25519.pub}"
 SSH_KEY="${HYPR_DE_SSH_KEY:-$HOME/.ssh/id_ed25519}"
 PASSWORD="${HYPR_DE_PASSWORD:-hyprde}"
+# HYPR_DE_HEADLESS=1 runs without a window (CI, or keeping the desktop quiet);
+# the guest still renders on the virtio GPU, so greeter/session checks behave
+# the same and a window can be attached later by restarting without it.
+if [ "${HYPR_DE_HEADLESS:-0}" = 1 ]; then
+    DISPLAY_MODE=none
+else
+    DISPLAY_MODE=gtk,show-cursor=on
+fi
 
 need() { command -v "$1" >/dev/null || { echo "missing: $1" >&2; exit 1; }; }
 need qemu-system-x86_64
@@ -188,7 +196,7 @@ qemu_args() {
 -netdev user,id=net0,hostfwd=tcp:127.0.0.1:$SSH_PORT-:22
 -device virtio-net-pci,netdev=net0
 -vga virtio
--display gtk,show-cursor=on
+-display $DISPLAY_MODE
 -device virtio-tablet-pci
 -usb
 -device usb-kbd
