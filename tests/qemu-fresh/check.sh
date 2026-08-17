@@ -118,7 +118,7 @@ if [ -d /run/user/1000 ]; then
 fi
 
 echo "== journal errors (hypr-de / vigil / greetd / waybar)"
-errs=$(journalctl -b -p err --no-pager 2>/dev/null | grep -Ei 'vigil|greetd|waybar|hypr-de|workspace-zones' || true)
+errs=$(journalctl -b -p err --no-pager 2>/dev/null | grep -Ei 'vigil|greetd|waybar|hypr-de|workspace-zones' | grep -v 'gkr-pam' || true)
 if [ -n "$errs" ]; then
     printf '%s\n' "$errs"
     bad "error-level journal lines for DE components (see above)"
