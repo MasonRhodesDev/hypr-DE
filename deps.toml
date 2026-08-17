@@ -44,8 +44,8 @@ fedora = ["xdg-desktop-portal", "xdg-desktop-portal-hyprland", "xdg-desktop-port
 arch = ["xdg-desktop-portal", "xdg-desktop-portal-hyprland", "xdg-desktop-portal-gtk", "hyprpolkitagent"]
 
 [session]
-reason = "uwsm env files for the stock Hyprland (uwsm) session + swaybg wallpaper unit"
-fedora = ["uwsm", "swaybg"]
+reason = "uwsm env files for the stock Hyprland (uwsm) session + swaybg wallpaper unit. python3-pyxdg: the nett00n COPR uwsm RPM omits it, and without the xdg module uwsm tracebacks on import — every greeter login dies in ~100ms with no log"
+fedora = ["uwsm", "swaybg", "python3-pyxdg"]
 arch = ["uwsm", "swaybg"]
 
 [screenshot]
@@ -80,9 +80,14 @@ fedora = ["udiskie", "kitty", "NetworkManager", "network-manager-applet", "nauti
 arch = ["udiskie", "kitty", "networkmanager", "network-manager-applet", "nautilus", "gtk4", "libadwaita", "man-db"]
 
 [fonts]
-reason = "waybar/swaync stylesheets (JetBrainsMono Nerd Font, Symbols Nerd Font), lock/UI labels (Noto Sans)"
-fedora = ["jetbrains-mono-fonts", "google-noto-sans-fonts", "fira-code-fonts"]
-arch = ["ttf-jetbrains-mono-nerd", "noto-fonts", "ttf-firacode-nerd"]
+reason = "waybar/swaync stylesheets (JetBrainsMono Nerd Font, Symbols Nerd Font), lock/UI labels (Noto Sans). Fedora has no Nerd variants in its repos, so the patched families come from hypr-de-extras — without them every bar/notification glyph is tofu"
+fedora = ["jetbrains-mono-fonts", "google-noto-sans-fonts", "fira-code-fonts", "jetbrains-mono-nerd-fonts", "nerd-fonts-symbols"]
+arch = ["ttf-jetbrains-mono-nerd", "noto-fonts", "ttf-firacode-nerd", "ttf-nerd-fonts-symbols"]
+
+[icons]
+reason = "Full app-icon theme for fuzzel/swaync/GTK apps: adwaita-icon-theme dropped its app icons, so hicolor-only apps aside, a fresh install shows blank icons everywhere. Papirus is official on both distros; hypr-de-setup seeds it as the gsettings default and lmtt flips the -Dark variant per mode"
+fedora = ["papirus-icon-theme"]
+arch = ["papirus-icon-theme"]
 
 [gaming]
 reason = "hypr-de-gaming subpackage: bp-game-focus (hyprland socket events), steam scope cleanup"

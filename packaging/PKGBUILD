@@ -20,10 +20,11 @@ _depends_main=(
   hyprland-qt-support hyprland-voice-dictation hyprpicker hyprpolkitagent
   hyprpwcenter hyprshutdown hyprstate hyprstate-gui jq kitty libadwaita
   libnotify lmtt logind-idle-control man-db matugen nautilus network-manager-applet
-  networkmanager noto-fonts overskride pavucontrol pipewire pipewire-alsa
-  pipewire-pulse playerctl python python-dbus python-gobject qt6ct slurp
-  sni-watcher socat swappy swaybg swaync ttf-firacode-nerd
-  ttf-jetbrains-mono-nerd udiskie uwsm vigil waybar waybar-workspace-buttons
+  networkmanager noto-fonts overskride papirus-icon-theme pavucontrol pipewire
+  pipewire-alsa pipewire-pulse playerctl python python-dbus python-gobject
+  qt6ct slurp sni-watcher socat swappy swaybg swaync ttf-firacode-nerd
+  ttf-jetbrains-mono-nerd ttf-nerd-fonts-symbols udiskie uwsm vigil waybar
+  waybar-workspace-buttons
   wireplumber wl-clipboard xdg-desktop-portal xdg-desktop-portal-gtk
   xdg-desktop-portal-hyprland
 )

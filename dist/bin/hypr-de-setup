@@ -109,6 +109,21 @@ if [ ! -e "$CONFIG/hypr/xdph.conf" ]; then
     say "xdph.conf seeded (XDPH has no system config path)"
 fi
 
+# Icon theme: adwaita-icon-theme no longer ships app icons, so the gsettings
+# default renders blank icons in fuzzel/swaync/GTK apps. Seed Papirus once
+# (lmtt's gtk module then flips Papirus/Papirus-Dark per mode); never touch a
+# theme the user picked themselves.
+if command -v gsettings >/dev/null 2>&1 && [ -d /usr/share/icons/Papirus ]; then
+    current_icons=$(gsettings get org.gnome.desktop.interface icon-theme 2>/dev/null | tr -d "'" || echo "")
+    case "$current_icons" in
+        ""|Adwaita|hicolor)
+            if gsettings set org.gnome.desktop.interface icon-theme Papirus 2>/dev/null; then
+                say "icon theme seeded to Papirus (was ${current_icons:-unset})"
+            fi
+            ;;
+    esac
+fi
+
 if [ "$ADOPT" = 1 ] && [ -e "$CONFIG/hypr/hyprland.lua" ]; then
     BK="$CONFIG/hypr-de/backup-$(date +%Y%m%d-%H%M%S)"
     mkdir -p "$BK"

@@ -97,6 +97,26 @@ else
     bad "main.lua does not mention packaged workspace-zones path"
 fi
 
+echo "== fonts / icons"
+# The waybar/swaync stylesheets request these families by name; without them
+# every glyph is tofu (Fedora shipped zero Nerd fonts before hypr-de-extras).
+if fc-list 2>/dev/null | grep -qi "JetBrainsMono Nerd Font"; then
+    ok "JetBrainsMono Nerd Font present"
+else
+    bad "JetBrainsMono Nerd Font missing"
+fi
+if fc-list 2>/dev/null | grep -qi "Symbols Nerd Font"; then
+    ok "Symbols Nerd Font present"
+else
+    bad "Symbols Nerd Font missing"
+fi
+# adwaita-icon-theme dropped app icons; Papirus supplies them for fuzzel/GTK.
+if [ -f /usr/share/icons/Papirus/index.theme ]; then
+    ok "Papirus icon theme installed"
+else
+    bad "Papirus icon theme missing"
+fi
+
 echo "== man"
 if MANPAGER=cat MANWIDTH=72 man hypr-de >/dev/null 2>&1; then
     ok "man hypr-de"
@@ -115,10 +135,13 @@ if systemctl is-active --quiet greetd; then
 else
     bad "greetd is $(systemctl is-active greetd 2>/dev/null || echo missing)"
 fi
-if pgrep -u greeter -x vigil >/dev/null; then
-    ok "vigil running as greeter"
+# Arch's greetd runs the greeter as "greeter", Fedora's as "greetd".
+greeter_user=greeter
+[ "$DISTRO" = fedora ] && greeter_user=greetd
+if pgrep -u "$greeter_user" -x vigil >/dev/null; then
+    ok "vigil running as $greeter_user"
 else
-    bad "no vigil process as greeter"
+    bad "no vigil process as $greeter_user"
 fi
 if journalctl -b -u greetd --no-pager 2>/dev/null | grep -q 'embedded default theme is invalid'; then
     bad "vigil panicked on embedded theme (slint-kit include path)"

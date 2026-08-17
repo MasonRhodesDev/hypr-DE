@@ -1,10 +1,14 @@
 #!/bin/bash
 # Render LMTT styles before waybar/swaync start. Preserves the current
 # light/dark mode; never bare `lmtt switch` (that toggles).
+#
+# --no-notify is load-bearing: this unit runs Before=swaync.service, so no
+# notification daemon exists yet and lmtt's notify-send would block on D-Bus
+# activation until it times out — ~90s of frozen login before the bar appears.
 set -euo pipefail
 mode=$(lmtt status 2>/dev/null | sed -n 's/^Current theme: //p') || true
 case "$mode" in
     light|dark) ;;
     *) mode=dark ;;
 esac
-exec lmtt switch "$mode"
+exec lmtt switch --no-notify "$mode"

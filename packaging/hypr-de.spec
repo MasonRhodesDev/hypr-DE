@@ -38,6 +38,9 @@ Requires:       hyprshutdown
 Requires:       hyprstate
 Requires:       hyprstate-gui
 Requires:       jetbrains-mono-fonts
+# Nerd variants come from hypr-de-extras (none exist in Fedora proper); the
+# waybar/swaync stylesheets request these families by name
+Requires:       jetbrains-mono-nerd-fonts
 Requires:       jq
 Requires:       kitty
 Requires:       libadwaita
@@ -49,7 +52,9 @@ Requires:       matugen
 Requires:       nautilus
 Requires:       NetworkManager
 Requires:       network-manager-applet
+Requires:       nerd-fonts-symbols
 Requires:       overskride
+Requires:       papirus-icon-theme
 Requires:       pavucontrol
 Requires:       pipewire
 Requires:       pipewire-alsa
@@ -58,6 +63,9 @@ Requires:       playerctl
 Requires:       python3
 Requires:       python3-dbus
 Requires:       python3-gobject
+# nett00n's uwsm RPM omits this; without the xdg module uwsm tracebacks on
+# import and every greeter login dies instantly (see deps.toml [session])
+Requires:       python3-pyxdg
 Requires:       qt6ct
 Requires:       slurp
 Requires:       sni-watcher
