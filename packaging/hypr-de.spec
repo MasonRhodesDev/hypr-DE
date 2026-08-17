@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.9
+Version:        0.2.10
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -197,6 +197,13 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Mon Aug 17 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.10-1
+- prime-theme passes --no-notify: its notification blocked on a daemon
+  ordered after itself, freezing login for ~90s before waybar appeared
+- Fedora: require python3-pyxdg (uwsm tracebacks without it and every
+  greeter login dies instantly), Nerd fonts from hypr-de-extras, and
+  papirus-icon-theme; fuzzel and gsettings default to Papirus
+
 * Mon Aug 17 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.9-1
 - Ship /etc/greetd/vigil.toml defaulting the greeter to the uwsm-managed
   Hyprland session: without it a fresh install logs into a bare compositor
