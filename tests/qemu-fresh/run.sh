@@ -1,38 +1,31 @@
 #!/bin/bash
-# Fresh-Arch QEMU harness. First boot runs the **published** installer
-# (same curl | sh a third party uses) and pacman packages from [mason].
-# This checkout is never copied into the guest.
+# Fresh-install QEMU harness (Arch by default, Fedora with `fedora`).
+# First boot runs the **published** installer (same curl | sh a third party
+# uses) and packages from [mason] / COPR. This checkout is never copied into
+# the guest.
 #
-#   tests/qemu-fresh/run.sh reset   # new overlay + boot
-#   tests/qemu-fresh/run.sh start   # boot existing overlay
-#   tests/qemu-fresh/run.sh wait    # wait for SSH + firstboot ok
-#   tests/qemu-fresh/run.sh reboot  # reboot guest, wait for SSH
-#   tests/qemu-fresh/run.sh check   # second-boot file/unit/greeter checks
-#   tests/qemu-fresh/run.sh test    # reset + wait + reboot + check
+#   tests/qemu-fresh/run.sh [fedora] reset   # new overlay + boot
+#   tests/qemu-fresh/run.sh [fedora] start   # boot existing overlay
+#   tests/qemu-fresh/run.sh [fedora] wait    # wait for SSH + firstboot ok
+#   tests/qemu-fresh/run.sh [fedora] reboot  # reboot guest, wait for SSH
+#   tests/qemu-fresh/run.sh [fedora] check   # second-boot checks
+#   tests/qemu-fresh/run.sh [fedora] test    # reset + wait + reboot + check
 #
 # Guest login: mason / hyprde (NOPASSWD sudo)
-# SSH: ssh -p 2222 -i ~/.ssh/id_ed25519 mason@127.0.0.1
+# SSH: ssh -p 2222 (arch) / 2223 (fedora) -i ~/.ssh/id_ed25519 mason@127.0.0.1
 # Installer log in the guest: /var/log/get-hypr-de.log
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-WORKDIR="${HYPR_DE_QEMU_DIR:-$HOME/vms/hypr-de-fresh}"
-CLOUDIMG="$WORKDIR/Arch-Linux-x86_64-cloudimg.qcow2"
-CLOUDIMG_URL="${HYPR_DE_CLOUDIMG_URL:-https://geo.mirror.pkgbuild.com/images/latest/Arch-Linux-x86_64-cloudimg.qcow2}"
-OVERLAY="$WORKDIR/overlay.qcow2"
-CIDATA_DIR="$WORKDIR/cidata"
-CIDATA_ISO="$WORKDIR/cidata.iso"
-SSH_PUB="${HYPR_DE_SSH_PUB:-$HOME/.ssh/id_ed25519.pub}"
-SSH_KEY="${HYPR_DE_SSH_KEY:-$HOME/.ssh/id_ed25519}"
-SSH_PORT="${HYPR_DE_SSH_PORT:-2222}"
-PASSWORD="${HYPR_DE_PASSWORD:-hyprde}"
 
+DISTRO=arch
 cmd=start
 for arg in "$@"; do
     case "$arg" in
+        arch|fedora) DISTRO=$arg ;;
         reset|start|wait|reboot|check|test) cmd=$arg ;;
         -h|--help)
-            sed -n '2,16p' "$0"
+            sed -n '2,17p' "$0"
             exit 0
             ;;
         *)
@@ -42,6 +35,31 @@ for arg in "$@"; do
     esac
 done
 
+# Fedora release for the fedora flavor; images/ index is scraped for the
+# current Cloud-Base-Generic qcow2 build at reset time.
+FEDORA_RELEASE="${HYPR_DE_FEDORA_RELEASE:-44}"
+FEDORA_IMGDIR="https://download.fedoraproject.org/pub/fedora/linux/releases/$FEDORA_RELEASE/Cloud/x86_64/images"
+
+if [ "$DISTRO" = fedora ]; then
+    VMNAME=hypr-de-fresh-fedora
+    WORKDIR="${HYPR_DE_QEMU_DIR:-$HOME/vms/hypr-de-fresh-fedora}"
+    CLOUDIMG="$WORKDIR/Fedora-Cloud-Base-Generic-$FEDORA_RELEASE.qcow2"
+    CLOUDIMG_URL="${HYPR_DE_CLOUDIMG_URL:-}"   # resolved from the index when empty
+    SSH_PORT="${HYPR_DE_SSH_PORT:-2223}"
+else
+    VMNAME=hypr-de-fresh
+    WORKDIR="${HYPR_DE_QEMU_DIR:-$HOME/vms/hypr-de-fresh}"
+    CLOUDIMG="$WORKDIR/Arch-Linux-x86_64-cloudimg.qcow2"
+    CLOUDIMG_URL="${HYPR_DE_CLOUDIMG_URL:-https://geo.mirror.pkgbuild.com/images/latest/Arch-Linux-x86_64-cloudimg.qcow2}"
+    SSH_PORT="${HYPR_DE_SSH_PORT:-2222}"
+fi
+OVERLAY="$WORKDIR/overlay.qcow2"
+CIDATA_DIR="$WORKDIR/cidata"
+CIDATA_ISO="$WORKDIR/cidata.iso"
+SSH_PUB="${HYPR_DE_SSH_PUB:-$HOME/.ssh/id_ed25519.pub}"
+SSH_KEY="${HYPR_DE_SSH_KEY:-$HOME/.ssh/id_ed25519}"
+PASSWORD="${HYPR_DE_PASSWORD:-hyprde}"
+
 need() { command -v "$1" >/dev/null || { echo "missing: $1" >&2; exit 1; }; }
 need qemu-system-x86_64
 need qemu-img
@@ -50,11 +68,14 @@ need openssl
 need curl
 
 stop_vm() {
-    if pgrep -f 'qemu-system-x86_64 -name hypr-de-fresh' >/dev/null; then
-        echo "== stopping hypr-de-fresh"
-        pkill -f 'qemu-system-x86_64 -name hypr-de-fresh' || true
+    # "-machine" terminates the match so the arch pattern cannot also hit
+    # the fedora VM (name is a prefix of the other).
+    local pat="qemu-system-x86_64 -name $VMNAME -machine"
+    if pgrep -f "$pat" >/dev/null; then
+        echo "== stopping $VMNAME"
+        pkill -f "$pat" || true
         for _ in $(seq 1 20); do
-            pgrep -f 'qemu-system-x86_64 -name hypr-de-fresh' >/dev/null || break
+            pgrep -f "$pat" >/dev/null || break
             sleep 0.5
         done
     fi
@@ -64,7 +85,17 @@ ensure_cloudimg() {
     if [ -f "$CLOUDIMG" ]; then
         return 0
     fi
-    echo "== downloading Arch cloudimg"
+    if [ -z "$CLOUDIMG_URL" ]; then
+        # Fedora: the qcow2 name embeds the build (…-44-1.6.x86_64.qcow2),
+        # so resolve it from the directory index.
+        echo "== resolving Fedora cloudimg from $FEDORA_IMGDIR"
+        local img
+        img=$(curl -fsL "$FEDORA_IMGDIR/" \
+            | grep -oE 'Fedora-Cloud-Base-Generic[^"]*\.x86_64\.qcow2' | head -1)
+        [ -n "$img" ] || { echo "no Cloud-Base-Generic qcow2 in index" >&2; exit 1; }
+        CLOUDIMG_URL="$FEDORA_IMGDIR/$img"
+    fi
+    echo "== downloading $DISTRO cloudimg"
     mkdir -p "$WORKDIR"
     curl -fL "$CLOUDIMG_URL" -o "$CLOUDIMG.partial"
     mv "$CLOUDIMG.partial" "$CLOUDIMG"
@@ -79,12 +110,12 @@ write_cidata() {
 
     mkdir -p "$CIDATA_DIR"
     cat >"$CIDATA_DIR/meta-data" <<EOF
-instance-id: hypr-de-fresh-$(date +%s)
-local-hostname: hypr-de-fresh
+instance-id: $VMNAME-$(date +%s)
+local-hostname: $VMNAME
 EOF
     cat >"$CIDATA_DIR/user-data" <<EOF
 #cloud-config
-hostname: hypr-de-fresh
+hostname: $VMNAME
 users:
   - name: mason
     gecos: Mason
@@ -147,7 +178,7 @@ reset_overlay() {
 
 qemu_args() {
     cat <<EOF
--name hypr-de-fresh
+-name $VMNAME
 -machine q35,accel=kvm
 -cpu host
 -m 6144
@@ -168,7 +199,7 @@ EOF
 start_vm() {
     [ -f "$OVERLAY" ] || { echo "no overlay; run: $0 reset" >&2; exit 1; }
     [ -f "$CIDATA_ISO" ] || { echo "no cidata.iso; run: $0 reset" >&2; exit 1; }
-    echo "== QEMU hypr-de-fresh (SSH 127.0.0.1:$SSH_PORT, mason / $PASSWORD)"
+    echo "== QEMU $VMNAME (SSH 127.0.0.1:$SSH_PORT, mason / $PASSWORD)"
     echo "   first-boot installer log: /var/log/get-hypr-de.log"
     if [ "${1:-}" = background ]; then
         # Intentional word splitting of qemu_args.

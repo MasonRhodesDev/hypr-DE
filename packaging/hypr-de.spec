@@ -174,6 +174,7 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/60-hypr-de.conf
 %config(noreplace) %{_sysconfdir}/xdg/uwsm/env
 %config(noreplace) %{_sysconfdir}/xdg/uwsm/env-hyprland
+%config(noreplace) %{_sysconfdir}/greetd/vigil.toml
 %{_sysconfdir}/xdg/hypr/hyprland.lua
 
 %files gaming

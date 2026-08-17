@@ -56,6 +56,9 @@ main)
     # entry: hypr-DE is configs + deps, not a competing greeter session.
     inst "$STAGE/uwsm/env"          "$XDGCONFDIR/uwsm/env"
     inst "$STAGE/uwsm/env-hyprland" "$XDGCONFDIR/uwsm/env-hyprland"
+    # vigil greeter defaults: the uwsm session must be the default or nothing
+    # WantedBy=graphical-session.target (waybar, swaync) ever starts.
+    inst "$STAGE/greetd/vigil.toml" "$GREETDDIR/vigil.toml"
     inst "$STAGE/environment.d/60-hypr-de.conf" "$ENVGENDIR/60-hypr-de.conf"
     inst "$STAGE/xdg/hypr/hyprland.lua" "$XDGCONFDIR/hypr/hyprland.lua"
 

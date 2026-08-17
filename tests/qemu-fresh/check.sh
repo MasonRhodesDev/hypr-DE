@@ -7,9 +7,26 @@ fail=0
 ok() { printf 'ok   %s\n' "$*"; }
 bad() { printf 'FAIL %s\n' "$*"; fail=1; }
 
+# arch or fedora — picks the package tool and per-distro file paths below.
+if command -v pacman >/dev/null; then
+    DISTRO=arch
+    LIBDIR=/usr/lib
+else
+    DISTRO=fedora
+    LIBDIR=/usr/lib64
+fi
+
+pkg_version() {
+    if [ "$DISTRO" = arch ]; then
+        pacman -Q "$1" 2>/dev/null | awk '{print $2}' | sed 's/-.*//'
+    else
+        rpm -q --qf '%{VERSION}' "$1" 2>/dev/null
+    fi
+}
+
 pkg_at_least() {
     local pkg=$1 want=$2 have
-    have=$(pacman -Q "$pkg" 2>/dev/null | awk '{print $2}' | sed 's/-.*//') || {
+    have=$(pkg_version "$pkg") && [ -n "$have" ] || {
         bad "$pkg is not installed"
         return
     }
@@ -29,19 +46,24 @@ pkg_at_least waybar 0.15
 pkg_at_least greetd 0.10
 
 echo "== files"
-for f in \
-    /usr/bin/man \
-    /usr/bin/vigil \
-    /usr/bin/hypr-de-setup \
-    /usr/bin/hypr-de-help \
-    /usr/share/man/man7/hypr-de.7.gz \
-    /usr/share/man/man7/workspace-zones.7.gz \
-    /usr/share/man/man1/hypr-de-help.1.gz \
-    /usr/lib/waybar/workspace_buttons.so \
-    /usr/lib/hyprland/plugins/libworkspace-zones.so \
-    /etc/xdg/hypr/hyprland.lua \
-    /usr/share/hypr-de/waybar/config.jsonc \
+files=(
+    /usr/bin/man
+    /usr/bin/vigil
+    /usr/bin/hypr-de-setup
+    /usr/bin/hypr-de-help
+    /usr/share/man/man7/hypr-de.7.gz
+    /usr/share/man/man7/workspace-zones.7.gz
+    /usr/share/man/man1/hypr-de-help.1.gz
+    "$LIBDIR/waybar/workspace_buttons.so"
+    /etc/xdg/hypr/hyprland.lua
+    /usr/share/hypr-de/waybar/config.jsonc
     /usr/share/vigil/slint-kit/ui/theme.slint
+)
+# The workspace-zones Hyprland plugin is packaged on Arch only; on Fedora it
+# is ABI-locked to the compositor and installed via hyprpm (main.lua probes
+# both packaged paths and ~/.local, so its absence is not a failure there).
+[ "$DISTRO" = arch ] && files+=(/usr/lib/hyprland/plugins/libworkspace-zones.so)
+for f in "${files[@]}"
 do
     if [ -e "$f" ]; then
         ok "$f"
@@ -55,6 +77,14 @@ if grep -q 'command = "/usr/bin/vigil"' /etc/greetd/config.toml 2>/dev/null; the
     ok "greetd command is vigil"
 else
     bad "greetd is not pointed at /usr/bin/vigil"
+fi
+# Without this default vigil picks the plain "Hyprland" entry (sorts first),
+# uwsm never runs, graphical-session.target stays inactive, and waybar/swaync
+# silently never start on a fresh install.
+if grep -q 'default = "Hyprland (uwsm-managed)"' /etc/greetd/vigil.toml 2>/dev/null; then
+    ok "vigil default session is uwsm-managed"
+else
+    bad "vigil.toml missing or default session is not Hyprland (uwsm-managed)"
 fi
 if grep -q 'command -v swaync-client' /usr/share/hypr-de/waybar/config.jsonc; then
     ok "waybar notifications exec-if uses command -v"

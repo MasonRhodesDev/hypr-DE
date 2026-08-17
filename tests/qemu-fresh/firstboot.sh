@@ -7,7 +7,8 @@ echo "=== hypr-de firstboot $(date -Is) ==="
 echo running >/var/lib/hypr-de-firstboot.status
 trap 'echo fail >/var/lib/hypr-de-firstboot.status' ERR
 
-sed -i 's/^#\?ParallelDownloads.*/ParallelDownloads = 5/' /etc/pacman.conf
+# Arch guest only; Fedora's dnf parallelizes by default.
+[ -f /etc/pacman.conf ] && sed -i 's/^#\?ParallelDownloads.*/ParallelDownloads = 5/' /etc/pacman.conf
 
 ok_net=0
 for _ in $(seq 1 60); do

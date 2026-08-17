@@ -46,7 +46,8 @@ package_hypr-de() {
     'libva-nvidia-driver: NVIDIA VA-API when the nvidia module is loaded'
   )
   backup=('etc/xdg/uwsm/env'
-          'etc/xdg/uwsm/env-hyprland')
+          'etc/xdg/uwsm/env-hyprland'
+          'etc/greetd/vigil.toml')
   install=hypr-de.install
 
   cd "$srcdir"; cd "hypr-DE-$pkgver" 2>/dev/null || cd "$pkgbase-$pkgver"  # GH tarball vs CI snapshot prefix

@@ -1,0 +1,13 @@
+# hypr-DE: greeter defaults for vigil (/etc/greetd/vigil.toml).
+#
+# The default session must be the uwsm-managed Hyprland entry: everything in
+# hypr-DE's user stack (waybar, swaync, hypridle wiring) hangs off
+# graphical-session.target, and only the uwsm launch path activates it. The
+# plain "Hyprland" entry sorts first alphabetically, so without this default a
+# fresh install logs into a bare compositor with no bar or notifications.
+# The entry is named "Hyprland (uwsm-managed)" on both Arch and Fedora.
+#
+# vigil's remembered last session (per user) still wins over this default.
+
+[sessions]
+default = "Hyprland (uwsm-managed)"
