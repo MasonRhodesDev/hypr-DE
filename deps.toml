@@ -75,9 +75,9 @@ fedora = ["hyprshutdown", "hyprland-guiutils", "hyprland-qt-support"]
 arch = ["hyprshutdown", "hyprland-guiutils", "hyprland-qt-support"]
 
 [desktop-misc]
-reason = "udiskie automount (preset unit), kitty (SUPER+Q terminal, updates-check), nautilus (SUPER+E; GTK4/libadwaita follows LMTT portal appearance), gtk4+libadwaita (hypr-de-help), NetworkManager (enabled on install) + nm-applet"
-fedora = ["udiskie", "kitty", "NetworkManager", "network-manager-applet", "nautilus", "gtk4", "libadwaita"]
-arch = ["udiskie", "kitty", "networkmanager", "network-manager-applet", "nautilus", "gtk4", "libadwaita"]
+reason = "udiskie automount (preset unit), kitty (SUPER+Q terminal, updates-check), nautilus (SUPER+E; GTK4/libadwaita follows LMTT portal appearance), gtk4+libadwaita (hypr-de-help), NetworkManager (enabled on install) + nm-applet, man-db (hypr-de-help 'man hypr-de' / 'man workspace-zones' buttons; pages are shipped but a cloud/minimal image has no man binary)"
+fedora = ["udiskie", "kitty", "NetworkManager", "network-manager-applet", "nautilus", "gtk4", "libadwaita", "man-db"]
+arch = ["udiskie", "kitty", "networkmanager", "network-manager-applet", "nautilus", "gtk4", "libadwaita", "man-db"]
 
 [fonts]
 reason = "waybar/swaync stylesheets (JetBrainsMono Nerd Font, Symbols Nerd Font), lock/UI labels (Noto Sans)"

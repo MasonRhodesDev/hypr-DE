@@ -142,4 +142,12 @@ fi
 
 nvidia_notice
 
+if [ ! -e /usr/lib/hyprland/plugins/libworkspace-zones.so ] \
+    && [ ! -e /usr/lib64/hyprland/plugins/libworkspace-zones.so ] \
+    && [ ! -e "$HOME/.local/lib/hyprland-plugins/libworkspace-zones.so" ]; then
+    warn "workspace-zones plugin missing; SUPER+ALT+S is a no-op until:"
+    warn "  hyprpm add https://github.com/MasonRhodesDev/waybar-workspace-buttons"
+    warn "  hyprpm enable workspace-zones"
+fi
+
 say "hypr-DE setup complete. Log into Hyprland (uwsm) from the greeter."

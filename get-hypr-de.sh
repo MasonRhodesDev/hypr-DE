@@ -65,9 +65,8 @@ say "hypr-DE is alpha. Expect breakage."
 install_arch() {
     say "Installing [mason] repo key"
     pacman -S --needed --noconfirm gnupg curl >/dev/null
-    if [ ! -e /etc/pacman.d/gnupg/pubring.gpg ] && [ ! -e /etc/pacman.d/gnupg/pubring.kbx ]; then
-        pacman-key --init
-    fi
+    # pubring can exist without a secret key; lsign still needs --init.
+    pacman-key --init
     key=$(mktemp)
     fetch "$KEY_URL" "$key"
     got=$(gpg --show-keys --with-colons "$key" | awk -F: '$1 == "fpr" { print $10; exit }')

@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.7
+Version:        0.2.8
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -44,6 +44,7 @@ Requires:       libadwaita
 Requires:       /usr/bin/notify-send
 Requires:       lmtt
 Requires:       logind-idle-control
+Requires:       man-db
 Requires:       matugen
 Requires:       nautilus
 Requires:       NetworkManager
@@ -187,6 +188,13 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Sun Aug 16 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.8-1
+- Depend on man-db so hypr-de-help man buttons work on a minimal install.
+- Load workspace-zones from the packaged plugin path, not ~/.local only.
+- Drop `which` from the waybar notifications exec-if (not on cloud images).
+- Watch %t/hypr for wayland-env-guard so a fresh login does not hit the
+  path trigger limit.
+
 * Sun Aug 16 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.7-1
 - Pass release secrets explicitly and always publish COPR and [mason].
 

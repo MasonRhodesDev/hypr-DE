@@ -53,8 +53,29 @@ end
 -- auto-dismissed on leave. Wrapped in pcall: `hyprctl reload` re-executes this
 -- file with the plugin already loaded, which would otherwise error and abort
 -- the whole config.
+--
+-- A ~/.local copy wins so a hyprland-git rebuild is not shadowed by the
+-- extra-hyprland .so the Arch package ships. Packaged paths cover a fresh
+-- install that has never run hyprpm.
 pcall(function()
-    hl.plugin.load(HOME .. "/.local/lib/hyprland-plugins/libworkspace-zones.so")
+    local home_plug = HOME .. "/.local/lib/hyprland-plugins/libworkspace-zones.so"
+    local path
+    if file_exists(home_plug) then
+        path = home_plug
+    else
+        for _, candidate in ipairs({
+            "/usr/lib/hyprland/plugins/libworkspace-zones.so",
+            "/usr/lib64/hyprland/plugins/libworkspace-zones.so",
+        }) do
+            if file_exists(candidate) then
+                path = candidate
+                break
+            end
+        end
+    end
+    if path then
+        hl.plugin.load(path)
+    end
 end)
 -- Named specials (special:magic) dismiss via the built-in
 -- binds.hide_special_on_workspace_change (see LOOK AND FEEL) — verified
