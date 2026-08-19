@@ -4,7 +4,7 @@
 # (packaging/gen-deps.sh check) gates drift against these arrays.
 pkgbase=hypr-de
 pkgname=('hypr-de' 'hypr-de-gaming')
-pkgver=0.2.10
+pkgver=0.2.11
 pkgrel=1
 pkgdesc="Alpha Hyprland config set (not ready)"
 arch=('any')

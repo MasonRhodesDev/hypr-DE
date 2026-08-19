@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.10
+Version:        0.2.11
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -197,6 +197,13 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Tue Aug 18 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.11-1
+- First-boot hypr-de-setup applies the packaged gradient theme when none
+  is recorded, so lmtt-colors.lua and waybar.css exist before first login
+- User-facing copy names the greeter entry Hyprland (uwsm-managed)
+- Wallpaper re-render uses --no-notify when no Wayland display so setup
+  does not stall waiting for a notification daemon
+
 * Mon Aug 17 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.10-1
 - prime-theme passes --no-notify: its notification blocked on a daemon
   ordered after itself, freezing login for ~90s before waybar appeared
