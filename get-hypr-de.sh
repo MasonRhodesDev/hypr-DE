@@ -139,5 +139,5 @@ fi
 
 cat <<'EOF'
 
-Done. Reboot, then pick Hyprland (uwsm) at the vigil greeter.
+Done. Reboot, then pick Hyprland (uwsm-managed) at the vigil greeter.
 EOF

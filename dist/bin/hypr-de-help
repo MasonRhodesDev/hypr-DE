@@ -13,7 +13,7 @@ APP_ID = "dev.mason.hypr-de-help"
 
 HOW_IT_WORKS = """\
 <b>hypr-DE</b> is packaged Hyprland configuration plus the packages that \
-session needs. Log into <b>Hyprland (uwsm)</b> — there is no separate greeter session.
+session needs. Log into <b>Hyprland (uwsm-managed)</b> — there is no separate greeter session.
 
 <b>Config</b>
 Packaged Lua loads first; your overrides win last.

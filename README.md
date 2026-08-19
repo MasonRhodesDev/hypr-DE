@@ -13,7 +13,7 @@ and the rest of the set.
 An opinionated Hyprland config set for **Fedora** and **Arch**: compositor
 Lua config, waybar, swaync with click-to-focus notification recovery,
 fuzzel, Material You theming via lmtt, monitor profiles via hyprstate, and
-screenshot/recording tooling. Log into **Hyprland (uwsm)** from the
+screenshot/recording tooling. Log into **Hyprland (uwsm-managed)** from the
 Hyprland package.
 
 Configs and styles are **package-owned** and live in `/usr` and `/etc/xdg`.
@@ -71,7 +71,7 @@ sudo pacman -Syu hypr-de        # + hypr-de-gaming
 hypr-de-setup          # presets user units; seeds xdph.conf (XDPH is home-only)
 ```
 
-Log out and pick **Hyprland (uwsm)** at the vigil greeter.
+Log out and pick **Hyprland (uwsm-managed)** at the vigil greeter.
 
 If you still have a leftover `~/.config/hypr/hyprland.lua` stub from an
 older hypr-DE, `hypr-de-setup --adopt` backs it up and removes it so the

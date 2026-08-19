@@ -94,7 +94,7 @@ hypr-DE is a packaged Hyprland configuration and the runtime packages it
 needs: compositor Lua config, waybar, swaync with notification recovery,
 fuzzel, Material You theming via lmtt, monitor profiles via hyprstate,
 screenshot/recording tooling. It is not a greeter session. Log into
-Hyprland (uwsm) from the Hyprland package; hypr-DE supplies /etc/xdg and
+Hyprland (uwsm-managed) from the Hyprland package; hypr-DE supplies /etc/xdg and
 /usr defaults plus a thin per-user override surface (~/.config/hypr/local.lua,
 lmtt module shadowing, systemd drop-ins).
 

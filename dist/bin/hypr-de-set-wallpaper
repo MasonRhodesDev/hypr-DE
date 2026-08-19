@@ -49,7 +49,13 @@ if [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ] || [ -n "${XDG_RUNTIME_DIR:-}" ]; then
     if command -v lmtt >/dev/null 2>&1; then
         MODE=$(lmtt status 2>/dev/null | sed -n 's/^Current theme: //p')
         case "$MODE" in light|dark) ;; *) MODE=dark ;; esac
-        lmtt switch "$MODE" >/dev/null 2>&1 || true
+        # First-boot setup has a user bus but no compositor; notify-send
+        # would stall waiting for a notification daemon that is not up.
+        if [ -n "${WAYLAND_DISPLAY:-}" ]; then
+            lmtt switch "$MODE" >/dev/null 2>&1 || true
+        else
+            lmtt switch --no-notify "$MODE" >/dev/null 2>&1 || true
+        fi
     fi
 fi
 

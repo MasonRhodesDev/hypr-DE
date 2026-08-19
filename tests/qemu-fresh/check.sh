@@ -72,6 +72,22 @@ do
     fi
 done
 
+echo "== lmtt styles"
+# These only exist after hypr-de-setup applies the packaged gradient theme.
+lmtt_files=(
+    "$HOME/.config/hypr-de/theme"
+    "$HOME/.config/hypr/lmtt-colors.lua"
+    "$HOME/.config/hypr-de/waybar.css"
+)
+for f in "${lmtt_files[@]}"
+do
+    if [ -e "$f" ]; then
+        ok "$f"
+    else
+        bad "missing $f (hypr-de-setup should apply gradient on firstboot)"
+    fi
+done
+
 echo "== config"
 if grep -q 'command = "/usr/bin/vigil"' /etc/greetd/config.toml 2>/dev/null; then
     ok "greetd command is vigil"

@@ -3,7 +3,7 @@ post_install() {
     cat <<'EOF'
 ==> hypr-DE installed. Per user, run:
       hypr-de-setup          # presets user units; seeds xdph.conf
-    Log into Hyprland (uwsm) at the vigil greeter.
+    Log into Hyprland (uwsm-managed) at the vigil greeter.
     Overrides: ~/.config/hypr/local.lua, ~/.config/lmtt/modules/, systemd
     user drop-ins. See /usr/share/hypr-de/hypr/local.lua.example.
 EOF
