@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.12
+Version:        0.2.13
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
