@@ -4,9 +4,9 @@
 # so deps can be dropped when their component goes.
 
 [compositor]
-reason = "Hyprland Lua config API (hl.bind / hyprland.lua). Floor is 0.55; hyprland-git Provides hyprland= so a 0.55.x git build satisfies this."
-fedora = ["hyprland >= 0.55"]
-arch = ["hyprland>=0.55"]
+reason = "Hyprland Lua config API (hl.bind / hyprland.lua). Floor is 0.56: 0.55 has a fullscreen-vs-monitor-removal segfault (null monitor in CLayoutManager::recalculateMonitor, fixed upstream by the #14705 fullscreen refactor, first release v0.56.0). hyprland-git Provides hyprland= so a 0.56+ git build satisfies this."
+fedora = ["hyprland >= 0.56"]
+arch = ["hyprland>=0.56"]
 
 [lock-idle]
 reason = "vigil (vigil-lock lock_cmd / before_sleep_cmd), hypridle (idle policy in hypr/hypridle.conf); SUPER+L is loginctl lock-session which hypridle answers"

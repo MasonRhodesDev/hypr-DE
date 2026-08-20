@@ -20,11 +20,12 @@ Configs and styles are **package-owned** and live in `/usr` and `/etc/xdg`.
 Home carries only what you own: `~/.config/hypr/local.lua`, monitor
 profiles, wallpaper, and optional module/unit overrides.
 
-> **Compositor:** hypr-DE requires Hyprland **0.55 or newer** (Lua config
-> API). extra/COPR `hyprland` 0.56+ qualifies. `hyprland-git` qualifies when
-> it `Provides: hyprland=0.55` or higher — install the git stack first so
-> `hypr-de` does not pull extra Hyprland. Mixing extra and `-git` hyprwm
-> packages is unsupported.
+> **Compositor:** hypr-DE requires Hyprland **0.56 or newer** (Lua config
+> API landed in 0.55, but 0.55 can segfault when a monitor disconnects while
+> a window is fullscreen — fixed in 0.56.0). extra/COPR `hyprland` 0.56+
+> qualifies. `hyprland-git` qualifies when it `Provides: hyprland=0.56` or
+> higher — install the git stack first so `hypr-de` does not pull extra
+> Hyprland. Mixing extra and `-git` hyprwm packages is unsupported.
 
 ## Install
 
@@ -47,7 +48,7 @@ sudo dnf copr enable solaris765/hypr-de solaris765/hyprstate solaris765/lmtt \
     solaris765/logind-idle-control \
     solaris765/waybar-workspace-buttons solaris765/vigil solaris765/sni-watcher \
     solaris765/hyprstate-gui solaris765/hypr-de-extras
-sudo dnf copr enable nett00n/hyprland heus-sueh/packages   # hyprland 0.55+ stack, matugen
+sudo dnf copr enable nett00n/hyprland heus-sueh/packages   # hyprland 0.56+ stack, matugen
 sudo dnf install hypr-de            # + hypr-de-gaming if you want the gaming layer
 ```
 

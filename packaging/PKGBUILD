@@ -16,7 +16,7 @@ sha256sums=('402afa6bd546b287d1491ad6cd665ea17b6a19d9f0468602b60528d2323be65c')
 
 _depends_main=(
   bluez bluez-obex bluez-utils brightnessctl fuzzel gnome-keyring
-  gpu-screen-recorder grim gtk4 hypridle 'hyprland>=0.55' hyprland-guiutils
+  gpu-screen-recorder grim gtk4 hypridle 'hyprland>=0.56' hyprland-guiutils
   hyprland-qt-support hyprpicker hyprpolkitagent
   hyprpwcenter hyprshutdown hyprstate hyprstate-gui jq kitty libadwaita
   libnotify lmtt logind-idle-control man-db matugen nautilus network-manager-applet
