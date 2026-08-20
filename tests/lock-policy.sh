@@ -20,16 +20,16 @@ assert_log() {
 
 : > "$LOCK_POLICY_LOG"
 "$root/dist/libexec/lock-cmd.sh"
-assert_log 'vigil-lock:--daemonize
+assert_log 'vigil-lock:--wait
 hyprctl:dispatch hl.dsp.dpms({ action = '\''on'\'' })'
 
 : > "$LOCK_POLICY_LOG"
 VIGIL_IDLE_WARNING_SECONDS=7 "$root/dist/libexec/lock-cmd.sh" --idle
-assert_log 'vigil-lock:--daemonize --warn 7
+assert_log 'vigil-lock:--wait --warn 7
 hyprctl:dispatch hl.dsp.dpms({ action = '\''on'\'' })'
 
 : > "$LOCK_POLICY_LOG"
 LOCK_POLICY_VIGIL_STATUS=3 "$root/dist/libexec/lock-cmd.sh" --idle
-assert_log 'vigil-lock:--daemonize --warn 10'
+assert_log 'vigil-lock:--wait --warn 10'
 
 echo "lock policy routing is correct"
