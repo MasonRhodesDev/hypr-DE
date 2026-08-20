@@ -1,0 +1,3 @@
+#!/bin/sh
+printf 'vigil-lock:%s\n' "$*" >> "$LOCK_POLICY_LOG"
+exit "${LOCK_POLICY_VIGIL_STATUS:-0}"

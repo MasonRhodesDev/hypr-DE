@@ -1,0 +1,2 @@
+#!/bin/sh
+printf 'hyprctl:%s\n' "$*" >> "$LOCK_POLICY_LOG"

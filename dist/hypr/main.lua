@@ -216,6 +216,9 @@ hl.config({
         disable_splash_rendering = false,
         force_default_wallpaper = 1,
         focus_on_activate       = true,
+        -- Permit Hyprland to restore a held ext-session-lock surface after a
+        -- compositor restart instead of exposing the session.
+        allow_session_lock_restore = true,
         -- Direct setDPMS(true) on input. After VT return with outputs
         -- DPMS-disabled, Aquamarine will not schedule frames (enabledState
         -- false); this path modesets without waiting for a frame.
