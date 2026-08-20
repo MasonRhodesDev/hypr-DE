@@ -4,7 +4,7 @@
 # (packaging/gen-deps.sh check) gates drift against these arrays.
 pkgbase=hypr-de
 pkgname=('hypr-de' 'hypr-de-gaming')
-pkgver=0.2.13
+pkgver=0.2.14
 pkgrel=1
 pkgdesc="Alpha Hyprland config set (not ready)"
 arch=('any')
@@ -36,6 +36,12 @@ build() {
   LIBEXECDIR=/usr/lib/hypr-de \
   WAYBAR_CFFI=/usr/lib/waybar/workspace_buttons.so \
     ./packaging/substitute.sh dist-build
+}
+
+check() {
+  cd "$srcdir"; cd "hypr-DE-$pkgver" 2>/dev/null || cd "$pkgbase-$pkgver"
+  ./packaging/gen-deps.sh check
+  ./tests/lock-policy.sh
 }
 
 package_hypr-de() {

@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.13
+Version:        0.2.14
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -132,6 +132,7 @@ mv dist-build/lmtt/modules/* dist-build/lmtt-system-modules/
 find dist-build/bin dist-build/libexec -type f -exec sh -c 'head -1 "$1" | grep -q "^#!/bin/bash" && bash -n "$1"' _ {} \;
 find dist-build/bin dist-build/libexec -type f -exec sh -c 'head -1 "$1" | grep -q python && python3 -m py_compile "$1"' _ {} \;
 ./packaging/gen-deps.sh check
+./tests/lock-policy.sh
 
 %install
 LIBEXECDIR=%{_libexecdir}/hypr-de \
@@ -196,6 +197,10 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Thu Aug 20 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.14-1
+- Add the cancelable Vigil frost warning only to idle-triggered locks.
+- Keep manual and before-sleep locks immediate and enable safe lock restore.
+
 * Thu Aug 20 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.12-1
 - Make Voice Dictation an independently installed optional suite application.
 - Stop requiring, enabling, or validating its service from Hypr-DE.
