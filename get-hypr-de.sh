@@ -102,7 +102,6 @@ install_fedora() {
         solaris765/hyprstate \
         solaris765/lmtt \
         solaris765/logind-idle-control \
-        solaris765/hyprland-voice-dictation \
         solaris765/waybar-workspace-buttons \
         solaris765/vigil \
         solaris765/sni-watcher \

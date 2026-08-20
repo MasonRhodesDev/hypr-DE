@@ -14,5 +14,4 @@ enable hypr-de-prime-theme.service
 enable udiskie.service
 enable hyprstate.service
 enable logind-idle-control.service
-enable voice-dictation.service
 enable obex.service

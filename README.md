@@ -44,12 +44,16 @@ the sudo-invoking user.
 
 ```bash
 sudo dnf copr enable solaris765/hypr-de solaris765/hyprstate solaris765/lmtt \
-    solaris765/logind-idle-control solaris765/hyprland-voice-dictation \
+    solaris765/logind-idle-control \
     solaris765/waybar-workspace-buttons solaris765/vigil solaris765/sni-watcher \
     solaris765/hyprstate-gui solaris765/hypr-de-extras
 sudo dnf copr enable nett00n/hyprland heus-sueh/packages   # hyprland 0.55+ stack, matugen
 sudo dnf install hypr-de            # + hypr-de-gaming if you want the gaming layer
 ```
+
+Voice Dictation is an optional suite application. It remains available from
+the `[mason]` Arch repository and `solaris765/hyprland-voice-dictation` COPR,
+but `hypr-de` does not install or activate it.
 
 **Arch** (manual) — add the [`[mason]` repo](https://masonrhodesdev.github.io/arch-repo/)
 to `/etc/pacman.conf`:

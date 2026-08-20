@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.11
+Version:        0.2.12
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -30,7 +30,6 @@ Requires:       hypridle
 Requires:       hyprland >= 0.55
 Requires:       hyprland-guiutils
 Requires:       hyprland-qt-support
-Requires:       hyprland-voice-dictation
 Requires:       hyprpicker
 Requires:       hyprpolkitagent
 Requires:       hyprpwcenter
@@ -197,6 +196,10 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Thu Aug 20 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.12-1
+- Make Voice Dictation an independently installed optional suite application.
+- Stop requiring, enabling, or validating its service from Hypr-DE.
+
 * Tue Aug 18 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.11-1
 - First-boot hypr-de-setup applies the packaged gradient theme when none
   is recorded, so lmtt-colors.lua and waybar.css exist before first login

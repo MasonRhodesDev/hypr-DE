@@ -38,7 +38,6 @@ REQUIRED_UNITS=(
     udiskie.service
     hyprstate.service
     logind-idle-control.service
-    voice-dictation.service
     obex.service
 )
 
