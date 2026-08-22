@@ -15,5 +15,9 @@ path = "~/.config/hypr-de/swaync.css"
 path = "@DATADIR@/lmtt/templates/swaync.css.hbs"
 
 [reload]
-command = "swaync-client --reload-css || true"
-timeout = 5000
+# Only reload a RUNNING swaync: hypr-de-prime-theme renders this file
+# Before=swaync.service, and swaync-client against an absent daemon blocks
+# on D-Bus activation until the timeout — 5s of every login, for nothing.
+# swaync reads the stylesheet fresh when it starts.
+command = "pgrep -x swaync >/dev/null && swaync-client --reload-css || true"
+timeout = 2000
