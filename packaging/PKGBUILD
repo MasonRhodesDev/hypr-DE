@@ -4,7 +4,7 @@
 # (packaging/gen-deps.sh check) gates drift against these arrays.
 pkgbase=hypr-de
 pkgname=('hypr-de' 'hypr-de-gaming')
-pkgver=0.2.15
+pkgver=0.2.16
 pkgrel=1
 pkgdesc="Alpha Hyprland config set (not ready)"
 arch=('any')
@@ -23,7 +23,7 @@ _depends_main=(
   networkmanager noto-fonts overskride papirus-icon-theme pavucontrol pipewire
   pipewire-alsa pipewire-pulse playerctl python python-dbus python-gobject
   qt6ct slurp sni-watcher socat swappy swaybg swaync ttf-firacode-nerd
-  ttf-jetbrains-mono-nerd ttf-nerd-fonts-symbols udiskie uwsm vigil waybar
+  ttf-jetbrains-mono-nerd ttf-nerd-fonts-symbols udiskie uwsm 'vigil>=0.3.0' waybar
   waybar-workspace-buttons
   wireplumber wl-clipboard xdg-desktop-portal xdg-desktop-portal-gtk
   xdg-desktop-portal-hyprland

@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.15
+Version:        0.2.16
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -73,7 +73,7 @@ Requires:       swappy
 Requires:       swaybg
 Requires:       udiskie
 Requires:       uwsm
-Requires:       vigil
+Requires:       vigil >= 0.3.0
 Requires:       waybar
 Requires:       waybar-workspace-buttons
 Requires:       wireplumber
