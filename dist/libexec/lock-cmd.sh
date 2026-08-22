@@ -9,6 +9,10 @@ if [ "${1:-}" = "--idle" ]; then
     [ "$status" -eq 3 ] && exit 0
     [ "$status" -eq 0 ] || exit "$status"
 else
-    vigil-lock --wait || exit $?
+    # --no-warn pins the immediate paths even if a vigil.toml enables a
+    # default warning duration: manual locks and before-sleep must never
+    # be cancelable (a nudged mouse during lid-close would suspend
+    # unlocked).
+    vigil-lock --wait --no-warn || exit $?
 fi
 exec hyprctl dispatch "hl.dsp.dpms({ action = 'on' })"

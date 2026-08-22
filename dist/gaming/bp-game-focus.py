@@ -104,7 +104,7 @@ def close_special_except(keep: str | None) -> None:
         name = mon.get("specialWorkspace", {}).get("name", "")
         if name and name != keep:
             log(f"closing special workspace {name}")
-            hyprctl("dispatch", "togglespecialworkspace", name.removeprefix("special:"))
+            hyprctl("dispatch", f'hl.dsp.workspace.toggle_special("{name.removeprefix("special:")}")')
 
 
 def ensure_webhelper_patch() -> None:
@@ -287,24 +287,28 @@ class SteamSession:
     async def focus_bp(self, addr: str) -> None:
         # Single focus dispatch (minimise window churn). Then close any special
         # overlay and assert fullscreen once if BP didn't come up fullscreen.
-        hyprctl("dispatch", "focuswindow", f"address:{addr}")
+        hyprctl("dispatch", f'hl.dsp.focus({{ window = "address:{addr}" }})')
         close_special_except(window_workspace(addr))
         await asyncio.sleep(FULLSCREEN_GRACE)
         self.ensure_bp_fullscreen()
 
     async def focus_fullscreen(self, addr: str) -> None:
-        hyprctl("dispatch", "focuswindow", f"address:{addr}")
+        hyprctl("dispatch", f'hl.dsp.focus({{ window = "address:{addr}" }})')
         close_special_except(window_workspace(addr))
         await asyncio.sleep(FULLSCREEN_GRACE)
         aw = active_window()
         if aw.get("address") == addr and aw.get("fullscreen") != 2:
-            hyprctl("dispatch", "fullscreen", "0")
+            # The guard above means the window is not fullscreen: "set" is the
+            # race-safe form of the old toggle.
+            hyprctl("dispatch", 'hl.dsp.window.fullscreen({ mode = "fullscreen", action = "set" })')
 
     def ensure_bp_fullscreen(self) -> None:
         aw = active_window()
         if aw.get("address") == self.bp_addr and aw.get("fullscreen") != 2:
             log("re-fullscreening Big Picture")
-            hyprctl("dispatch", "fullscreen", "0")
+            # The guard above means the window is not fullscreen: "set" is the
+            # race-safe form of the old toggle.
+            hyprctl("dispatch", 'hl.dsp.window.fullscreen({ mode = "fullscreen", action = "set" })')
 
 
 # --- inputs ----------------------------------------------------------------

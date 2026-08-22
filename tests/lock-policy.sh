@@ -20,7 +20,7 @@ assert_log() {
 
 : > "$LOCK_POLICY_LOG"
 "$root/dist/libexec/lock-cmd.sh"
-assert_log 'vigil-lock:--wait
+assert_log 'vigil-lock:--wait --no-warn
 hyprctl:dispatch hl.dsp.dpms({ action = '\''on'\'' })'
 
 : > "$LOCK_POLICY_LOG"
