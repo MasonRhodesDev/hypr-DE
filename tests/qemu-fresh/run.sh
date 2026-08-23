@@ -221,9 +221,16 @@ start_vm() {
 }
 
 guest_ssh() {
+    # ServerAliveInterval/CountMax make a black-holed connection die in ~15s.
+    # Without it, a `guest_ssh` that is mid-session when the guest reboots
+    # (the reboot-drain loop below, or `systemctl reboot` itself) hangs
+    # forever instead of returning, wedging the whole run.
     ssh -o StrictHostKeyChecking=accept-new \
         -o UserKnownHostsFile="$WORKDIR/known_hosts" \
         -o ConnectTimeout=5 \
+        -o ServerAliveInterval=5 \
+        -o ServerAliveCountMax=3 \
+        -o BatchMode=yes \
         -p "$SSH_PORT" -i "$SSH_KEY" \
         mason@127.0.0.1 "$@"
 }
