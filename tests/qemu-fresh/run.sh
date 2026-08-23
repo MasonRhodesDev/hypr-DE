@@ -204,7 +204,25 @@ qemu_args() {
 EOF
 }
 
+# Refuse to run against a VM we did not start. If something else already
+# holds the SSH port (a stale run, a vmkit session, another harness), every
+# ssh/check below silently talks to THAT guest -- which can report a bogus
+# pass as easily as a bogus failure.
+port_guard() {
+    ss -ltn 2>/dev/null | grep -q ":$SSH_PORT " || return 0
+    local holder
+    holder=$(ss -ltnp 2>/dev/null | awk -v p=":$SSH_PORT " '$0 ~ p {match($0, /pid=[0-9]+/); print substr($0, RSTART+4, RLENGTH-4); exit}')
+    if [ -n "$holder" ] && [ -f "$WORKDIR/qemu.pid" ] && [ "$holder" = "$(cat "$WORKDIR/qemu.pid")" ]; then
+        return 0   # our own VM from this workdir
+    fi
+    echo "ERROR: 127.0.0.1:$SSH_PORT is already held by pid ${holder:-unknown}" >&2
+    ps -o pid,args= -p "${holder:-0}" 2>/dev/null | tail -1 >&2
+    echo "Stop it first (that guest would be tested instead of a fresh one)." >&2
+    exit 1
+}
+
 start_vm() {
+    port_guard
     [ -f "$OVERLAY" ] || { echo "no overlay; run: $0 reset" >&2; exit 1; }
     [ -f "$CIDATA_ISO" ] || { echo "no cidata.iso; run: $0 reset" >&2; exit 1; }
     echo "== QEMU $VMNAME (SSH 127.0.0.1:$SSH_PORT, mason / $PASSWORD)"
