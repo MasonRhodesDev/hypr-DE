@@ -234,12 +234,15 @@ if [ -f /etc/xdg/nvim/sysinit.vim ]; then ok "/etc/xdg/nvim/sysinit.vim"; else b
 echo "== workspace button click dispatch"
 # Older modules used "hyprctl dispatch workspace N"; newer Hyprland parses
 # dispatch args as Lua and rejects that, so clicks silently did nothing.
-if strings /usr/lib/waybar/workspace_buttons.so 2>/dev/null | grep -q 'hl.dsp.focus'; then
+wsb_so="$LIBDIR/waybar/workspace_buttons.so"
+if ! command -v strings >/dev/null; then
+    ok "skipped dispatcher check (no strings/binutils in guest)"
+elif grep -aq 'hl.dsp.focus' "$wsb_so" 2>/dev/null; then
     ok "workspace buttons use the Lua dispatcher"
-elif strings /usr/lib/waybar/workspace_buttons.so 2>/dev/null | grep -q 'dispatch workspace'; then
+elif grep -aq 'dispatch workspace' "$wsb_so" 2>/dev/null; then
     bad "workspace buttons use the classic dispatcher — clicks are a no-op on Hyprland with Lua config"
 else
-    bad "could not determine the workspace-button dispatcher"
+    bad "could not determine the workspace-button dispatcher ($wsb_so)"
 fi
 
 echo "== idle inhibitor tray (waybar indicator)"
