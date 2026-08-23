@@ -229,7 +229,18 @@ if [ -f "$HOME/.config/hypr-de/nvim-colors.lua" ] && grep -q 'colors_name' "$HOM
 else
     bad "nvim-colors.lua missing or empty"
 fi
-if [ -f /etc/xdg/nvim/sysinit.vim ]; then ok "/etc/xdg/nvim/sysinit.vim"; else bad "system nvim sysinit missing"; fi
+for f in /usr/share/nvim/site/plugin/hypr-de-defaults.lua /usr/share/nvim/site/colors/lmtt-material-you.lua; do
+    if [ -f "$f" ]; then ok "$f"; else bad "$f missing"; fi
+done
+# End-to-end: a user with no nvim config must actually get the themed scheme.
+if command -v nvim >/dev/null; then
+    got=$(HOME="$HOME" nvim --headless -c 'lua io.write(vim.g.colors_name or "NONE")' -c qa 2>&1 | tail -1)
+    if [ "$got" = "lmtt-material-you" ]; then
+        ok "nvim loads the Material You colorscheme ($got)"
+    else
+        bad "nvim colorscheme is '$got' (expected lmtt-material-you)"
+    fi
+fi
 
 echo "== workspace button click dispatch"
 # Older modules used "hyprctl dispatch workspace N"; newer Hyprland parses

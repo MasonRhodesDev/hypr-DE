@@ -56,9 +56,11 @@ main)
     # entry: hypr-DE is configs + deps, not a competing greeter session.
     inst "$STAGE/uwsm/env"          "$XDGCONFDIR/uwsm/env"
     inst "$STAGE/uwsm/env-hyprland" "$XDGCONFDIR/uwsm/env-hyprland"
-    # System Neovim config: nvim sources the first $XDG_CONFIG_DIRS/nvim/
-    # sysinit.vim before user config. Package-owned baseline + lmtt colors.
-    inst "$STAGE/nvim/sysinit.vim" "$XDGCONFDIR/nvim/sysinit.vim"
+    # Neovim baseline + Material You colorscheme. These go in the nvim SITE
+    # dir (in nvim's default runtimepath); /etc/xdg/nvim/sysinit.vim is owned
+    # by the neovim package on Arch and shipping it is a file conflict.
+    inst "$STAGE/nvim/site/plugin/hypr-de-defaults.lua" "$NVIMSITE/plugin/hypr-de-defaults.lua"
+    inst "$STAGE/nvim/site/colors/lmtt-material-you.lua" "$NVIMSITE/colors/lmtt-material-you.lua"
     # vigil greeter defaults: the uwsm session must be the default or nothing
     # WantedBy=graphical-session.target (waybar, swaync) ever starts.
     inst "$STAGE/greetd/vigil.toml" "$GREETDDIR/vigil.toml"

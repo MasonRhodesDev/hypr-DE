@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.20
+Version:        0.2.21
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -184,7 +184,8 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/60-hypr-de.conf
 %config(noreplace) %{_sysconfdir}/xdg/uwsm/env
 %config(noreplace) %{_sysconfdir}/xdg/uwsm/env-hyprland
-%config(noreplace) %{_sysconfdir}/xdg/nvim/sysinit.vim
+%{_datadir}/nvim/site/plugin/hypr-de-defaults.lua
+%{_datadir}/nvim/site/colors/lmtt-material-you.lua
 %config(noreplace) %{_sysconfdir}/greetd/vigil.toml
 %{_sysconfdir}/xdg/hypr/hyprland.lua
 
@@ -200,6 +201,9 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Sun Aug 23 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.21-1
+- Ship the Neovim baseline in /usr/share/nvim/site instead of /etc/xdg/nvim/sysinit.vim, which the neovim package owns (0.2.20 aborted every Arch install with a file conflict).
+
 * Sun Aug 23 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.20-1
 - Declare the new deps in deps.toml (neovim, waybar-workspace-buttons floor); 0.2.19 failed its dependency drift gate.
 
