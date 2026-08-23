@@ -14,9 +14,9 @@ fedora = ["vigil >= 0.3.0", "hypridle"]
 arch = ["vigil>=0.3.0", "hypridle"]
 
 [bar]
-reason = "waybar + CFFI workspace buttons module (waybar/config.jsonc)"
-fedora = ["waybar", "waybar-workspace-buttons"]
-arch = ["waybar", "waybar-workspace-buttons"]
+reason = "waybar + CFFI workspace buttons module (waybar/config.jsonc). Floor 1.1.2: older modules click-dispatch the classic \"hyprctl dispatch workspace N\", which Hyprland with the Lua config parses as Lua and rejects, so workspace buttons silently do nothing"
+fedora = ["waybar", "waybar-workspace-buttons >= 1.1.2"]
+arch = ["waybar", "waybar-workspace-buttons>=1.1.2"]
 
 [tray]
 reason = "sni-watcher owns org.kde.StatusNotifierWatcher (Type=dbus, Before=waybar.service) so Waybar's tray module attaches as host-only"
@@ -78,6 +78,11 @@ arch = ["hyprshutdown", "hyprland-guiutils", "hyprland-qt-support"]
 reason = "udiskie automount (preset unit), kitty (SUPER+Q terminal, updates-check), nautilus (SUPER+E; GTK4/libadwaita follows LMTT portal appearance), gtk4+libadwaita (hypr-de-help), NetworkManager (enabled on install) + nm-applet, man-db (hypr-de-help 'man hypr-de' / 'man workspace-zones' buttons; pages are shipped but a cloud/minimal image has no man binary)"
 fedora = ["udiskie", "kitty", "NetworkManager", "network-manager-applet", "nautilus", "gtk4", "libadwaita", "man-db"]
 arch = ["udiskie", "kitty", "networkmanager", "network-manager-applet", "nautilus", "gtk4", "libadwaita", "man-db"]
+
+[editor]
+reason = "neovim is the packaged default editor: hypr-de-help's Edit local.lua action and EDITOR/VISUAL in the uwsm env point at it, and /etc/xdg/nvim/sysinit.vim plus the hypr-de-nvim lmtt module theme it. Without it that action fails on a fresh install"
+fedora = ["neovim"]
+arch = ["neovim"]
 
 [fonts]
 reason = "waybar/swaync stylesheets (JetBrainsMono Nerd Font, Symbols Nerd Font), lock/UI labels (Noto Sans). Fedora has no Nerd variants in its repos, so the patched families come from hypr-de-extras — without them every bar/notification glyph is tofu"
