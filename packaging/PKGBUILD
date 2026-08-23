@@ -24,7 +24,7 @@ _depends_main=(
   pipewire-alsa pipewire-pulse playerctl python python-dbus python-gobject
   qt6ct slurp sni-watcher socat swappy swaybg swaync ttf-firacode-nerd
   ttf-jetbrains-mono-nerd ttf-nerd-fonts-symbols udiskie uwsm 'vigil>=0.3.0' waybar
-  waybar-workspace-buttons
+  'waybar-workspace-buttons>=1.1.2'
   wireplumber wl-clipboard xdg-desktop-portal xdg-desktop-portal-gtk
   xdg-desktop-portal-hyprland
 )

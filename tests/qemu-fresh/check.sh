@@ -48,7 +48,7 @@ if pkg_version hyprstate-gui >/dev/null 2>&1 && [ -n "$(pkg_version hyprstate-gu
 else
     ok "no hyprstate-gui package"
 fi
-pkg_at_least waybar-workspace-buttons 1.0.3
+pkg_at_least waybar-workspace-buttons 1.1.2
 pkg_at_least man-db 2.0
 pkg_at_least waybar 0.15
 pkg_at_least greetd 0.10
@@ -230,6 +230,17 @@ else
     bad "nvim-colors.lua missing or empty"
 fi
 if [ -f /etc/xdg/nvim/sysinit.vim ]; then ok "/etc/xdg/nvim/sysinit.vim"; else bad "system nvim sysinit missing"; fi
+
+echo "== workspace button click dispatch"
+# Older modules used "hyprctl dispatch workspace N"; newer Hyprland parses
+# dispatch args as Lua and rejects that, so clicks silently did nothing.
+if strings /usr/lib/waybar/workspace_buttons.so 2>/dev/null | grep -q 'hl.dsp.focus'; then
+    ok "workspace buttons use the Lua dispatcher"
+elif strings /usr/lib/waybar/workspace_buttons.so 2>/dev/null | grep -q 'dispatch workspace'; then
+    bad "workspace buttons use the classic dispatcher — clicks are a no-op on Hyprland with Lua config"
+else
+    bad "could not determine the workspace-button dispatcher"
+fi
 
 echo "== idle inhibitor tray (waybar indicator)"
 pkg_at_least logind-idle-control 0.2.3

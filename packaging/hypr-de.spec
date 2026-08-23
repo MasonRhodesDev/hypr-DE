@@ -76,7 +76,7 @@ Requires:       udiskie
 Requires:       uwsm
 Requires:       vigil >= 0.3.0
 Requires:       waybar
-Requires:       waybar-workspace-buttons
+Requires:       waybar-workspace-buttons >= 1.1.2
 Requires:       wireplumber
 Requires:       wl-clipboard
 Requires:       xdg-desktop-portal
@@ -206,6 +206,9 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 - hypr-de-help view tabs get symbolic icons (no more missing-icon placeholders).
 - swaync stylesheet is self-contained (colors inline) so the control-center is no longer transparent.
 - Enable logind-idle-control-tray so the idle inhibitor shows in the waybar tray.
+- Floor waybar-workspace-buttons at 1.1.2: older builds dispatch the classic
+  'hyprctl dispatch workspace N', which newer Hyprland parses as Lua and
+  rejects, so clicking a workspace button silently did nothing.
 
 * Sat Aug 22 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.18-1
 - Depend on dials (formerly hyprstate-gui); voice dictation is wayland-voice-dictation.
