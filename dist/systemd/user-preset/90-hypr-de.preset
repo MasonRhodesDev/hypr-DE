@@ -14,4 +14,5 @@ enable hypr-de-prime-theme.service
 enable udiskie.service
 enable hyprstate.service
 enable logind-idle-control.service
+enable logind-idle-control-tray.service
 enable obex.service

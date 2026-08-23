@@ -145,11 +145,11 @@ install -d %{buildroot}%{_datadir}/lmtt/modules
 install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt/modules/
 
 %post
-%systemd_user_post swaybg.service waybar-reload.path waybar-reload.service waybar-watchdog.service waybar-watchdog.timer wayland-env-guard.path wayland-env-guard.service wayland-env-guard.timer hyprland-configreload-listener.service notification-focus-proxy.service hypr-de-prime-theme.service
+%systemd_user_post swaybg.service waybar-reload.path waybar-reload.service waybar-watchdog.service waybar-watchdog.timer wayland-env-guard.path wayland-env-guard.service wayland-env-guard.timer hyprland-configreload-listener.service notification-focus-proxy.service hypr-de-prime-theme.service logind-idle-control-tray.service
 %{_libexecdir}/hypr-de/hypr-de-sys-setup >/dev/null 2>&1 || :
 
 %preun
-%systemd_user_preun swaybg.service waybar-reload.path waybar-reload.service waybar-watchdog.service waybar-watchdog.timer wayland-env-guard.path wayland-env-guard.service wayland-env-guard.timer hyprland-configreload-listener.service notification-focus-proxy.service hypr-de-prime-theme.service
+%systemd_user_preun swaybg.service waybar-reload.path waybar-reload.service waybar-watchdog.service waybar-watchdog.timer wayland-env-guard.path wayland-env-guard.service wayland-env-guard.timer hyprland-configreload-listener.service notification-focus-proxy.service hypr-de-prime-theme.service logind-idle-control-tray.service
 
 %post gaming
 %systemd_user_post bp-game-focus.service steam-clean-shutdown.service
@@ -205,6 +205,7 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 - Ship a package-owned Neovim config + lmtt Material You colorscheme module.
 - hypr-de-help view tabs get symbolic icons (no more missing-icon placeholders).
 - swaync stylesheet is self-contained (colors inline) so the control-center is no longer transparent.
+- Enable logind-idle-control-tray so the idle inhibitor shows in the waybar tray.
 
 * Sat Aug 22 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.18-1
 - Depend on dials (formerly hyprstate-gui); voice dictation is wayland-voice-dictation.

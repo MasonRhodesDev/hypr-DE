@@ -231,6 +231,14 @@ else
 fi
 if [ -f /etc/xdg/nvim/sysinit.vim ]; then ok "/etc/xdg/nvim/sysinit.vim"; else bad "system nvim sysinit missing"; fi
 
+echo "== idle inhibitor tray (waybar indicator)"
+pkg_at_least logind-idle-control 0.2.3
+if [ -x /usr/bin/logind-idle-control-tray ]; then ok "logind-idle-control-tray binary"; else bad "idle-control tray binary missing"; fi
+case "$(systemctl --user is-enabled logind-idle-control-tray.service 2>/dev/null)" in
+    enabled) ok "logind-idle-control-tray.service enabled (idle inhibitor shows in tray)" ;;
+    *) bad "logind-idle-control-tray.service not enabled — no idle inhibitor in waybar" ;;
+esac
+
 echo "== swaync background (control-center not transparent)"
 if grep -q '@define-color background' "$HOME/.config/hypr-de/swaync.css" 2>/dev/null; then
     ok "swaync background color defined inline"

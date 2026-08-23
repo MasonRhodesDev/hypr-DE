@@ -38,6 +38,7 @@ REQUIRED_UNITS=(
     udiskie.service
     hyprstate.service
     logind-idle-control.service
+    logind-idle-control-tray.service
     obex.service
 )
 
