@@ -1,7 +1,25 @@
 /* hypr-DE swaync stylesheet — rendered by lmtt into ~/.config/hypr-de/swaync.css.
- * Template: @DATADIR@/lmtt/templates/swaync.css.hbs. Palette (incl. derived
- * shades) comes from lmtt's built-in swaync module output. Mode: {{mode}} */
-@import url('../swaync/lmtt-colors.css');
+ * Template: @DATADIR@/lmtt/templates/swaync.css.hbs. Mode: {{mode}}
+ *
+ * Colors are defined inline from lmtt's Material You tokens so this sheet is
+ * self-contained: swaync is launched with --style pointing here (never a
+ * ~/.config/swaync/style.css), and lmtt's built-in swaync module only writes
+ * the separate lmtt-colors.css when a style.css marks swaync "configured".
+ * That gate never fires for the --style setup, so importing it left every
+ * @color undefined and the control-center transparent. Defining them here
+ * removes the cross-module dependency entirely. */
+@define-color background {{surface}};
+@define-color surface_variant {{surface_variant}};
+@define-color surface_container_low {{surface_container_low}};
+@define-color surface_container_high {{surface_container_high}};
+@define-color primary {{primary}};
+@define-color on_primary {{on_primary}};
+@define-color on_surface {{on_surface}};
+@define-color on_surface_variant {{on_surface_variant}};
+@define-color outline {{outline}};
+@define-color outline_variant {{outline_variant}};
+@define-color error {{error}};
+@define-color on_error {{on_error}};
 
 * {
   font-family: "JetBrainsMono Nerd Font", "Symbols Nerd Font", sans-serif;

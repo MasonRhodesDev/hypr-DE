@@ -1,0 +1,12 @@
+# Shipped by hypr-de under /usr/share/lmtt/modules/. Renders a Material You
+# Neovim colorscheme; /etc/xdg/nvim/sysinit.vim sources the output. No binary
+# gate — nvim is a hard hypr-de dependency and sysinit pcall-guards the file.
+name = "hypr-de-nvim"
+description = "hypr-DE Neovim Material You colorscheme (rendered from packaged template)"
+priority = 110
+
+[output]
+path = "~/.config/hypr-de/nvim-colors.lua"
+
+[template]
+path = "@DATADIR@/lmtt/templates/nvim-colors.lua.hbs"

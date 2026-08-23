@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.18
+Version:        0.2.19
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -42,6 +42,7 @@ Requires:       jetbrains-mono-fonts
 Requires:       jetbrains-mono-nerd-fonts
 Requires:       jq
 Requires:       kitty
+Requires:       neovim
 Requires:       libadwaita
 Requires:       /usr/bin/notify-send
 Requires:       lmtt
@@ -174,6 +175,7 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %exclude %{_datadir}/hypr-de/gaming/
 %{_datadir}/lmtt/modules/hypr-de-waybar.toml
 %{_datadir}/lmtt/modules/hypr-de-swaync.toml
+%{_datadir}/lmtt/modules/hypr-de-nvim.toml
 %{_prefix}/lib/systemd/user/*
 %exclude %{_prefix}/lib/systemd/user/bp-game-focus.service
 %exclude %{_prefix}/lib/systemd/user/steam-clean-shutdown.service
@@ -182,6 +184,7 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/60-hypr-de.conf
 %config(noreplace) %{_sysconfdir}/xdg/uwsm/env
 %config(noreplace) %{_sysconfdir}/xdg/uwsm/env-hyprland
+%config(noreplace) %{_sysconfdir}/xdg/nvim/sysinit.vim
 %config(noreplace) %{_sysconfdir}/greetd/vigil.toml
 %{_sysconfdir}/xdg/hypr/hyprland.lua
 
@@ -197,6 +200,12 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Sun Aug 23 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.19-1
+- Default editor: install neovim, set EDITOR/VISUAL, hypr-de-help resolves a real editor (fixes the nano-missing failure).
+- Ship a package-owned Neovim config + lmtt Material You colorscheme module.
+- hypr-de-help view tabs get symbolic icons (no more missing-icon placeholders).
+- swaync stylesheet is self-contained (colors inline) so the control-center is no longer transparent.
+
 * Sat Aug 22 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.18-1
 - Depend on dials (formerly hyprstate-gui); voice dictation is wayland-voice-dictation.
 

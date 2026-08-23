@@ -215,6 +215,29 @@ else
     bad "dials --entries failed"
 fi
 
+echo "== editor + nvim theme"
+pkg_at_least neovim 0.9
+if command -v nvim >/dev/null; then ok "nvim on PATH"; else bad "nvim missing (default editor)"; fi
+ed="${EDITOR:-}"
+if [ -n "$ed" ] && command -v "${ed%% *}" >/dev/null; then
+    ok "EDITOR=$ed resolves"
+else
+    bad "EDITOR unset or not on PATH (=$ed)"
+fi
+if [ -f "$HOME/.config/hypr-de/nvim-colors.lua" ] && grep -q 'colors_name' "$HOME/.config/hypr-de/nvim-colors.lua"; then
+    ok "nvim Material You colorscheme rendered"
+else
+    bad "nvim-colors.lua missing or empty"
+fi
+if [ -f /etc/xdg/nvim/sysinit.vim ]; then ok "/etc/xdg/nvim/sysinit.vim"; else bad "system nvim sysinit missing"; fi
+
+echo "== swaync background (control-center not transparent)"
+if grep -q '@define-color background' "$HOME/.config/hypr-de/swaync.css" 2>/dev/null; then
+    ok "swaync background color defined inline"
+else
+    bad "swaync background undefined — control-center would be transparent"
+fi
+
 echo "== journal errors (hypr-de / vigil / greetd / waybar)"
 errs=$(journalctl -b -p err --no-pager 2>/dev/null | grep -Ei 'vigil|greetd|waybar|hypr-de|workspace-zones' | grep -v 'gkr-pam' || true)
 if [ -n "$errs" ]; then

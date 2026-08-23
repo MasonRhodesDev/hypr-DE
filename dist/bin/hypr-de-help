@@ -94,6 +94,25 @@ def load_binds() -> tuple[list[tuple[str, str]], str | None]:
     return [(combo, desc) for combo, desc, _rank in rows], None
 
 
+def resolve_editor() -> str | None:
+    """First usable editor: $VISUAL/$EDITOR if on PATH, else nvim (the hypr-DE
+    default), then common fallbacks. None when nothing is installed."""
+    for env in (os.environ.get("VISUAL"), os.environ.get("EDITOR")):
+        if env and shutil.which(env.split()[0]):
+            return env
+    for cand in ("nvim", "vi", "vim", "nano"):
+        if shutil.which(cand):
+            return cand
+    return None
+
+
+def notify(summary: str, body: str = "") -> None:
+    if shutil.which("notify-send"):
+        subprocess.Popen(["notify-send", summary, body], start_new_session=True)
+    else:
+        print(f"{summary}: {body}", file=sys.stderr)
+
+
 def launch(argv: list[str]) -> None:
     if shutil.which("uwsm"):
         subprocess.Popen(["uwsm", "app", "--", *argv], start_new_session=True)
@@ -108,7 +127,14 @@ def open_local_lua() -> None:
     os.makedirs(dest_dir, exist_ok=True)
     if not os.path.exists(dest) and os.path.isfile(example):
         shutil.copyfile(example, dest)
-    editor = os.environ.get("EDITOR") or "nano"
+    editor = resolve_editor()
+    if not editor:
+        notify(
+            "No text editor found",
+            "Install neovim (the hypr-DE default) or set $EDITOR, then edit "
+            + dest,
+        )
+        return
     terminal = shutil.which("kitty") or shutil.which("xdg-terminal-exec")
     if terminal and os.path.basename(terminal) == "kitty":
         launch([terminal, "-e", editor, dest])
@@ -178,7 +204,7 @@ def build_ui(app, first_run: bool) -> None:
     welcome.append(title)
     welcome.append(blurb)
     welcome.append(buttons)
-    stack.add_titled(welcome, "welcome", "Welcome")
+    stack.add_titled_with_icon(welcome, "welcome", "Welcome", "starred-symbolic")
 
     how_label = Gtk.Label()
     how_label.set_markup(HOW_IT_WORKS)
@@ -193,7 +219,7 @@ def build_ui(app, first_run: bool) -> None:
     how_scroll = Gtk.ScrolledWindow()
     how_scroll.set_child(how_label)
     how_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-    stack.add_titled(how_scroll, "how", "How it works")
+    stack.add_titled_with_icon(how_scroll, "how", "How it works", "dialog-information-symbolic")
 
     binds_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
     binds_box.set_margin_top(12)
@@ -246,7 +272,7 @@ def build_ui(app, first_run: bool) -> None:
     scroll.set_vexpand(True)
     binds_box.append(search)
     binds_box.append(scroll)
-    stack.add_titled(binds_box, "binds", "Keybinds")
+    stack.add_titled_with_icon(binds_box, "binds", "Keybinds", "input-keyboard-symbolic")
 
     if first_run:
         stack.set_visible_child_name("welcome")

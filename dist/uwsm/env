@@ -12,3 +12,8 @@ export GTK_USE_PORTAL=1
 export MOZ_ENABLE_WAYLAND=1
 export ELECTRON_OZONE_PLATFORM_HINT=wayland
 export XCURSOR_SIZE=24
+
+# Default editor for the session (nvim is a hard dependency; user files
+# sourced later win — set yours in ~/.config/uwsm/env).
+export EDITOR=nvim
+export VISUAL=nvim
