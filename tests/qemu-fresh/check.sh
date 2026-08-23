@@ -39,7 +39,15 @@ pkg_at_least() {
 
 echo "== packages"
 pkg_at_least hypr-de 0.2.8
-pkg_at_least vigil 0.2.8
+pkg_at_least vigil 0.3.0
+pkg_at_least dials 0.4.0
+pkg_at_least lmtt 0.3.1
+pkg_at_least hyprstate 2.4.2
+if pkg_version hyprstate-gui >/dev/null 2>&1 && [ -n "$(pkg_version hyprstate-gui)" ]; then
+    bad "hyprstate-gui is still installed (renamed to dials)"
+else
+    ok "no hyprstate-gui package"
+fi
 pkg_at_least waybar-workspace-buttons 1.0.3
 pkg_at_least man-db 2.0
 pkg_at_least waybar 0.15
@@ -188,6 +196,23 @@ if [ -d /run/user/1000 ]; then
     else
         bad "failed user units: ${usr_failed[*]}"
     fi
+fi
+
+echo "== dials (settings window)"
+for f in /usr/bin/dials /usr/share/applications/dials.desktop /usr/share/applications/lmtt-config.desktop
+do
+    if [ -e "$f" ]; then ok "$f"; else bad "$f missing"; fi
+done
+if entries=$(dials --entries 2>&1); then
+    if printf '%s\n' "$entries" | grep -q $'^Appearance\tlmtt-config\t'; then
+        ok "dials --entries lists lmtt-config under Appearance"
+    else
+        printf '%s\n' "$entries"
+        bad "dials --entries does not list lmtt-config"
+    fi
+else
+    printf '%s\n' "$entries"
+    bad "dials --entries failed"
 fi
 
 echo "== journal errors (hypr-de / vigil / greetd / waybar)"

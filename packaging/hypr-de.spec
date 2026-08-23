@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.17
+Version:        0.2.18
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -35,7 +35,7 @@ Requires:       hyprpolkitagent
 Requires:       hyprpwcenter
 Requires:       hyprshutdown
 Requires:       hyprstate
-Requires:       hyprstate-gui
+Requires:       dials
 Requires:       jetbrains-mono-fonts
 # Nerd variants come from hypr-de-extras (none exist in Fedora proper); the
 # waybar/swaync stylesheets request these families by name
@@ -197,6 +197,9 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Sat Aug 22 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.18-1
+- Depend on dials (formerly hyprstate-gui); voice dictation is wayland-voice-dictation.
+
 * Thu Aug 20 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.14-1
 - Add the cancelable Vigil frost warning only to idle-triggered locks.
 - Keep manual and before-sleep locks immediate and enable safe lock restore.

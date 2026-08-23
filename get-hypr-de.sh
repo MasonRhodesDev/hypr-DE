@@ -105,7 +105,7 @@ install_fedora() {
         solaris765/waybar-workspace-buttons \
         solaris765/vigil \
         solaris765/sni-watcher \
-        solaris765/hyprstate-gui \
+        solaris765/dials \
         solaris765/hypr-de-extras \
         nett00n/hyprland \
         heus-sueh/packages
