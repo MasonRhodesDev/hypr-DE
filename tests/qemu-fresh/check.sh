@@ -218,11 +218,21 @@ fi
 echo "== editor + nvim theme"
 pkg_at_least neovim 0.9
 if command -v nvim >/dev/null; then ok "nvim on PATH"; else bad "nvim missing (default editor)"; fi
-ed="${EDITOR:-}"
-if [ -n "$ed" ] && command -v "${ed%% *}" >/dev/null; then
-    ok "EDITOR=$ed resolves"
+# EDITOR comes from the uwsm session env, so an SSH shell (and an automated
+# run, where nobody logs in at the greeter) never has it. Assert the packaged
+# contract instead, and the live session env only when a session exists.
+ed_decl=$(grep -hoE '^export EDITOR=.*' /etc/xdg/uwsm/env 2>/dev/null | head -1)
+if [ -n "$ed_decl" ] && command -v "${ed_decl#export EDITOR=}" >/dev/null; then
+    ok "uwsm env sets ${ed_decl#export } and it resolves"
 else
-    bad "EDITOR unset or not on PATH (=$ed)"
+    bad "uwsm env does not set a usable EDITOR (got '${ed_decl:-none}')"
+fi
+if pgrep -u "$USER" -x Hyprland >/dev/null 2>&1; then
+    if systemctl --user show-environment 2>/dev/null | grep -q '^EDITOR='; then
+        ok "EDITOR present in the live session environment"
+    else
+        bad "session is up but EDITOR is missing from its environment"
+    fi
 fi
 if [ -f "$HOME/.config/hypr-de/nvim-colors.lua" ] && grep -q 'colors_name' "$HOME/.config/hypr-de/nvim-colors.lua"; then
     ok "nvim Material You colorscheme rendered"
