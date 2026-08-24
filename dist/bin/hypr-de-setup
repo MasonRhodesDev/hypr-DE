@@ -33,7 +33,6 @@ REQUIRED_UNITS=(
     wayland-env-guard.path
     wayland-env-guard.timer
     hyprland-configreload-listener.service
-    notification-focus-proxy.service
     hypr-de-prime-theme.service
     udiskie.service
     hyprstate.service

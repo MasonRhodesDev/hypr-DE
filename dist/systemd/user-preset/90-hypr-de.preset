@@ -9,7 +9,6 @@ enable waybar-watchdog.timer
 enable wayland-env-guard.path
 enable wayland-env-guard.timer
 enable hyprland-configreload-listener.service
-enable notification-focus-proxy.service
 enable hypr-de-prime-theme.service
 enable udiskie.service
 enable hyprstate.service
