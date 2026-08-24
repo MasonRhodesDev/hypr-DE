@@ -16,21 +16,147 @@
 # child inherits that scope, not hypridle's; the scope outlives this script
 # for as long as the locker runs. Blocking semantics are unchanged, which
 # matters because hypridle waits for lock_cmd before suspending.
+#
+# THIS SCRIPT MUST NEVER FAIL OPEN. A lock request that ends with the session
+# still unlocked is a security failure, not a logged inconvenience: hypridle
+# moves on, dpms-off-if-unlocked.sh blanks the outputs, and the user walks
+# away from what looks exactly like a locked screen but is a live desktop one
+# keypress away. So a failed locker escalates -- retry unscoped, then any
+# other installed locker, then terminate the session -- and only gives up on
+# locking by taking the session down with it.
+set -u
+
+runtime_dir=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
+# Read by dpms-off-if-unlocked.sh: while this exists a lock attempt has
+# failed, so the outputs must stay lit rather than fake a locked screen.
+fail_marker="$runtime_dir/hypr-de-lock-failed"
+
+log() { printf 'hypr-de lock: %s\n' "$*" >&2; }
+
+# logind's LockedHint is the same signal dpms-off-if-unlocked.sh trusts, so it
+# is the authority on "is this session actually locked".
+locked_hint() {
+    [ "$(loginctl show-session self -p LockedHint --value 2>/dev/null || true)" = yes ]
+}
+
+# The hint can land just after the locker returns; give it a moment before
+# treating a non-zero exit as an unlocked session.
+locked_within() {
+    tries=${HYPR_DE_LOCK_VERIFY_TRIES:-20}
+    while [ "$tries" -gt 0 ]; do
+        locked_hint && return 0
+        tries=$((tries - 1))
+        if [ "$tries" -gt 0 ]; then sleep 0.1; fi
+    done
+    return 1
+}
+
 lock() {
     if command -v systemd-run >/dev/null 2>&1 \
         && systemd-run --user --scope --quiet --collect true >/dev/null 2>&1
     then
         systemd-run --user --scope --quiet --collect -- vigil-lock "$@"
+        status=$?
+        # Exit 3 is a cancelled idle lock, not a launch failure -- never retry
+        # it, or a nudged mouse would lock the session anyway. Anything else
+        # can be the scope failing to start rather than the locker refusing,
+        # so try again without it: a locker in hypridle's cgroup beats none.
+        if [ "$status" -ne 0 ] && [ "$status" -ne 3 ] && ! locked_hint; then
+            log "scoped locker exited $status; retrying without the transient scope"
+            vigil-lock "$@"
+            status=$?
+        fi
     else
         # No user manager (or transient units unavailable): still lock. A
         # locker tied to hypridle's lifetime beats no locker at all.
         vigil-lock "$@"
+        status=$?
     fi
+    return "$status"
+}
+
+# Emergency only, once vigil-lock is missing or broken. Each candidate is a
+# command line, "|"-separated, tried in order and skipped if not installed; a
+# trailing "&" means the locker holds the foreground until unlock, so it is
+# backgrounded and counted as locked if it is still alive a second later.
+# Restricted to lockers that return (or daemonize) as soon as the screen is
+# locked, because hypridle waits for lock_cmd before it suspends -- a locker
+# that blocks until unlock would hold off the suspend it was called for.
+fallback_candidates=${HYPR_DE_LOCK_FALLBACKS-'swaylock -f|gtklock -d|hyprlock &'}
+
+fallback_lock() {
+    saved_ifs=$IFS
+    IFS='|'
+    for entry in $fallback_candidates; do
+        IFS=$saved_ifs
+        case "$entry" in
+            *'&')
+                # shellcheck disable=SC2086  # deliberate: entry is a command line
+                set -- ${entry%&}
+                [ "$#" -gt 0 ] && command -v "$1" >/dev/null 2>&1 || continue
+                "$@" >/dev/null 2>&1 &
+                pid=$!
+                sleep 1
+                if kill -0 "$pid" 2>/dev/null; then
+                    log "locked with $1 (fallback)"
+                    return 0
+                fi
+                ;;
+            *)
+                # shellcheck disable=SC2086  # deliberate: entry is a command line
+                set -- $entry
+                [ "$#" -gt 0 ] && command -v "$1" >/dev/null 2>&1 || continue
+                if "$@"; then
+                    log "locked with $1 (fallback)"
+                    return 0
+                fi
+                ;;
+        esac
+    done
+    IFS=$saved_ifs
+    return 1
+}
+
+fail_closed() {
+    : > "$fail_marker" 2>/dev/null || true
+    case "${HYPR_DE_LOCK_FAILSAFE:-terminate}" in
+        warn|none)
+            log "no locker succeeded; HYPR_DE_LOCK_FAILSAFE=warn, so the session stays up and UNLOCKED. Outputs are kept lit so it cannot pass for a locked screen."
+            ;;
+        *)
+            log "no locker succeeded; terminating the session rather than leaving it exposed (set HYPR_DE_LOCK_FAILSAFE=warn to keep it)"
+            sid=${XDG_SESSION_ID:-}
+            [ -n "$sid" ] || sid=$(loginctl show-session self -p Id --value 2>/dev/null || true)
+            if [ -n "$sid" ]; then
+                loginctl terminate-session "$sid"
+            else
+                loginctl terminate-user "$(id -u)"
+            fi
+            ;;
+    esac
+}
+
+# 0 locked, 3 idle lock cancelled by activity, 1 fell all the way through.
+lock_or_fail_closed() {
+    lock "$@"
+    status=$?
+    [ "$status" -eq 3 ] && return 3
+    if [ "$status" -eq 0 ] || locked_within; then
+        rm -f "$fail_marker" 2>/dev/null || true
+        return 0
+    fi
+    log "vigil-lock failed (exit $status) and the session is not locked"
+    if fallback_lock; then
+        rm -f "$fail_marker" 2>/dev/null || true
+        return 0
+    fi
+    fail_closed
+    return 1
 }
 
 case "${1:-}" in
     --idle)
-        lock --wait --warn "${VIGIL_IDLE_WARNING_SECONDS:-10}"
+        lock_or_fail_closed --wait --warn "${VIGIL_IDLE_WARNING_SECONDS:-10}"
         status=$?
         # Exit 3 means user activity cancelled before session-lock. That is a
         # successful idle-policy outcome, not a locker failure.
@@ -40,7 +166,7 @@ case "${1:-}" in
     --sleep)
         # before_sleep: never cancelable, and no DPMS poke on the way down
         # (after_sleep_cmd turns the outputs back on when we resume).
-        lock --wait --no-warn || exit $?
+        lock_or_fail_closed --wait --no-warn || exit $?
         exit 0
         ;;
     *)
@@ -48,7 +174,7 @@ case "${1:-}" in
         # default warning duration: manual locks and before-sleep must never
         # be cancelable (a nudged mouse during lid-close would suspend
         # unlocked).
-        lock --wait --no-warn || exit $?
+        lock_or_fail_closed --wait --no-warn || exit $?
         ;;
 esac
 

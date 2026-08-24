@@ -1,0 +1,22 @@
+#!/bin/sh
+# Stand-in for systemd-run: strips the scope flags and runs the command, so
+# the scoped path is exercised deterministically without touching the real
+# user manager. LOCK_POLICY_SCOPE_STATUS makes the scoped vigil-lock
+# invocation fail the way a scope that cannot start does -- the probe (which
+# runs `true`) still succeeds, which is exactly the case the retry exists for.
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --) shift; break ;;
+        -*) shift ;;
+        *) break ;;
+    esac
+done
+case "${1:-}" in
+    vigil-lock)
+        if [ "${LOCK_POLICY_SCOPE_STATUS:-0}" -ne 0 ]; then
+            printf 'systemd-run:scope-failed\n' >> "$LOCK_POLICY_LOG"
+            exit "$LOCK_POLICY_SCOPE_STATUS"
+        fi
+        ;;
+esac
+exec "$@"
