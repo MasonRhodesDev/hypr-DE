@@ -47,6 +47,7 @@ check() {
   ./tests/steam-launch-options.sh
   ./tests/runtime-paths.sh
   ./tests/pam-rewrite.sh
+  ./tests/share-consent.sh
 }
 
 package_hypr-de() {

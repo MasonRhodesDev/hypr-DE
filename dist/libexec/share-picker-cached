@@ -7,6 +7,21 @@
 # hyprland-share-picker (2-4 dialogs per share). Serialize prompts and replay
 # the first real selection for repeats within TTL so the user picks once.
 #
+# The replay is scoped to the client that gave consent, not just to a stretch
+# of time. Keyed on time alone, any process opening a ScreenCast session
+# inside the window inherited the user's screen or window with no picker
+# shown — the exact opposite of what xdph.conf's allow_token_by_default =
+# false is for.
+#
+# xdph passes the picker no caller identity (argv is just --allow-token), so
+# it comes from the portal frontend: every live portal session is exported at
+# /org/freedesktop/portal/desktop/session/<requesting client's bus name>/<token>.
+# A selection is replayed only while no client that was not already holding a
+# session at consent time has turned up. A new consumer means a new bus name,
+# which means a fresh picker. Unrelated portal use (a file chooser opening
+# mid-share) also forces a fresh picker — one extra dialog, never a silent
+# capture.
+#
 # Protocol (xdph ScreencopyShared.cpp): stdout must contain
 # [SELECTION]<flags>/<screen:NAME|window:HANDLE|region:OUT@X,Y,W,H> and xdph
 # passes --allow-token when screencopy:allow_token_by_default is set.
@@ -14,14 +29,46 @@ set -u
 CACHE="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/xdph-share-picker.cache"
 TTL=15
 PICKER="${XDPH_PICKER:-hyprland-share-picker}"
+BUSCTL="${XDPH_BUSCTL:-busctl}"
+
+# The set of D-Bus clients currently holding a portal session, comma-wrapped.
+# Empty means "could not tell", which is never treated as a match.
+portal_clients() {
+    "$BUSCTL" --user tree org.freedesktop.portal.Desktop 2>/dev/null \
+        | grep -oE '/session/[^/ ]+' \
+        | sed 's|/session/||' \
+        | sort -u \
+        | tr '\n' ',' \
+        | sed 's/^/,/'
+}
+
+# Every client asking now was already asking when consent was given.
+no_new_client() {  # no_new_client <now> <at-consent>
+    local now="$1" then="$2" c
+    [ -n "$now" ] && [ "$now" != "," ] || return 1   # cannot tell: no replay
+    [ -n "$then" ] || return 1
+    for c in $(printf '%s' "$now" | tr ',' ' '); do
+        case "$then" in
+            *",$c,"*) ;;
+            *) return 1 ;;
+        esac
+    done
+    return 0
+}
 
 exec 9>"$CACHE.lock"
 flock 9 # a concurrent prompt waits here, then reads the fresh cache
 
+clients=$(portal_clients)
+
 if [ -f "$CACHE" ]; then
     ts=$(sed -n 1p "$CACHE")
-    sel=$(sed -n 2p "$CACHE")
-    if [ -n "$sel" ] && [ $(($(date +%s) - ts)) -le "$TTL" ]; then
+    cached_clients=$(sed -n 2p "$CACHE")
+    sel=$(sed -n 3p "$CACHE")
+    if [ -n "$sel" ] \
+        && [ "$(($(date +%s) - ${ts:-0}))" -le "$TTL" ] \
+        && no_new_client "$clients" "$cached_clients"
+    then
         printf '%s\n' "$sel"
         exit 0
     fi
@@ -31,8 +78,11 @@ out=$("$PICKER" "$@")
 ec=$?
 sel=$(printf '%s\n' "$out" | grep -o '\[SELECTION\].*' | tail -1)
 if [ "$ec" -eq 0 ] && [ -n "$sel" ]; then
-    # Stamp after the picker closes — the user may deliberate longer than TTL.
-    printf '%s\n%s\n' "$(date +%s)" "$sel" > "$CACHE"
+    # Stamp after the picker closes — the user may deliberate longer than TTL
+    # — but record the client set from BEFORE it opened. Anything that turned
+    # up while the user was deliberating is a new consumer, not the one being
+    # consented to.
+    printf '%s\n%s\n%s\n' "$(date +%s)" "$clients" "$sel" > "$CACHE"
 else
     rm -f "$CACHE" # a cancel invalidates any previous selection
 fi
