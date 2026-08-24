@@ -4,7 +4,7 @@
 #
 # Why this exists: pacman and rpm replace a file by unlinking and rewriting it.
 # Hyprland watches its config with inotify, so an upgrade that touches
-# /etc/xdg/hypr/hyprland.lua or the packaged Lua under /usr/share/hypr-de/hypr
+# /etc/xdg/hypr/hyprland.lua or the packaged Lua under @DATADIR@/hypr
 # can fire the watcher during that split second, fail to open the file, and
 # latch "Your config has errors: cannot open ..." on screen. Nothing is
 # actually broken -- the file is written correctly -- but the banner stays
