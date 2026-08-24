@@ -1,15 +1,27 @@
 #!/bin/bash
-# Set XWayland primary to ultrawide monitor (detected by model)
-# This fixes games launching on the wrong monitor in multi-monitor setups
+# Set the XWayland primary output to a chosen monitor (matched by model
+# substring). Fixes XWayland games/apps launching on the wrong monitor in
+# multi-monitor setups. Opt-in: does nothing until you name a monitor.
+#
+# Configure the model substring in either:
+#   ~/.config/hypr-de/xwayland-primary        (file: one model substring)
+#   $HYPR_DE_XWAYLAND_PRIMARY_MODEL           (env var, wins over the file)
+# Find your model with: hyprctl monitors -j | jq -r '.[].model'
 
-ULTRAWIDE_MODEL="S3422DWG"
+CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/hypr-de/xwayland-primary"
+MODEL="${HYPR_DE_XWAYLAND_PRIMARY_MODEL:-}"
+if [[ -z "$MODEL" && -r "$CONFIG" ]]; then
+    MODEL=$(head -n1 "$CONFIG" | tr -d '[:space:]')
+fi
 
-# Get output name from hyprctl (has reliable model info)
-ULTRAWIDE_OUTPUT=$(hyprctl monitors -j | jq -r '.[] | select(.model | contains("'"$ULTRAWIDE_MODEL"'")) | .name')
+# Unconfigured is the silent default — most setups don't need this.
+[[ -z "$MODEL" ]] && exit 0
 
-if [[ -n "$ULTRAWIDE_OUTPUT" ]]; then
-    xrandr --output "$ULTRAWIDE_OUTPUT" --primary
-    echo "$(date): Set $ULTRAWIDE_OUTPUT as XWayland primary"
+OUTPUT=$(hyprctl monitors -j | jq -r --arg m "$MODEL" '.[] | select(.model | contains($m)) | .name')
+
+if [[ -n "$OUTPUT" ]]; then
+    xrandr --output "$OUTPUT" --primary
+    echo "$(date): Set $OUTPUT as XWayland primary"
 else
-    echo "$(date): Ultrawide monitor ($ULTRAWIDE_MODEL) not found"
+    echo "$(date): XWayland-primary monitor (model ~ $MODEL) not connected"
 fi

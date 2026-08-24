@@ -234,6 +234,12 @@ def cmd_install(src):
         die(f"{src}: no theme.toml")
     theme = load_theme(src)
     name = theme["meta"]["name"]
+    # name comes from an untrusted third-party theme.toml and is used as a
+    # directory that gets rmtree'd and copytree'd; a name like "../../x" would
+    # escape USER_THEMES and delete/overwrite arbitrary user dirs. Require a
+    # plain basename.
+    if not name or name in (".", "..") or os.path.basename(name) != name:
+        die(f"invalid theme name {name!r}: must be a plain directory name")
     dst = os.path.join(USER_THEMES, name)
     os.makedirs(USER_THEMES, exist_ok=True)
     if os.path.exists(dst):

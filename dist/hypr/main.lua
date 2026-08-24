@@ -399,7 +399,6 @@ hl.window_rule({ name = "hyprpwcenter",     match = { class = "^(hyprpwcenter)$"
 hl.window_rule({ name = "overskride",       match = { class = "^(io\\.github\\.kaii_lb\\.Overskride)$" }, float = true, center = true, stay_focused = true })
 hl.window_rule({ name = "hypr-de-help",     match = { class = "^(dev\\.mason\\.hypr-de-help)$" }, float = true, center = true, size = "860 600", stay_focused = true })
 hl.window_rule({ name = "satty",            match = { class = "^(com.gabm.satty)$" }, float = true, pin = true, center = true, stay_focused = true })
-hl.window_rule({ name = "zoom-annotate",    match = { class = "^(zoom)$", title = "^(annotate_toolbar)$" }, float = true, size = "1 1", move = "-9999 -9999", opacity = "0.0 override 0.0 override", border_size = 0, no_blur = true, no_shadow = true, no_initial_focus = true, no_focus = true })
 
 ----------------------------------------------------------------------
 -- AUTOSTART ---------------------------------------------------------

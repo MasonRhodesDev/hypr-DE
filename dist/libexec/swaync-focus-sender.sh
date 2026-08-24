@@ -42,6 +42,16 @@ needle=$(printf '%s' "$needle_raw" \
 
 [ -z "$needle" ] && exit 0
 
+# The app-name / desktop-entry fields come from the untrusted D-Bus Notify
+# call: any session process can spoof them. run_plugin() sources
+# "$APPS_DIR/$name.sh", so a needle containing a path separator or ".."
+# would source a file outside the plugin dir. Restrict to a safe basename
+# charset and reject traversal before it is ever used as a path.
+needle=$(printf '%s' "$needle" | tr -cd 'a-z0-9._-')
+case "$needle" in
+    ""|.|..|*..*) exit 0 ;;
+esac
+
 # --- per-app recovery plugin (background; focusing below stays instant) ----
 run_plugin() {
     local name plugin
