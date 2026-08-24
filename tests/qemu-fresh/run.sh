@@ -322,27 +322,24 @@ run_check() {
 # greetd autologin so an automated run gets a real Hyprland session.
 enable_autologin() {
     echo "== enabling greetd autologin (test-only)"
+    # Append an [initial_session] table instead of rewriting the file: the
+    # shipped [default_session] differs per distro (the greeter user is
+    # "greeter" on Arch but not on Fedora), and clobbering it makes greetd
+    # fail to start at all.
     guest_ssh 'set -e
         sess=$(ls /usr/share/wayland-sessions/*uwsm*.desktop 2>/dev/null | head -1)
-        [ -n "$sess" ] || sess=$(grep -l "Hyprland" /usr/share/wayland-sessions/*.desktop | head -1)
+        [ -n "$sess" ] || sess=$(grep -l "Hyprland" /usr/share/wayland-sessions/*.desktop 2>/dev/null | head -1)
         [ -n "$sess" ] || { echo "no wayland session entry found" >&2; exit 1; }
         cmd=$(awk -F= "/^Exec=/{print \$2; exit}" "$sess")
         echo "   session entry: $sess"
         echo "   exec: $cmd"
-        sudo cp /etc/greetd/config.toml /etc/greetd/config.toml.bak
-        sudo tee /etc/greetd/config.toml >/dev/null <<EOF
-[terminal]
-vt = 1
-
-[initial_session]
-command = "$cmd"
-user = "mason"
-
-[default_session]
-command = "/usr/bin/vigil"
-user = "greeter"
-EOF
-        sudo systemctl restart greetd'
+        [ -f /etc/greetd/config.toml.bak ] || sudo cp /etc/greetd/config.toml /etc/greetd/config.toml.bak
+        sudo cp /etc/greetd/config.toml.bak /etc/greetd/config.toml
+        printf "\n[initial_session]\ncommand = \"%s\"\nuser = \"%s\"\n" "$cmd" "$USER" \
+            | sudo tee -a /etc/greetd/config.toml >/dev/null
+        sudo systemctl restart greetd
+        sleep 2
+        systemctl is-active greetd'
 }
 
 wait_session() {
@@ -358,29 +355,56 @@ wait_session() {
         sleep 2
     done
     echo "no Hyprland session appeared" >&2
-    guest_ssh 'journalctl --user -b --no-pager | tail -20' >&2 || true
+    echo "--- greetd status ---" >&2
+    guest_ssh 'systemctl is-active greetd; sudo systemctl status greetd --no-pager -l 2>&1 | tail -15' >&2 || true
+    echo "--- greetd journal ---" >&2
+    guest_ssh 'sudo journalctl -u greetd -b --no-pager | tail -20' >&2 || true
     exit 1
 }
 
-# Roll hypr-de back to the previous published release, so the upgrade under
-# test is a real version change. Uses the GitHub release asset; the repo only
-# ever carries the newest build.
+# Roll hypr-de back to the previous published release so the upgrade under
+# test is a real version change. Sets DOWNGRADED=1 on success. Not fatal: the
+# deterministic recovery assertions in upgrade-check.sh do not need a version
+# change, so a repo without an older build still gets a meaningful run.
+DOWNGRADED=0
 downgrade_hypr_de() {
+    if [ "$DISTRO" = fedora ]; then
+        # COPR results moved to Pulp, so old-build RPM URLs are not dependable;
+        # ask dnf for an older version in the repo instead.
+        echo "== looking for a previous hypr-de in COPR"
+        if guest_ssh 'sudo dnf -y downgrade hypr-de hypr-de-gaming >/dev/null 2>&1 || sudo dnf -y downgrade hypr-de >/dev/null 2>&1'; then
+            DOWNGRADED=1
+            echo "   downgraded to $(guest_ssh 'rpm -q --qf "%{VERSION}" hypr-de' 2>/dev/null)"
+        else
+            echo "   no older build available in COPR — running without a version change"
+        fi
+        return 0
+    fi
+
     local prev="${HYPR_DE_PREV_TAG:-}"
     if [ -z "$prev" ]; then
-        prev=$(curl -fsL https://api.github.com/repos/MasonRhodesDev/hypr-DE/releases             | grep -oE '"tag_name": *"v[0-9.]+"' | sed 's/.*"v/v/; s/"//' | sed -n 2p)
+        prev=$(curl -fsL https://api.github.com/repos/MasonRhodesDev/hypr-DE/releases \
+            | grep -oE '"tag_name": *"v[0-9.]+"' | sed 's/.*"v/v/; s/"//' | sed -n 2p)
     fi
-    [ -n "$prev" ] || { echo "could not resolve the previous release tag" >&2; exit 1; }
+    if [ -z "$prev" ]; then
+        echo "   could not resolve a previous release — running without a version change" >&2
+        return 0
+    fi
     echo "== downgrading hypr-de to $prev (previous release)"
     local base="https://github.com/MasonRhodesDev/hypr-DE/releases/download/$prev"
     local ver="${prev#v}"
-    guest_ssh "set -e
+    if guest_ssh "set -e
         cd /tmp
         curl -fsSLO '$base/hypr-de-$ver-1-any.pkg.tar.zst'
         curl -fsSLO '$base/hypr-de-gaming-$ver-1-any.pkg.tar.zst' || true
-        sudo pacman -U --noconfirm hypr-de-$ver-1-any.pkg.tar.zst hypr-de-gaming-$ver-1-any.pkg.tar.zst 2>/dev/null \
+        sudo pacman -U --noconfirm hypr-de-$ver-1-any.pkg.tar.zst hypr-de-gaming-$ver-1-any.pkg.tar.zst 2>/dev/null \\
           || sudo pacman -U --noconfirm hypr-de-$ver-1-any.pkg.tar.zst
         pacman -Q hypr-de"
+    then
+        DOWNGRADED=1
+    else
+        echo "   downgrade failed — running without a version change" >&2
+    fi
 }
 
 run_upgrade_test() {
@@ -388,8 +412,35 @@ run_upgrade_test() {
     downgrade_hypr_de
     enable_autologin
     wait_session
-    echo "== upgrading hypr-de under the live session (the real scenario)"
-    guest_ssh 'sudo pacman -Syu --noconfirm 2>&1 | tail -5; pacman -Q hypr-de'
+    if [ "$DOWNGRADED" = 1 ]; then
+        echo "== upgrading hypr-de under the live session (the real scenario)"
+    else
+        echo "== reinstalling hypr-de under the live session (no older build to come from)"
+    fi
+    local before after
+    if [ "$DISTRO" = fedora ]; then
+        before=$(guest_ssh 'rpm -q --qf "%{VERSION}" hypr-de' 2>/dev/null)
+        # dnf5 aborts the whole transaction if any named package is not
+        # installed, and hypr-de-gaming is not part of a default Fedora
+        # install -- so only pass packages that are actually present.
+        guest_ssh 'set -e
+            list=""
+            for p in hypr-de hypr-de-gaming; do rpm -q "$p" >/dev/null 2>&1 && list="$list $p"; done
+            echo "   upgrading:$list"
+            sudo dnf -y upgrade $list 2>&1 | tail -4'
+        after=$(guest_ssh 'rpm -q --qf "%{VERSION}" hypr-de' 2>/dev/null)
+    else
+        before=$(guest_ssh 'pacman -Q hypr-de | cut -d" " -f2' 2>/dev/null)
+        guest_ssh 'sudo pacman -Syu --noconfirm 2>&1 | tail -5'
+        after=$(guest_ssh 'pacman -Q hypr-de | cut -d" " -f2' 2>/dev/null)
+    fi
+    echo "   hypr-de: $before -> $after"
+    # A downgrade that is not followed by a real upgrade means the run proved
+    # nothing about the upgrade path; fail loudly instead of quietly passing.
+    if [ "$DOWNGRADED" = 1 ] && [ "$before" = "$after" ]; then
+        echo "ERROR: downgraded to $before but the upgrade did not change the version" >&2
+        exit 1
+    fi
     echo "== upgrade checks"
     guest_ssh 'bash -s' <"$HERE/upgrade-check.sh"
 }
