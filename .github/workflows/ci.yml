@@ -45,3 +45,5 @@ jobs:
         run: ./tests/steam-launch-options.sh
       - name: Runtime state paths
         run: ./tests/runtime-paths.sh
+      - name: PAM rewrite safety
+        run: ./tests/pam-rewrite.sh

@@ -4,13 +4,27 @@
 # PAM when missing.
 set -euo pipefail
 
-systemctl enable NetworkManager.service >/dev/null 2>&1 || true
-systemctl enable bluetooth.service >/dev/null 2>&1 || true
+warn() { printf 'hypr-de-sys-setup: %s\n' "$*" >&2; }
 
-pam=/etc/pam.d/greetd
-if [ -f "$pam" ] && ! grep -q 'pam_gnome_keyring.so' "$pam"; then
-    tmp=$(mktemp)
-    awk '
+# Wire gnome-keyring into a greetd PAM stack.
+#
+# This runs as root from %post/post_install and edits the file that decides
+# whether anyone can log in. It used to pipe awk straight over the live file
+# with no check and no backup, so any awk that produced nothing useful --
+# mawk/busybox/gawk differences, a greetd PAM file that does not look like
+# the one this was written against -- truncated the auth stack and locked the
+# machine out. So: validate the rewrite first, back the original up, and on
+# anything unexpected leave the original alone and carry on. A missing
+# keyring is a nuisance; a broken PAM stack is a reinstall.
+wire_keyring_pam() {
+    local pam="$1" tmp backup added line
+
+    [ -f "$pam" ] || return 0
+    grep -q 'pam_gnome_keyring.so' "$pam" && return 0
+
+    tmp=$(mktemp) || { warn "mktemp failed; leaving $pam alone"; return 0; }
+
+    if ! awk '
         { print }
         /^auth[[:space:]]+include[[:space:]]+system-local-login/ && !auth {
             print "-auth       optional    pam_gnome_keyring.so"
@@ -24,7 +38,66 @@ if [ -f "$pam" ] && ! grep -q 'pam_gnome_keyring.so' "$pam"; then
             print "-session    optional    pam_gnome_keyring.so auto_start"
             session = 1
         }
-    ' "$pam" > "$tmp"
-    cat "$tmp" > "$pam"
+    ' "$pam" > "$tmp"; then
+        warn "awk failed on $pam; leaving it unchanged"
+        rm -f "$tmp"
+        return 0
+    fi
+
+    if [ ! -s "$tmp" ]; then
+        warn "rewrite of $pam came out empty; leaving the original in place"
+        rm -f "$tmp"
+        return 0
+    fi
+
+    added=$(grep -c 'pam_gnome_keyring.so' "$tmp" || true)
+    if [ "${added:-0}" -eq 0 ]; then
+        warn "no insertion point in $pam (no 'include system-local-login' lines); gnome-keyring not wired"
+        rm -f "$tmp"
+        return 0
+    fi
+
+    # The awk prints every input line and only ever inserts, so the output
+    # must contain everything the input had. Anything missing means the awk
+    # did something other than what this expects.
+    while IFS= read -r line; do
+        if ! grep -qxF -- "$line" "$tmp"; then
+            warn "rewrite of $pam dropped a line ('$line'); leaving the original in place"
+            rm -f "$tmp"
+            return 0
+        fi
+    done < "$pam"
+
+    if ! grep -qE '^auth[[:space:]]' "$tmp" || ! grep -qE '^session[[:space:]]' "$tmp"; then
+        warn "rewrite of $pam has no auth or session line; leaving the original in place"
+        rm -f "$tmp"
+        return 0
+    fi
+
+    backup="$pam.hypr-de-backup.$(date +%Y%m%d%H%M%S)"
+    if ! cp -a "$pam" "$backup"; then
+        warn "could not back up $pam; not rewriting it"
+        rm -f "$tmp"
+        return 0
+    fi
+
+    # `cat >` rather than `mv`: it keeps the live file's inode, mode, owner
+    # and SELinux label, which for a PAM file matter more than atomicity.
+    if cat "$tmp" > "$pam"; then
+        printf 'hypr-de-sys-setup: wired gnome-keyring into %s (backup: %s)\n' "$pam" "$backup"
+    else
+        warn "writing $pam failed; restoring it from $backup"
+        cat "$backup" > "$pam" || warn "RESTORE FAILED -- $pam may be broken, backup is at $backup"
+    fi
     rm -f "$tmp"
+}
+
+# Sourced by tests/pam-rewrite.sh to drive wire_keyring_pam against fixtures.
+if [ -n "${HYPR_DE_SYS_SETUP_LIB:-}" ]; then
+    return 0 2>/dev/null || exit 0
 fi
+
+systemctl enable NetworkManager.service >/dev/null 2>&1 || true
+systemctl enable bluetooth.service >/dev/null 2>&1 || true
+
+wire_keyring_pam /etc/pam.d/greetd
