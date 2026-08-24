@@ -10,6 +10,8 @@
 #   tests/qemu-fresh/run.sh [fedora] reboot  # reboot guest, wait for SSH
 #   tests/qemu-fresh/run.sh [fedora] check   # second-boot checks
 #   tests/qemu-fresh/run.sh [fedora] test    # reset + wait + reboot + check
+#   tests/qemu-fresh/run.sh [fedora] upgrade # install, roll back one release,
+#                                            # autologin, then upgrade LIVE
 #
 # Guest login: mason / hyprde (NOPASSWD sudo)
 # SSH: ssh -p 2222 (arch) / 2223 (fedora) -i ~/.ssh/id_ed25519 mason@127.0.0.1
@@ -23,9 +25,9 @@ cmd=start
 for arg in "$@"; do
     case "$arg" in
         arch|fedora) DISTRO=$arg ;;
-        reset|start|wait|reboot|check|test) cmd=$arg ;;
+        reset|start|wait|reboot|check|test|upgrade) cmd=$arg ;;
         -h|--help)
-            sed -n '2,17p' "$0"
+            sed -n '2,19p' "$0"
             exit 0
             ;;
         *)
@@ -309,6 +311,89 @@ run_check() {
     guest_ssh 'bash -s' <"$HERE/check.sh"
 }
 
+
+# --- upgrade-path testing -------------------------------------------------
+# The fresh-install checks never log in, so they cannot see anything that only
+# breaks for a user who is *sitting in a session* while packages change --
+# e.g. Hyprland latching "Your config has errors" when a watched config file is
+# replaced mid-transaction. These helpers put a real session on screen, roll
+# hypr-de back to the previous release, then upgrade under that live session.
+
+# greetd autologin so an automated run gets a real Hyprland session.
+enable_autologin() {
+    echo "== enabling greetd autologin (test-only)"
+    guest_ssh 'set -e
+        sess=$(ls /usr/share/wayland-sessions/*uwsm*.desktop 2>/dev/null | head -1)
+        [ -n "$sess" ] || sess=$(grep -l "Hyprland" /usr/share/wayland-sessions/*.desktop | head -1)
+        [ -n "$sess" ] || { echo "no wayland session entry found" >&2; exit 1; }
+        cmd=$(awk -F= "/^Exec=/{print \$2; exit}" "$sess")
+        echo "   session entry: $sess"
+        echo "   exec: $cmd"
+        sudo cp /etc/greetd/config.toml /etc/greetd/config.toml.bak
+        sudo tee /etc/greetd/config.toml >/dev/null <<EOF
+[terminal]
+vt = 1
+
+[initial_session]
+command = "$cmd"
+user = "mason"
+
+[default_session]
+command = "/usr/bin/vigil"
+user = "greeter"
+EOF
+        sudo systemctl restart greetd'
+}
+
+wait_session() {
+    echo "== waiting for a live Hyprland session"
+    local i
+    for i in $(seq 1 60); do
+        if guest_ssh 'pgrep -u mason -x Hyprland >/dev/null' 2>/dev/null; then
+            echo "   session up ($i)"
+            # let the session settle (waybar/swaync start via graphical-session)
+            guest_ssh 'for _ in $(seq 1 30); do pgrep -u mason -x waybar >/dev/null && break; sleep 1; done' 2>/dev/null || true
+            return 0
+        fi
+        sleep 2
+    done
+    echo "no Hyprland session appeared" >&2
+    guest_ssh 'journalctl --user -b --no-pager | tail -20' >&2 || true
+    exit 1
+}
+
+# Roll hypr-de back to the previous published release, so the upgrade under
+# test is a real version change. Uses the GitHub release asset; the repo only
+# ever carries the newest build.
+downgrade_hypr_de() {
+    local prev="${HYPR_DE_PREV_TAG:-}"
+    if [ -z "$prev" ]; then
+        prev=$(curl -fsL https://api.github.com/repos/MasonRhodesDev/hypr-DE/releases             | grep -oE '"tag_name": *"v[0-9.]+"' | sed 's/.*"v/v/; s/"//' | sed -n 2p)
+    fi
+    [ -n "$prev" ] || { echo "could not resolve the previous release tag" >&2; exit 1; }
+    echo "== downgrading hypr-de to $prev (previous release)"
+    local base="https://github.com/MasonRhodesDev/hypr-DE/releases/download/$prev"
+    local ver="${prev#v}"
+    guest_ssh "set -e
+        cd /tmp
+        curl -fsSLO '$base/hypr-de-$ver-1-any.pkg.tar.zst'
+        curl -fsSLO '$base/hypr-de-gaming-$ver-1-any.pkg.tar.zst' || true
+        sudo pacman -U --noconfirm hypr-de-$ver-1-any.pkg.tar.zst hypr-de-gaming-$ver-1-any.pkg.tar.zst 2>/dev/null \
+          || sudo pacman -U --noconfirm hypr-de-$ver-1-any.pkg.tar.zst
+        pacman -Q hypr-de"
+}
+
+run_upgrade_test() {
+    wait_ssh
+    downgrade_hypr_de
+    enable_autologin
+    wait_session
+    echo "== upgrading hypr-de under the live session (the real scenario)"
+    guest_ssh 'sudo pacman -Syu --noconfirm 2>&1 | tail -5; pacman -Q hypr-de'
+    echo "== upgrade checks"
+    guest_ssh 'bash -s' <"$HERE/upgrade-check.sh"
+}
+
 case "$cmd" in
     reset)
         stop_vm
@@ -336,5 +421,14 @@ case "$cmd" in
         wait_firstboot
         reboot_guest
         run_check
+        ;;
+    upgrade)
+        # Fresh install, roll back one release, log in, then upgrade live.
+        stop_vm
+        write_cidata
+        reset_overlay
+        start_vm background
+        wait_firstboot
+        run_upgrade_test
         ;;
 esac
