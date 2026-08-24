@@ -137,6 +137,7 @@ find dist-build/bin dist-build/libexec -type f -exec sh -c 'head -1 "$1" | grep 
 ./packaging/check-units.sh
 ./tests/lock-policy.sh
 ./tests/installer-trust.sh
+./tests/steam-launch-options.sh
 
 %install
 LIBEXECDIR=%{_libexecdir}/hypr-de \

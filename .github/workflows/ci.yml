@@ -41,3 +41,5 @@ jobs:
 
       - name: Installer trust behaviour
         run: ./tests/installer-trust.sh
+      - name: Steam launch-option validation
+        run: ./tests/steam-launch-options.sh

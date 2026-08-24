@@ -16,6 +16,94 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 
+# ---------------------------------------------------------------------------
+# Launch-option validation
+#
+# Whatever ends up in Steam's LaunchOptions is executed as
+# `ENV=v wrapper %command%` every time the game starts, and the strings this
+# tool offers come from a model prompted with ProtonDB summaries and Steam
+# store text -- remote input that anyone can influence. A game description
+# that talks the model into emitting `bash -c '...' %command%` would otherwise
+# be one keypress away from running as the user.
+#
+# So nothing here is trusted by shape. Every token must match an allowlist and
+# anything else is refused, never escaped and passed along.
+
+# Wrappers that may precede %command%.
+LAUNCH_WRAPPERS='mangohud gamemoderun gamescope prime-run obs-gamecapture strangle'
+
+# Rejected even though their prefix is allowed: each one either loads code
+# from a path the caller chooses or runs a command outright. This is the list
+# most likely to need extending -- when in doubt, leave a variable out.
+launch_env_name_denied() {
+    case "$1" in
+        LD_*|PATH|ENV|BASH_ENV|IFS|SHELL) return 0 ;;
+        VK_ICD_FILENAMES|VK_DRIVER_FILES|VK_LAYER_PATH|VK_ADD_LAYER_PATH|VK_INSTANCE_LAYERS) return 0 ;;
+        MESA_LOADER_DRIVER_OVERRIDE|LIBGL_DRIVERS_PATH|WINEDLLPATH) return 0 ;;
+        MANGOHUD_CONFIG|MANGOHUD_CONFIGFILE) return 0 ;;  # supports exec=<command>
+    esac
+    return 1
+}
+
+launch_option_token_ok() {
+    local tok="$1" name
+
+    [[ "$tok" == '%command%' ]] && return 0
+    case " $LAUNCH_WRAPPERS " in *" $tok "*) return 0 ;; esac
+
+    # gamescope-style flags and their numeric arguments, and game arguments
+    # after %command%.
+    [[ "$tok" == "--" ]] && return 0
+    [[ "$tok" =~ ^--?[A-Za-z0-9][A-Za-z0-9-]*$ ]] && return 0
+    [[ "$tok" =~ ^[0-9]+$ ]] && return 0
+
+    if [[ "$tok" =~ ^([A-Za-z_][A-Za-z0-9_]*)=([A-Za-z0-9_.,:%/+@=-]*)$ ]]; then
+        name="${BASH_REMATCH[1]}"
+        launch_env_name_denied "$name" && return 1
+        [[ "$name" =~ ^(AMD|DXVK|VKD3D|RADV|MESA|VK|SDL|PROTON|WINE|LIBGL|MANGOHUD|GAMEMODE|VKBASALT|ENABLE_VKBASALT|NV|DRI|__GL|__NV|__VK|vblank_mode)[A-Za-z0-9_]*$ ]] && return 0
+    fi
+
+    return 1
+}
+
+# validate_launch_options <string> -- 0 if safe to hand to Steam, else 1 with
+# the reason on stderr. An empty string is "no change" and is fine.
+validate_launch_options() {
+    local opts="$1" tok cmd_count=0 bad
+
+    [[ -z "$opts" ]] && return 0
+
+    if (( ${#opts} > 512 )); then
+        printf 'implausibly long (%d chars)\n' "${#opts}" >&2
+        return 1
+    fi
+
+    # No shell metacharacter ever belongs in a launch-options string. Catching
+    # them up front means the token rules below never have to be airtight
+    # about quoting, substitution or chaining.
+    if [[ "$opts" =~ ([^A-Za-z0-9_.,:%/+@=[:space:]-]) ]]; then
+        bad="${BASH_REMATCH[1]}"
+        printf "contains a character that never belongs in launch options: '%s'\n" "$bad" >&2
+        return 1
+    fi
+
+    for tok in $opts; do
+        if ! launch_option_token_ok "$tok"; then
+            printf 'refused token: %s\n' "$tok" >&2
+            return 1
+        fi
+        [[ "$tok" == '%command%' ]] && cmd_count=$((cmd_count + 1))
+    done
+
+    if (( cmd_count != 1 )); then
+        printf 'must contain exactly one %%command%% (found %d)\n' "$cmd_count" >&2
+        return 1
+    fi
+
+    return 0
+}
+
+
 # Build launch options based on installed software
 build_launch_options() {
     local options=""
@@ -287,17 +375,28 @@ update_vdf_launch_options() {
     local appid="$2"
     local new_options="$3"
     local backup="${file}.backup.$(date +%s)"
+    local reason
+
+    # Last line of defence. This is the one place a string turns into
+    # something Steam will execute, so it re-validates even though the caller
+    # already did.
+    if ! reason=$(validate_launch_options "$new_options" 2>&1); then
+        echo -e "${RED}Refusing to write unsafe launch options: ${reason}${NC}" >&2
+        echo -e "${RED}  ${new_options}${NC}" >&2
+        return 1
+    fi
 
     # Create backup
     cp "$file" "$backup"
     echo -e "${BLUE}Created backup: $backup${NC}"
 
-    # Escape special characters for sed
-    local escaped_options=$(printf '%s\n' "$new_options" | sed 's/[\/&]/\\&/g')
-
-    # Use awk to update the launch options
-    awk -v appid="$appid" -v newopts="$escaped_options" '
-        BEGIN { in_app=0; updated=0; }
+    # The value goes through the environment rather than `awk -v`, which
+    # reprocesses backslash escapes, and the line is rebuilt by concatenation
+    # rather than sub(), whose replacement text reprocesses & and \. Escaping
+    # for one consumer and then handing the result to a different one is how
+    # the old version let a quote in the value add VDF keys of its own.
+    NEWOPTS="$new_options" awk -v appid="$appid" '
+        BEGIN { in_app=0; updated=0; opts=ENVIRON["NEWOPTS"]; }
 
         # Found the app section
         $0 ~ "\"" appid "\"" {
@@ -306,20 +405,20 @@ update_vdf_launch_options() {
             next;
         }
 
-        # In app section, found LaunchOptions
-        in_app && /LaunchOptions/ && !updated {
-            # Replace or add the line
-            sub(/"[^"]*"[[:space:]]*$/, "\"" newopts "\"");
+        # In app section, found LaunchOptions: rebuild the line, keeping the
+        # original indentation.
+        in_app && /"LaunchOptions"/ && !updated {
+            match($0, /^[[:space:]]*/);
+            print substr($0, 1, RLENGTH) "\"LaunchOptions\"\t\t\"" opts "\"";
             updated=1;
-            print;
             next;
         }
 
         # Exiting app section
-        in_app && /^\s*}/ {
+        in_app && /^[[:space:]]*}/ {
             # If we never found LaunchOptions, add it before closing brace
             if (!updated) {
-                print "\t\t\t\t\t\"LaunchOptions\"\t\t\"" newopts "\"";
+                print "\t\t\t\t\t\"LaunchOptions\"\t\t\"" opts "\"";
                 updated=1;
             }
             in_app=0;
@@ -403,12 +502,24 @@ prompt_launch_options() {
 
     echo -e "${YELLOW}Available configurations:${NC}" >&2
 
-    local i
+    local i menu=0 reason
+    local -a selectable=()
     for ((i=0; i<option_count; i++)); do
         local label=$(echo "$options_json" | jq -r ".options[$i].label" 2>/dev/null)
         local launch_opts=$(echo "$options_json" | jq -r ".options[$i].launch_options" 2>/dev/null)
         local desc=$(echo "$options_json" | jq -r ".options[$i].description" 2>/dev/null)
         local confidence=$(echo "$options_json" | jq -r ".options[$i].confidence // \"unknown\"" 2>/dev/null)
+
+        # The model was prompted with remote ProtonDB and store text, so its
+        # output is untrusted input. Anything that is not plainly safe is
+        # shown as refused and cannot be selected at all.
+        if ! reason=$(validate_launch_options "$launch_opts" 2>&1); then
+            echo -e "  ${RED}✗ ${label} - refused${NC}" >&2
+            echo -e "     ${RED}${reason}${NC}" >&2
+            echo -e "     ${BLUE}Proposed: ${launch_opts}${NC}" >&2
+            echo >&2
+            continue
+        fi
 
         # Set confidence indicator
         local confidence_indicator=""
@@ -427,7 +538,10 @@ prompt_launch_options() {
                 ;;
         esac
 
-        echo -e "  $((i+1))) ${GREEN}${label}${NC} [${confidence_indicator}]" >&2
+        menu=$((menu + 1))
+        selectable+=("$i")
+
+        echo -e "  ${menu}) ${GREEN}${label}${NC} [${confidence_indicator}]" >&2
         echo -e "     ${desc}" >&2
         if [[ -n "$launch_opts" ]]; then
             echo -e "     ${BLUE}Will set: ${launch_opts}${NC}" >&2
@@ -436,6 +550,14 @@ prompt_launch_options() {
         fi
         echo >&2
     done
+
+    if [[ "$menu" -eq 0 ]]; then
+        echo -e "${RED}Every suggested configuration was refused as unsafe.${NC}" >&2
+        echo -e "${YELLOW}Nothing will be changed. Set launch options by hand in Steam if you still want them.${NC}" >&2
+        return 1
+    fi
+
+    option_count=$menu
 
     # Add "keep current" option
     echo -e "  $((option_count+1))) ${GREEN}Keep current options (cancel)${NC}" >&2
@@ -460,8 +582,14 @@ prompt_launch_options() {
         return 1
     fi
 
-    # Return selected launch options
-    local selected_opts=$(echo "$options_json" | jq -r ".options[$((choice-1))].launch_options" 2>/dev/null)
+    # Return selected launch options. The menu only lists options that passed
+    # validation, so map the menu number back to its index in the JSON.
+    local idx=${selectable[$((choice-1))]}
+    local selected_opts=$(echo "$options_json" | jq -r ".options[$idx].launch_options" 2>/dev/null)
+    if ! validate_launch_options "$selected_opts" >/dev/null 2>&1; then
+        echo -e "${RED}Selected options failed validation; not applying${NC}" >&2
+        return 1
+    fi
     echo "$selected_opts"
     return 0
 }
@@ -650,8 +778,10 @@ main() {
         exit 0
     fi
 
-    read -p "Apply these launch options? [Y/n]: " -r confirm
-    confirm=${confirm:-Y}
+    echo -e "${YELLOW}These came from a model reading ProtonDB and Steam store text, and Steam${NC}"
+    echo -e "${YELLOW}runs them every time the game launches. Read them before accepting.${NC}"
+    read -p "Apply these launch options? [y/N]: " -r confirm
+    confirm=${confirm:-N}
 
     if [[ ! "$confirm" =~ ^[Yy] ]]; then
         echo -e "${YELLOW}Cancelled${NC}"
@@ -680,5 +810,11 @@ main() {
     echo -e "${BLUE}Game: ${name} (${appid})${NC}"
     echo -e "${BLUE}Options: ${new_options}${NC}"
 }
+
+# Sourced by tests/steam-launch-options.sh to exercise validation and the VDF
+# writer without running the interactive flow.
+if [[ -n "${HYPR_DE_GAMING_LIB:-}" ]]; then
+    return 0 2>/dev/null || exit 0
+fi
 
 main "$@"
