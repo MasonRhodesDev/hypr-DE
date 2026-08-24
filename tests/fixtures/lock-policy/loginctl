@@ -1,0 +1,15 @@
+#!/bin/sh
+# Stand-in for loginctl: reports a controllable LockedHint and logs session
+# termination so the fail-closed path is observable.
+case "${1:-}" in
+    show-session)
+        case "$*" in
+            *LockedHint*) printf '%s\n' "${LOCK_POLICY_LOCKED_HINT:-no}" ;;
+            *Id*)         printf '%s\n' "${LOCK_POLICY_SESSION_ID:-7}" ;;
+        esac
+        ;;
+    terminate-session|terminate-user)
+        printf 'loginctl:%s\n' "$*" >> "$LOCK_POLICY_LOG"
+        ;;
+esac
+exit 0

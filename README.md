@@ -133,6 +133,20 @@ existing snapshot/rollback tooling covers them.
 | Bar / notification styles | shadow the shipped lmtt module: copy from `/usr/share/lmtt/modules/hypr-de-*.toml` to `~/.config/lmtt/modules/` and edit |
 | Unit behavior | systemd user drop-ins (`systemctl --user edit waybar.service`) |
 | Per-app notification click recovery | plugins in `~/.config/hypr-de/notify-plugins/<app>.sh` |
+| Lock-failure behavior | `HYPR_DE_LOCK_FAILSAFE` / `HYPR_DE_LOCK_FALLBACKS` (see below) |
+
+### Lock integrity
+
+A lock request never fails open. If `vigil-lock` cannot take the session,
+`lock-cmd.sh` retries outside its transient scope, then tries any other
+installed locker (`HYPR_DE_LOCK_FALLBACKS`, default `swaylock -f|gtklock
+-d|hyprlock &`), and if nothing locks it **terminates the session** rather
+than hand back a desktop that hypridle is about to blank into looking locked.
+
+Set `HYPR_DE_LOCK_FAILSAFE=warn` (in `~/.config/environment.d/*.conf`, so
+hypridle's user unit sees it) to keep the session instead. The screen then
+stays lit on a failed lock — an obviously unlocked desktop, never a dark one
+that passes for locked.
 
 ## Development
 
