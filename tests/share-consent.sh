@@ -5,7 +5,7 @@
 # window with no picker shown.
 set -uo pipefail
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
-picker_script="$root/dist/libexec/share-picker-cached"
+src="$root/dist/libexec/share-picker-cached"
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
@@ -32,7 +32,17 @@ for c in ${CLIENTS:-}; do
 done
 BUSCTL
 chmod +x "$work/picker" "$work/busctl"
-export PICKER_CALLS="$calls" XDPH_PICKER="$work/picker" XDPH_BUSCTL="$work/busctl"
+export PICKER_CALLS="$calls"
+
+# The picker and busctl are absolute, root-owned-directory paths on purpose
+# (BAR-017: the session must not be able to name them), so the suite builds a
+# variant with the candidate lists pointed at the stubs rather than setting
+# environment variables the shipped script deliberately ignores.
+picker_script="$work/share-picker-cached"
+sed -e "s|^PICKER_CANDIDATES=.*|PICKER_CANDIDATES=$work/picker|" \
+    -e "s|^BUSCTL_CANDIDATES=.*|BUSCTL_CANDIDATES=$work/busctl|" \
+    "$src" > "$picker_script"
+chmod +x "$picker_script"
 
 run() { CLIENTS="$1" bash "$picker_script" --allow-token >"$work/out" 2>"$work/err"; }
 ncalls() { [ -f "$calls" ] && wc -l < "$calls" | tr -d ' ' || echo 0; }
@@ -97,6 +107,14 @@ echo "== the xdph protocol is preserved"
 reset
 run "1_100"
 grep -q '^\[SELECTION\]' "$work/out" && ok "stdout carries [SELECTION]" || bad "stdout lost the protocol line"
+
+echo "== the session cannot name the picker or the bus client"
+for v in XDPH_PICKER XDPH_BUSCTL; do
+    grep -q "$v" "$src" && bad "$src still honours \$$v" || ok "$v is not consulted"
+done
+grep -qE '^(PICKER|BUSCTL)_CANDIDATES="?/usr/' "$src" \
+    && ok "picker and busctl are absolute paths" \
+    || bad "picker/busctl are not absolute"
 
 echo
 [ "$fail" -eq 0 ] && { echo "share consent is scoped to the requesting client"; exit 0; }
