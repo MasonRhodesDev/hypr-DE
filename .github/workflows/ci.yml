@@ -35,3 +35,6 @@ jobs:
             || { echo "dist/ must use @TOKENS@ (see packaging/paths.conf)"; exit 1; }
       - name: deps.toml in sync with spec + PKGBUILD
         run: ./packaging/gen-deps.sh check
+
+      - name: Service-activation completeness
+        run: ./packaging/check-units.sh

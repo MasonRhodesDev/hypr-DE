@@ -41,6 +41,7 @@ build() {
 check() {
   cd "$srcdir"; cd "hypr-DE-$pkgver" 2>/dev/null || cd "$pkgbase-$pkgver"
   ./packaging/gen-deps.sh check
+  ./packaging/check-units.sh
   ./tests/lock-policy.sh
 }
 

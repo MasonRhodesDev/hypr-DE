@@ -133,6 +133,7 @@ mv dist-build/lmtt/modules/* dist-build/lmtt-system-modules/
 find dist-build/bin dist-build/libexec -type f -exec sh -c 'head -1 "$1" | grep -q "^#!/bin/bash" && bash -n "$1"' _ {} \;
 find dist-build/bin dist-build/libexec -type f -exec sh -c 'head -1 "$1" | grep -q python && python3 -m py_compile "$1"' _ {} \;
 ./packaging/gen-deps.sh check
+./packaging/check-units.sh
 ./tests/lock-policy.sh
 
 %install
