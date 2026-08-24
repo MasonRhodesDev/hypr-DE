@@ -30,7 +30,10 @@
 set -u
 
 APPS_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/hypr-de/notify-plugins"
-CTX_DIR="${XDG_RUNTIME_DIR:-/tmp}/swaync-context"
+# No /tmp fallback: focus-sender sources files out of this directory, so a
+# world-writable location would be arbitrary code execution as us.
+: "${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR is unset; refusing to keep notification context in /tmp}"
+CTX_DIR="$XDG_RUNTIME_DIR/swaync-context"
 
 needle_raw="${SWAYNC_DESKTOP_ENTRY:-${SWAYNC_APP_NAME:-}}"
 [ -z "$needle_raw" ] && exit 0

@@ -45,6 +45,7 @@ check() {
   ./tests/lock-policy.sh
   ./tests/installer-trust.sh
   ./tests/steam-launch-options.sh
+  ./tests/runtime-paths.sh
 }
 
 package_hypr-de() {

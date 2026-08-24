@@ -43,3 +43,5 @@ jobs:
         run: ./tests/installer-trust.sh
       - name: Steam launch-option validation
         run: ./tests/steam-launch-options.sh
+      - name: Runtime state paths
+        run: ./tests/runtime-paths.sh
