@@ -1,0 +1,3 @@
+#!/bin/sh
+# stub: no rpmdb to import into during a test
+exit 0
