@@ -1,0 +1,14 @@
+# Clear the transient "Your config has errors" banner that Hyprland latches
+# when pacman rewrites a watched config file mid-session, and apply the new
+# config right away. Runs once after the whole transaction.
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Path
+Target = etc/xdg/hypr/*
+Target = usr/share/hypr-de/hypr/*
+
+[Action]
+Description = Reloading live Hyprland sessions...
+When = PostTransaction
+Exec = @LIBEXECDIR@/hypr-de-reload-sessions

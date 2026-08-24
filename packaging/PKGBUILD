@@ -4,7 +4,7 @@
 # (packaging/gen-deps.sh check) gates drift against these arrays.
 pkgbase=hypr-de
 pkgname=('hypr-de' 'hypr-de-gaming')
-pkgver=0.2.21
+pkgver=0.2.22
 pkgrel=1
 pkgdesc="Alpha Hyprland config set (not ready)"
 arch=('any')
@@ -63,6 +63,10 @@ package_hypr-de() {
   # lmtt modules under the generic system module dir
   install -d "$pkgdir/usr/share/lmtt/modules"
   install -Dm644 dist-build/lmtt/modules/*.toml -t "$pkgdir/usr/share/lmtt/modules/"
+  # pacman hook: reload live Hyprland sessions after the transaction so an
+  # upgrade cannot leave a stale "config has errors" banner on screen.
+  install -Dm644 dist-build/pacman/95-hypr-de-reload.hook \
+    "$pkgdir/usr/share/libalpm/hooks/95-hypr-de-reload.hook"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/hypr-de/LICENSE"
 }
 

@@ -252,6 +252,26 @@ if command -v nvim >/dev/null; then
     fi
 fi
 
+echo "== upgrade config-reload safety"
+if [ -x "$LIBDIR/hypr-de/hypr-de-reload-sessions" ] || [ -x /usr/libexec/hypr-de/hypr-de-reload-sessions ]; then
+    ok "hypr-de-reload-sessions helper installed"
+else
+    bad "hypr-de-reload-sessions missing (upgrades can latch a stale config-error banner)"
+fi
+if [ "$DISTRO" = arch ]; then
+    if [ -f /usr/share/libalpm/hooks/95-hypr-de-reload.hook ]; then
+        ok "pacman PostTransaction reload hook installed"
+    else
+        bad "pacman reload hook missing"
+    fi
+fi
+# The packaged config Hyprland actually loads must exist and be readable.
+if [ -r /etc/xdg/hypr/hyprland.lua ] && grep -q 'main.lua' /etc/xdg/hypr/hyprland.lua; then
+    ok "/etc/xdg/hypr/hyprland.lua present and sources the packaged main.lua"
+else
+    bad "/etc/xdg/hypr/hyprland.lua missing or does not source main.lua"
+fi
+
 echo "== workspace button click dispatch"
 # Older modules used "hyprctl dispatch workspace N"; newer Hyprland parses
 # dispatch args as Lua and rejects that, so clicks silently did nothing.

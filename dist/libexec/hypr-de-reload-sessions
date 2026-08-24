@@ -1,0 +1,44 @@
+#!/bin/bash
+# Ask every live Hyprland session to reload its config. Run as root from the
+# package manager AFTER a transaction (pacman hook / rpm %posttrans).
+#
+# Why this exists: pacman and rpm replace a file by unlinking and rewriting it.
+# Hyprland watches its config with inotify, so an upgrade that touches
+# /etc/xdg/hypr/hyprland.lua or the packaged Lua under /usr/share/hypr-de/hypr
+# can fire the watcher during that split second, fail to open the file, and
+# latch "Your config has errors: cannot open ..." on screen. Nothing is
+# actually broken -- the file is written correctly -- but the banner stays
+# until some later reload succeeds. Reloading once here clears it and applies
+# the new config immediately.
+#
+# Never fails the transaction: every step is best-effort and the script always
+# exits 0.
+set -uo pipefail
+
+reloaded=0
+for sock in /run/user/*/hypr/*/.socket.sock; do
+    [ -S "$sock" ] || continue
+
+    # /run/user/<uid>/hypr/<signature>/.socket.sock
+    rest=${sock#/run/user/}
+    uid=${rest%%/*}
+    sig=${sock%/.socket.sock}
+    sig=${sig##*/}
+    case "$uid" in ''|*[!0-9]*) continue ;; esac
+
+    user=$(id -nu "$uid" 2>/dev/null) || continue
+
+    # A socket can outlive its compositor; only talk to a live one.
+    pgrep -u "$uid" -x Hyprland >/dev/null 2>&1 || continue
+
+    if runuser -u "$user" -- env \
+        XDG_RUNTIME_DIR="/run/user/$uid" \
+        HYPRLAND_INSTANCE_SIGNATURE="$sig" \
+        hyprctl reload >/dev/null 2>&1
+    then
+        reloaded=$((reloaded + 1))
+    fi
+done
+
+[ "$reloaded" -gt 0 ] && echo "hypr-DE: reloaded $reloaded live Hyprland session(s)"
+exit 0

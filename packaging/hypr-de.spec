@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.21
+Version:        0.2.22
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -148,6 +148,12 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %systemd_user_post swaybg.service waybar-reload.path waybar-reload.service waybar-watchdog.service waybar-watchdog.timer wayland-env-guard.path wayland-env-guard.service wayland-env-guard.timer hyprland-configreload-listener.service notification-focus-proxy.service hypr-de-prime-theme.service logind-idle-control-tray.service
 %{_libexecdir}/hypr-de/hypr-de-sys-setup >/dev/null 2>&1 || :
 
+%posttrans
+# Same reason as the Arch pacman hook: rpm replaces watched config files by
+# unlinking and rewriting them, which can latch a bogus Hyprland config
+# error banner on a live session. Reload once, best-effort.
+%{_libexecdir}/hypr-de/hypr-de-reload-sessions >/dev/null 2>&1 || :
+
 %preun
 %systemd_user_preun swaybg.service waybar-reload.path waybar-reload.service waybar-watchdog.service waybar-watchdog.timer wayland-env-guard.path wayland-env-guard.service wayland-env-guard.timer hyprland-configreload-listener.service notification-focus-proxy.service hypr-de-prime-theme.service logind-idle-control-tray.service
 
@@ -201,6 +207,10 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Sun Aug 23 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.22-1
+- Reload live Hyprland sessions after an upgrade so replacing a watched config
+  file can no longer leave a stale "Your config has errors" banner on screen.
+
 * Sun Aug 23 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.21-1
 - Ship the Neovim baseline in /usr/share/nvim/site instead of /etc/xdg/nvim/sysinit.vim, which the neovim package owns (0.2.20 aborted every Arch install with a file conflict).
 
