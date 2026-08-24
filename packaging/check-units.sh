@@ -45,7 +45,12 @@ declare -A UNIT_PKG=(
 )
 
 declared=()
-mapfile -t shipped < <(cd "$UNITDIR" && ls | grep -E '\.(service|timer|path|socket)$' | sort)
+# Glob rather than ls|grep so odd filenames cannot confuse the listing (SC2010).
+mapfile -t shipped < <(
+    for f in "$UNITDIR"/*.service "$UNITDIR"/*.timer "$UNITDIR"/*.path "$UNITDIR"/*.socket; do
+        [ -e "$f" ] && basename "$f"
+    done | sort
+)
 mapfile -t preset  < <(grep -oE '^(enable|disable)[[:space:]]+\S+' "$PRESET" | awk '{print $2}' | sort -u)
 
 in_list() { local n="$1"; shift; local x; for x in "$@"; do [ "$x" = "$n" ] && return 0; done; return 1; }
