@@ -12,26 +12,31 @@ arch = ["hyprland>=0.56"]
 reason = "vigil (vigil-lock lock_cmd / before_sleep_cmd), hypridle (idle policy in hypr/hypridle.conf); SUPER+L is loginctl lock-session which hypridle answers. Floor is vigil 0.3: lock-cmd.sh and hypridle.conf use --wait/--warn/--no-warn, which 0.2.x rejects — an unversioned dep let hypr-de 0.2.14 pair with vigil 0.2.16 and silently break idle/suspend locking."
 fedora = ["vigil >= 0.3.0", "hypridle"]
 arch = ["vigil>=0.3.0", "hypridle"]
+units = ["hypridle.service", "logind-idle-control.service", "logind-idle-control-tray.service"]
 
 [bar]
 reason = "waybar + CFFI workspace buttons module (waybar/config.jsonc). Floor 1.1.2: older modules click-dispatch the classic \"hyprctl dispatch workspace N\", which Hyprland with the Lua config parses as Lua and rejects, so workspace buttons silently do nothing"
 fedora = ["waybar", "waybar-workspace-buttons >= 1.1.2"]
 arch = ["waybar", "waybar-workspace-buttons>=1.1.2"]
+units = ["waybar.service"]
 
 [tray]
 reason = "sni-watcher owns org.kde.StatusNotifierWatcher (Type=dbus, Before=waybar.service) so Waybar's tray module attaches as host-only"
 fedora = ["sni-watcher"]
 arch = ["sni-watcher"]
+units = ["sni-watcher.service"]
 
 [bluetooth]
 reason = "BlueZ daemon (enabled on install) + OBEX; waybar bluetooth module is the indicator (no tray applet); left-click opens Overskride (GTK4/libadwaita pairing/profiles/files); right-click toggles adapter power. PipeWire/WirePlumber own BT audio. Overskride is hosted on [mason] and solaris765/hypr-de-extras (not in extra/Fedora)."
 fedora = ["bluez", "bluez-obexd", "overskride"]
 arch = ["bluez", "bluez-obex", "bluez-utils", "overskride"]
+units = ["obex.service"]
 
 [notifications]
 reason = "swaync daemon (swaync/config.json, recovery framework, waybar module)"
 fedora = ["SwayNotificationCenter"]
 arch = ["swaync"]
+units = ["swaync.service"]
 
 [launcher]
 reason = "fuzzel (SUPER+R bind, power-menu.sh + SUPER+SHIFT+/ cheatsheet dmenu backend)"
@@ -42,11 +47,13 @@ arch = ["fuzzel"]
 reason = "portal frontend + xdph backend (hypr/xdph.conf) + gtk Settings backend (LMTT appearance) + polkit agent (preset unit)"
 fedora = ["xdg-desktop-portal", "xdg-desktop-portal-hyprland", "xdg-desktop-portal-gtk", "hyprpolkitagent"]
 arch = ["xdg-desktop-portal", "xdg-desktop-portal-hyprland", "xdg-desktop-portal-gtk", "hyprpolkitagent"]
+units = ["hyprpolkitagent.service"]
 
 [session]
 reason = "uwsm env files for the stock Hyprland (uwsm) session + swaybg wallpaper unit. python3-pyxdg: the nett00n COPR uwsm RPM omits it, and without the xdg module uwsm tracebacks on import — every greeter login dies in ~100ms with no log"
 fedora = ["uwsm", "swaybg", "python3-pyxdg"]
 arch = ["uwsm", "swaybg"]
+units = ["hyprstate.service"]
 
 [screenshot]
 reason = "hypr-de-snip/record: grim, slurp, swappy annotation, hyprpicker freeze, wl-clipboard; gpu-screen-recorder is weak on Fedora (no repo package — hand-build or flatpak; packaging it is a 1.0-gate item like hyprland)"
@@ -78,6 +85,7 @@ arch = ["hyprshutdown", "hyprland-guiutils", "hyprland-qt-support"]
 reason = "udiskie automount (preset unit), kitty (SUPER+Q terminal, updates-check), nautilus (SUPER+E; GTK4/libadwaita follows LMTT portal appearance), gtk4+libadwaita (hypr-de-help), NetworkManager (enabled on install) + nm-applet, man-db (hypr-de-help 'man hypr-de' / 'man workspace-zones' buttons; pages are shipped but a cloud/minimal image has no man binary)"
 fedora = ["udiskie", "kitty", "NetworkManager", "network-manager-applet", "nautilus", "gtk4", "libadwaita", "man-db"]
 arch = ["udiskie", "kitty", "networkmanager", "network-manager-applet", "nautilus", "gtk4", "libadwaita", "man-db"]
+units = ["udiskie.service"]
 
 [editor]
 reason = "neovim is the packaged default editor: hypr-de-help's Edit local.lua action and EDITOR/VISUAL in the uwsm env point at it, and /etc/xdg/nvim/sysinit.vim plus the hypr-de-nvim lmtt module theme it. Without it that action fails on a fresh install"
