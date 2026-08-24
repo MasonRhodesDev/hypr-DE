@@ -140,6 +140,7 @@ find dist-build/bin dist-build/libexec -type f -exec sh -c 'head -1 "$1" | grep 
 ./tests/steam-launch-options.sh
 ./tests/runtime-paths.sh
 ./tests/pam-rewrite.sh
+./tests/share-consent.sh
 
 %install
 LIBEXECDIR=%{_libexecdir}/hypr-de \
