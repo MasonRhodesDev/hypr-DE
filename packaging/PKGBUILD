@@ -46,6 +46,7 @@ check() {
   ./tests/installer-trust.sh
   ./tests/steam-launch-options.sh
   ./tests/runtime-paths.sh
+  ./tests/pam-rewrite.sh
 }
 
 package_hypr-de() {
