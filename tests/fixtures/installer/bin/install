@@ -1,0 +1,3 @@
+#!/bin/sh
+# stub: the real install(1) would need root for /etc/pki
+exit 0

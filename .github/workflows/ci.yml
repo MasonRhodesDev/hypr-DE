@@ -38,3 +38,6 @@ jobs:
 
       - name: Service-activation completeness
         run: ./packaging/check-units.sh
+
+      - name: Installer trust behaviour
+        run: ./tests/installer-trust.sh

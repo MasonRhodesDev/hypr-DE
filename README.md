@@ -41,6 +41,13 @@ to also install `hypr-de-gaming`. The script adds the package repo (Arch
 `[mason]`, Fedora COPRs), installs `hypr-de`, and runs `hypr-de-setup` for
 the sudo-invoking user.
 
+Every repository it enables is pinned: the Arch `[mason]` key by fingerprint,
+and each COPR against the fingerprint recorded in `COPR_KEYS`. A repo serving
+a different signing key is refused rather than trusted, and a signature that
+does not verify fails immediately — the installer never retries past one.
+Enabling the COPRs by hand (below) skips those checks; `dnf copr enable`
+accepts whatever key the repo serves.
+
 **Fedora** (manual)
 
 ```bash
