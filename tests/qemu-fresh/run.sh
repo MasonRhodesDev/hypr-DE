@@ -10,6 +10,8 @@
 #   tests/qemu-fresh/run.sh [fedora] reboot  # reboot guest, wait for SSH
 #   tests/qemu-fresh/run.sh [fedora] check   # second-boot checks
 #   tests/qemu-fresh/run.sh [fedora] test    # reset + wait + reboot + check
+#   tests/qemu-fresh/run.sh [fedora] lock    # autologin, lock, restart hypridle,
+#                                            # assert the locker survives
 #   tests/qemu-fresh/run.sh [fedora] upgrade # install, roll back one release,
 #                                            # autologin, then upgrade LIVE
 #
@@ -25,7 +27,7 @@ cmd=start
 for arg in "$@"; do
     case "$arg" in
         arch|fedora) DISTRO=$arg ;;
-        reset|start|wait|reboot|check|test|upgrade) cmd=$arg ;;
+        reset|start|wait|reboot|check|test|upgrade|lock) cmd=$arg ;;
         -h|--help)
             sed -n '2,19p' "$0"
             exit 0
@@ -407,6 +409,14 @@ downgrade_hypr_de() {
     fi
 }
 
+run_lock_test() {
+    wait_ssh
+    enable_autologin
+    wait_session
+    echo "== lock-survival check"
+    guest_ssh 'bash -s' <"$HERE/lock-check.sh"
+}
+
 run_upgrade_test() {
     wait_ssh
     downgrade_hypr_de
@@ -472,6 +482,14 @@ case "$cmd" in
         wait_firstboot
         reboot_guest
         run_check
+        ;;
+    lock)
+        stop_vm
+        write_cidata
+        reset_overlay
+        start_vm background
+        wait_firstboot
+        run_lock_test
         ;;
     upgrade)
         # Fresh install, roll back one release, log in, then upgrade live.
