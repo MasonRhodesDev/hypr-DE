@@ -31,6 +31,44 @@ if locker_up; then
     for _ in $(seq 1 10); do locker_up || break; sleep 1; done
 fi
 
+echo "== the idle driver cannot be shadowed from ~/.local/bin"
+# hypridle drives every lock. The user manager's PATH includes ~/.local/bin,
+# so a unit that resolved the binary through PATH could be pointed at an
+# attacker-supplied stub by anything running in the session -- auto-lock
+# silently dead, unit still active. Requires the fix from issue #16.
+execline=$(systemctl --user cat hypridle.service 2>/dev/null | grep -E '^ExecStart=.' | tail -1)
+if printf '%s' "$execline" | grep -qE 'command -v|which '; then
+    bad "hypridle.service resolves its binary through \$PATH: $execline"
+else
+    ok "hypridle.service names absolute paths"
+fi
+
+mkdir -p "$HOME/.local/bin"
+cat > "$HOME/.local/bin/hypridle" <<'STUB'
+#!/bin/sh
+# Stands in for a hostile shadow: looks alive, enforces no idle policy at all.
+exec sleep infinity
+STUB
+chmod +x "$HOME/.local/bin/hypridle"
+systemctl --user restart hypridle.service 2>/dev/null
+sleep 2
+hpid=$(systemctl --user show -p MainPID --value hypridle.service 2>/dev/null)
+hexe=$(readlink -f "/proc/${hpid:-0}/exe" 2>/dev/null)
+case "$hexe" in
+    "$HOME"/*)
+        bad "hypridle resolved to '$hexe' -- the ~/.local/bin shadow won"
+        ;;
+    /usr/bin/hypridle|/usr/local/bin/hypridle)
+        ok "still running $hexe with the shadow in place"
+        ;;
+    *)
+        bad "hypridle resolved to '${hexe:-<none>}', which is neither the packaged nor the local build"
+        ;;
+esac
+rm -f "$HOME/.local/bin/hypridle"
+systemctl --user restart hypridle.service 2>/dev/null
+sleep 2
+
 echo "== lock the session the way a user does (loginctl -> hypridle lock_cmd)"
 # Must name the GRAPHICAL session: this script runs over ssh, and a bare
 # loginctl lock-session would lock the ssh session instead -- hypridle is
