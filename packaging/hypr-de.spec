@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.22
+Version:        0.2.23
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -207,6 +207,12 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Mon Aug 24 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.23-1
+- Retire the notification-focus-proxy service; the swaync action-script hook
+  is the sole click-to-focus path.
+- Stop focusing the sender window when a notification is dismissed via the
+  close button or Clear All.
+
 * Sun Aug 23 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.22-1
 - Reload live Hyprland sessions after an upgrade so replacing a watched config
   file can no longer leave a stale "Your config has errors" banner on screen.
