@@ -15,8 +15,8 @@ arch = ["vigil>=0.3.0", "hypridle"]
 units = ["hypridle.service", "logind-idle-control.service", "logind-idle-control-tray.service"]
 
 [bar]
-reason = "waybar + CFFI workspace buttons module (waybar/config.jsonc). Floor 1.1.2: older modules click-dispatch the classic \"hyprctl dispatch workspace N\", which Hyprland with the Lua config parses as Lua and rejects, so workspace buttons silently do nothing"
-fedora = ["waybar", "waybar-workspace-buttons >= 1.1.2"]
+reason = "waybar + CFFI workspace buttons module (waybar/config.jsonc). Floor 1.1.2: older modules click-dispatch the classic \"hyprctl dispatch workspace N\", which Hyprland with the Lua config parses as Lua and rejects, so workspace buttons silently do nothing. hyprland-workspace-zones: the workspace-zones compositor plugin (main.lua loads it from /usr/lib64/hyprland/plugins; zones keybinds error without it) — Fedora subpackage since 1.2.0, version-pinned to hyprland; on Arch the plugin ships inside waybar-workspace-buttons itself"
+fedora = ["waybar", "waybar-workspace-buttons >= 1.1.2", "hyprland-workspace-zones"]
 arch = ["waybar", "waybar-workspace-buttons>=1.1.2"]
 units = ["waybar.service"]
 

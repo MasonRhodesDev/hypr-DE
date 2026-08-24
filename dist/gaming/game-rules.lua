@@ -9,6 +9,8 @@ if not pcall(hl.workspace_rule, { workspace = "7", no_border = true, no_rounding
     hl.workspace_rule({ workspace = "7", border = false, rounding = false })
 end
 
+hl.window_rule({ name = "steam-main",  match = { class = "^(steam)$", title = "^(Steam)$" }, workspace = "special:magic silent", no_initial_focus = true, focus_on_activate = false })
+hl.window_rule({ name = "steam-empty", match = { class = "^(steam)$", title = "^()$" }, stay_focused = true, min_size = "1 1" })
 hl.window_rule({ name = "steam-bigpicture", match = { class = "^(steam)$", title = "^(Steam Big Picture Mode)$" }, workspace = "7", fullscreen = true, focus_on_activate = false })
 hl.window_rule({ name = "steam-game",  match = { class = "^(steam_app_\\d+)$" }, workspace = "7 silent", no_initial_focus = true, focus_on_activate = false, immediate = true, opacity = "1.0 override", no_blur = true, idle_inhibit = "always", pin = false })
 hl.window_rule({ name = "gamescope",   match = { class = "^(gamescope)$" }, workspace = "7 silent", no_initial_focus = true, focus_on_activate = false, pin = false })

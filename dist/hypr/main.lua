@@ -138,12 +138,23 @@ if file_exists(active_profile) then
     pcall(dofile, active_profile)
 end
 
--- hyprstate lid/dock policy: marker present = panel forced off. Added last so
--- it wins over both the fallback and the profile. Runtime state owned by the
--- hyprstate daemon (paths::edp_off_marker); deliberately unmanaged.
--- Absent marker = panel enabled, the fail-safe boot default.
+-- hyprstate lid/dock policy: marker present = internal panel forced off.
+-- Added last so it wins over both the fallback and the profile. Runtime state
+-- owned by the hyprstate daemon (paths::edp_off_marker); deliberately
+-- unmanaged. Absent marker = panel enabled, the fail-safe boot default.
+-- A non-empty first line names the output to disable; an empty marker (what
+-- hyprstate writes today) disables the common internal-panel names — a rule
+-- for an absent output is a no-op.
 if file_exists(CONFIG .. "/hypr/edp-off") then
-    hl.monitor({ output = "eDP-2", disabled = true })
+    local f = io.open(CONFIG .. "/hypr/edp-off", "r")
+    local name = f and f:read("l") or nil
+    if f then f:close() end
+    if name and name ~= "" then
+        hl.monitor({ output = name, disabled = true })
+    else
+        hl.monitor({ output = "eDP-1", disabled = true })
+        hl.monitor({ output = "eDP-2", disabled = true })
+    end
 end
 
 ----------------------------------------------------------------------
@@ -202,7 +213,6 @@ hl.config({
 
     input = {
         kb_layout    = "us",
-        kb_options   = "fkeys:basic_13-24,caps:shift",
         follow_mouse = 1,
         sensitivity  = 0,
         touchpad = {
@@ -216,9 +226,6 @@ hl.config({
         disable_splash_rendering = false,
         force_default_wallpaper = 1,
         focus_on_activate       = true,
-        -- Permit Hyprland to restore a held ext-session-lock surface after a
-        -- compositor restart instead of exposing the session.
-        allow_session_lock_restore = true,
         -- Direct setDPMS(true) on input. After VT return with outputs
         -- DPMS-disabled, Aquamarine will not schedule frames (enabledState
         -- false); this path modesets without waiting for a frame.
@@ -342,7 +349,6 @@ hl.bind(mainMod .. " + N", hl.dsp.exec_cmd("swaync-client -t -sw"),       { desc
 hl.bind(mainMod .. " + slash",         hl.dsp.exec_cmd("@BINDIR@/hypr-de-help"), { desc = "Help: Welcome and keybinds" })
 hl.bind(mainMod .. " + SHIFT + slash", hl.dsp.exec_cmd("@LIBEXECDIR@/hypr-de-cheatsheet"), { desc = "Help: Search keybinds" })
 hl.bind(mainMod .. " + D", hl.dsp.exec_cmd([[wl-copy --clear && notify-send -t 2000 "Clipboard cleared" "Ready for drag-and-drop"]]), { desc = "System: Clear clipboard (drag-and-drop prep)" })
-hl.bind(meh .. " + v", hl.dsp.exec_cmd("voice-dictation toggle"), { desc = "System: Voice dictation" })
 
 -- Cycle windows (floating), then raise (two dispatchers -> Lua fn calling both)
 hl.bind("ALT + Tab", function()
@@ -379,9 +385,6 @@ hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true, desc 
 -- Pinned windows get a high-contrast border so they're identifiable at a
 -- glance ("pin" is a dynamic match; legacy string = "<active> <inactive>").
 hl.window_rule({ name = "pinned-border",    match = { pin = true }, border_color = (c.tertiary or c.on_surface) .. " " .. (c.tertiary_container or c.outline) })
-hl.window_rule({ name = "discord-special",  match = { class = "^(discord)$" }, workspace = "special:magic silent" })
-hl.window_rule({ name = "slack-special",    match = { class = "^(slack)$" }, workspace = "special:magic silent" })
-hl.window_rule({ name = "ytmusic-special",  match = { title = "^(YouTube Music)$" }, workspace = "special:magic silent" })
 hl.window_rule({ name = "kitty-size",       match = { class = "^(kitty)$" }, size = "100 100" })
 hl.window_rule({ name = "helvum-float",     match = { title = "^(Helvum)$" }, float = true })
 hl.window_rule({ name = "pip",              match = { title = "^(Picture in picture)$" }, float = true, pin = true, opacity = "0.9 0.9" })
@@ -390,15 +393,12 @@ hl.window_rule({ name = "meet-sharing",     match = { title = "^(meet.google.com
 hl.window_rule({ name = "huddle",           match = { title = "^(Huddle.*)$" }, opacity = "1 1" })
 hl.window_rule({ name = "bitwarden-float",  match = { title = "^(.*Bitwarden.*)$" }, float = true })
 hl.window_rule({ name = "gcr-prompter",     match = { class = "^(gcr-prompter)$" }, float = true, pin = true, center = true, stay_focused = true })
-hl.window_rule({ name = "voice-dictation",  match = { class = "^(dev.mason.dictation)$" }, float = true, pin = true, size = "200 50", move = "50%-100 95%", border_size = 0, no_blur = true, no_shadow = true, no_initial_focus = true, no_focus = true })
 hl.window_rule({ name = "pre-sleep",        match = { title = "^(PRE_SLEEP_WINDOW)$" }, float = true, move = "-2000 -2000", size = "10000 10000", opacity = "0.95 override 0.95 override 0.95 override", xray = false })
 hl.window_rule({ name = "google-signin",    match = { title = "^(Sign in - Google Accounts.*)$" }, float = true })
 hl.window_rule({ name = "hyprpwcenter",     match = { class = "^(hyprpwcenter)$" }, float = true, center = true, size = "1000 600", stay_focused = true, pin = true })
 hl.window_rule({ name = "overskride",       match = { class = "^(io\\.github\\.kaii_lb\\.Overskride)$" }, float = true, center = true, stay_focused = true })
 hl.window_rule({ name = "hypr-de-help",     match = { class = "^(dev\\.mason\\.hypr-de-help)$" }, float = true, center = true, size = "860 600", stay_focused = true })
 hl.window_rule({ name = "satty",            match = { class = "^(com.gabm.satty)$" }, float = true, pin = true, center = true, stay_focused = true })
-hl.window_rule({ name = "steam-main",       match = { class = "^(steam)$", title = "^(Steam)$" }, workspace = "special:magic silent", no_initial_focus = true, focus_on_activate = false })
-hl.window_rule({ name = "steam-empty",      match = { class = "^(steam)$", title = "^()$" }, stay_focused = true, min_size = "1 1" })
 hl.window_rule({ name = "zoom-annotate",    match = { class = "^(zoom)$", title = "^(annotate_toolbar)$" }, float = true, size = "1 1", move = "-9999 -9999", opacity = "0.0 override 0.0 override", border_size = 0, no_blur = true, no_shadow = true, no_initial_focus = true, no_focus = true })
 
 ----------------------------------------------------------------------

@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.23
+Version:        0.2.24
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -30,6 +30,7 @@ Requires:       hypridle
 Requires:       hyprland >= 0.56
 Requires:       hyprland-guiutils
 Requires:       hyprland-qt-support
+Requires:       hyprland-workspace-zones
 Requires:       hyprpicker
 Requires:       hyprpolkitagent
 Requires:       hyprpwcenter
@@ -208,6 +209,11 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Mon Aug 24 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.24-1
+- Require hyprland-workspace-zones on Fedora: the zones compositor plugin is
+  stack-managed now (RPM pinned to the exact hyprland version) instead of a
+  manual local rebuild, so zones keybinds work on a fresh install.
+
 * Mon Aug 24 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.23-1
 - Retire the notification-focus-proxy service; the swaync action-script hook
   is the sole click-to-focus path.
