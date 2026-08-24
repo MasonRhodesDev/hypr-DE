@@ -17,6 +17,9 @@
 #   4. every unit deps.toml declares as required is preset AND validated by
 #      hypr-de-setup -- this is the rule that catches the tray-class bug, where
 #      the unit comes from a dependency and rules 1-3 cannot see it
+#   5. no Exec* line resolves its binary through $PATH -- the user manager's
+#      PATH includes ~/.local/bin, so a PATH-resolved unit can be pointed at
+#      an attacker-supplied binary by anything running in the session
 #
 # usage: check-units.sh [dist-dir]
 set -uo pipefail
@@ -98,6 +101,39 @@ if [ -f "$TOML" ]; then
         fi
     done
 fi
+
+# --- 5. no Exec* resolved through $PATH -------------------------------------
+# `ExecStart=/bin/sh -c 'exec "$(command -v hypridle)" ...'` let anything in
+# the session shadow hypridle from ~/.local/bin and silently disable
+# auto-lock, with the unit still reporting active. Every executable a unit
+# names must be an absolute path in a root-owned location.
+for f in "$UNITDIR"/*.service "$UNITDIR"/*.conf "$UNITDIR"/*/*.conf; do
+    [ -f "$f" ] || continue
+    while IFS= read -r line; do
+        case "$line" in
+            *'command -v '*|*'which '*)
+                bad "$(basename "$(dirname "$f")")/$(basename "$f"): resolves an executable through \$PATH ($line). Name an absolute path -- the user manager's PATH includes ~/.local/bin."
+                continue
+                ;;
+        esac
+        # Strip the Exec*= key and any +/-/!/: prefixes, then require /.
+        cmd=${line#*=}
+        cmd=${cmd##[[:space:]]}
+        while :; do
+            case "$cmd" in
+                [-+!:]*) cmd=${cmd#?} ;;
+                *) break ;;
+            esac
+        done
+        [ -z "$cmd" ] && continue          # ExecStart= reset line
+        # @TOKENS@ expand to absolute paths from packaging/paths.conf, and CI
+        # already rejects literal install paths in dist/.
+        case "$cmd" in
+            /*|@[A-Z_]*@/*) ;;
+            *) bad "$(basename "$f"): Exec line does not start with an absolute path ($line)" ;;
+        esac
+    done < <(grep -hE '^Exec(Start|Stop|StartPre|StartPost|StopPost|Reload)=' "$f" 2>/dev/null)
+done
 
 [ "$fail" = 0 ] && echo "units in sync (${#shipped[@]} shipped, ${#preset[@]} preset, ${#declared[@]} declared)"
 exit "$fail"
