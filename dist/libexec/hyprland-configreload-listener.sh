@@ -7,32 +7,31 @@
 set -euo pipefail
 
 SCRIPT_NAME=$(basename "$0")
-# The singleton lock lives in the per-user runtime dir, not /tmp: a
-# predictable name in a world-writable directory can be pre-planted as a
-# symlink (this writes our PID through it) or as a file holding a live PID
-# (this listener then refuses to start, for good), and two users on one host
-# would fight over the same path.
+XWAYLAND_PRIMARY_SCRIPT="@LIBEXECDIR@/set-xwayland-primary.sh"
+
+# Singleton guard, conforming to desktop-commons' singleton-guard-v1:
+# flock(2) on $XDG_RUNTIME_DIR/<name>.lock, held for the process's whole
+# lifetime, and the lock file is NEVER unlinked -- unlinking it is what lets
+# two starts race onto different inodes and both believe they are the owner.
+#
+# The previous guard wrote a pid into /tmp/<name>.lock and trusted it. That
+# is both non-conforming and attackable: a predictable path in a
+# world-writable directory can be pre-planted as a symlink (we write our pid
+# through it) or seeded with a live pid so this listener never starts again.
 : "${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR is unset; refusing to keep the lock in /tmp}"
 LOCKDIR="$XDG_RUNTIME_DIR/hypr-de"
 mkdir -p "$LOCKDIR" && chmod 700 "$LOCKDIR"
 LOCKFILE="$LOCKDIR/${SCRIPT_NAME}.lock"
-XWAYLAND_PRIMARY_SCRIPT="@LIBEXECDIR@/set-xwayland-primary.sh"
 
-cleanup() {
-    rm -f "$LOCKFILE"
-    exit 0
-}
-
-# Singleton management
-if [ -f "$LOCKFILE" ]; then
-    old_pid=$(cat "$LOCKFILE")
-    if [ -n "$old_pid" ] && kill -0 "$old_pid" 2>/dev/null; then
-        echo "Another instance is already running (PID: $old_pid)"
-        exit 1
-    fi
+exec 9>"$LOCKFILE"
+if ! flock -n 9; then
+    echo "Another instance is already running (holds $LOCKFILE)"
+    exit 1
 fi
-echo $$ > "$LOCKFILE"
-trap cleanup EXIT INT TERM
+
+# The kernel drops the flock when this process exits; there is nothing to
+# clean up. Exit 0 on a signal so a session shutdown is not a unit failure.
+trap 'exit 0' INT TERM
 
 echo "Starting Hyprland event listener (PID: $$)"
 
