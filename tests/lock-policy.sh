@@ -133,18 +133,30 @@ assert_log 'vigil-lock:--wait --no-warn
 vigil-lock:--wait --no-warn
 loginctl:terminate-session 7'
 
-# A policy file the session can write is ignored, whoever wrote it.
+# A policy file the session can write is ignored, whoever wrote it. The build
+# may run this suite as root (rpm %check does), and root cannot write a
+# file it does not own -- so hand it to nobody to make the case expressible.
 : > "$LOCK_POLICY_LOG"
+: > "$work/stderr"
 rm -f "$marker"
 printf 'failsafe=warn\n' > "$lock_conf"
-LOCK_POLICY_VIGIL_STATUS=1 run_lock
-assert_status 1
-assert_log 'vigil-lock:--wait --no-warn
+if [ "$(id -u)" -eq 0 ]; then
+    chown 65534:65534 "$lock_conf" 2>/dev/null \
+        || chown nobody:nobody "$lock_conf" 2>/dev/null \
+        || chown nobody "$lock_conf" 2>/dev/null || true
+fi
+if [ "$(stat -c '%u' "$lock_conf")" != 0 ]; then
+    LOCK_POLICY_VIGIL_STATUS=1 run_lock
+    assert_status 1
+    assert_log 'vigil-lock:--wait --no-warn
 vigil-lock:--wait --no-warn
 loginctl:terminate-session 7'
-grep -q "must be owned by root" "$work/stderr" || {
-    echo "expected a warning that the policy file was ignored" >&2; exit 1
-}
+    grep -q "must be owned by root" "$work/stderr" || {
+        echo "expected a warning that the policy file was ignored" >&2; exit 1
+    }
+else
+    echo "skip: cannot create a non-root-owned policy file in this environment"
+fi
 
 # The same file, when root owns it, is honoured -- it is the file's owner
 # that matters, not the caller's, which is the real deployment shape: a
