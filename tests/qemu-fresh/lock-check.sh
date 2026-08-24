@@ -15,7 +15,8 @@ fail=0
 ok()  { printf 'ok   %s\n' "$*"; }
 bad() { printf 'FAIL %s\n' "$*"; fail=1; }
 
-export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+XDG_RUNTIME_DIR="/run/user/$(id -u)"   # split: export+assign masks id(1) status (SC2155)
+export XDG_RUNTIME_DIR
 eval "$(systemctl --user show-environment 2>/dev/null \
     | grep -E '^(HYPRLAND_INSTANCE_SIGNATURE|WAYLAND_DISPLAY)=' | sed 's/^/export /')"
 
