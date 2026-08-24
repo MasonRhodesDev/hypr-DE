@@ -7,7 +7,15 @@
 set -euo pipefail
 
 SCRIPT_NAME=$(basename "$0")
-LOCKFILE="/tmp/${SCRIPT_NAME}.lock"
+# The singleton lock lives in the per-user runtime dir, not /tmp: a
+# predictable name in a world-writable directory can be pre-planted as a
+# symlink (this writes our PID through it) or as a file holding a live PID
+# (this listener then refuses to start, for good), and two users on one host
+# would fight over the same path.
+: "${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR is unset; refusing to keep the lock in /tmp}"
+LOCKDIR="$XDG_RUNTIME_DIR/hypr-de"
+mkdir -p "$LOCKDIR" && chmod 700 "$LOCKDIR"
+LOCKFILE="$LOCKDIR/${SCRIPT_NAME}.lock"
 XWAYLAND_PRIMARY_SCRIPT="@LIBEXECDIR@/set-xwayland-primary.sh"
 
 cleanup() {

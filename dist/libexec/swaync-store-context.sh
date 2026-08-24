@@ -13,7 +13,10 @@
 
 set -u
 
-CTX_DIR="${XDG_RUNTIME_DIR:-/tmp}/swaync-context"
+# No /tmp fallback: focus-sender sources files out of this directory, so a
+# world-writable location would be arbitrary code execution as us.
+: "${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR is unset; refusing to keep notification context in /tmp}"
+CTX_DIR="$XDG_RUNTIME_DIR/swaync-context"
 # Per-app plugins are user-owned (work/personal specific, e.g. Slack log
 # parsing) — packaged framework, user plugins:
 APPS_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/hypr-de/notify-plugins"
