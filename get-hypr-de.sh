@@ -62,6 +62,41 @@ esac
 
 say "hypr-DE is alpha. Expect breakage."
 
+# Repo metadata can be served mid-republish: GitHub Pages (and any CDN in
+# front of a COPR mirror) will happily hand out a database from one publish
+# and its signature from another, and the install dies with
+#   error: mason: signature from "..." is invalid
+#   error: failed to synchronize all databases (invalid or corrupted database)
+# It is transient and clears within a minute, but a one-shot installer just
+# fails in the user's face. Retry those specific errors after dropping the
+# cached metadata; anything else fails immediately as before.
+TRANSIENT_RE='invalid or corrupted (database|package)|signature from .* is invalid|could not be verified|repomd\.xml.*(signature|GPG)|Status code: 5[0-9][0-9]|Connection (timed out|reset)'
+
+retry_pkg() {  # retry_pkg <label> <cmd...>
+    local label="$1"; shift
+    local tries="${HYPR_DE_RETRIES:-4}" delay=15 i out rc
+    for i in $(seq 1 "$tries"); do
+        # `if cmd` is exempt from errexit, so this captures the status without
+        # toggling set -e (which would leak out of this function).
+        if out=$("$@" 2>&1); then rc=0; else rc=$?; fi
+        printf '%s\n' "$out"
+        [ "$rc" -eq 0 ] && return 0
+        if ! printf '%s' "$out" | grep -qiE "$TRANSIENT_RE"; then
+            return "$rc"   # a real failure: do not paper over it
+        fi
+        if [ "$i" -eq "$tries" ]; then
+            die "$label failed after $tries attempts (repo metadata still inconsistent)"
+        fi
+        say "$label hit transient repo metadata; refreshing and retrying ($i/$((tries - 1)))"
+        if command -v pacman >/dev/null 2>&1; then
+            rm -f /var/lib/pacman/sync/mason.db /var/lib/pacman/sync/mason.db.sig 2>/dev/null || true
+        else
+            dnf clean metadata >/dev/null 2>&1 || true
+        fi
+        sleep "$delay"
+    done
+}
+
 install_arch() {
     say "Installing [mason] repo key"
     pacman -S --needed --noconfirm gnupg curl >/dev/null
@@ -90,7 +125,8 @@ EOF
     pkgs=(hypr-de)
     [ "$GAMING" = 1 ] && pkgs+=(hypr-de-gaming)
     say "Installing ${pkgs[*]}"
-    pacman -Syu --needed --noconfirm "${pkgs[@]}"
+    # -Syy on retry: the cached db is exactly what may be inconsistent.
+    retry_pkg "install" pacman -Syyu --needed --noconfirm "${pkgs[@]}"
 }
 
 install_fedora() {
@@ -115,7 +151,7 @@ install_fedora() {
     pkgs=(hypr-de)
     [ "$GAMING" = 1 ] && pkgs+=(hypr-de-gaming)
     say "Installing ${pkgs[*]}"
-    dnf install -y "${pkgs[@]}"
+    retry_pkg "install" dnf install -y --refresh "${pkgs[@]}"
 }
 
 if [ "$DISTRO" = arch ]; then
