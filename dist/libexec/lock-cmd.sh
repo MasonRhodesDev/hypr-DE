@@ -26,6 +26,18 @@
 # locking by taking the session down with it.
 set -u
 
+# Policy lives in a root-owned file, never the environment.
+# desktop-commons BAR-017 (no-unprivileged-security-bypass): a protected mode
+# must not be disableable through a file, environment value, or control path
+# writable by the protected principal. An env knob for the failsafe would be
+# exactly that -- and ~/.config/environment.d/ makes it durable across
+# reboots, so it is not merely a "they already have code execution" case.
+# Loosening the failsafe is an operator decision; the session does not get one.
+LOCK_CONF=/etc/hypr-de/lock.conf
+FAILSAFE=terminate
+FALLBACKS='swaylock -f|gtklock -d|hyprlock &'
+VERIFY_TRIES=20
+
 runtime_dir=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
 # Read by dpms-off-if-unlocked.sh: while this exists a lock attempt has
 # failed, so the outputs must stay lit rather than fake a locked screen.
@@ -41,8 +53,34 @@ locked_hint() {
 
 # The hint can land just after the locker returns; give it a moment before
 # treating a non-zero exit as an unlocked session.
+# Read operator policy, but only from a file root owns and nobody else can
+# write. A config anyone else can edit is the bypass this is guarding.
+load_policy() {
+    [ -f "$LOCK_CONF" ] || return 0
+    owner=$(stat -c '%u' "$LOCK_CONF" 2>/dev/null || echo 1)
+    perms=$(stat -c '%a' "$LOCK_CONF" 2>/dev/null || echo 777)
+    case "$owner:$perms" in
+        0:[0-7][024][024]) ;;
+        *)
+            log "ignoring $LOCK_CONF: it must be owned by root and not writable by anyone else"
+            return 0
+            ;;
+    esac
+    # Parsed, not sourced: this file decides whether the screen locks.
+    while IFS='=' read -r key value; do
+        key=$(printf '%s' "$key" | tr -d '[:space:]')
+        value=$(printf '%s' "$value" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+        case "$key" in
+            ''|\#*) continue ;;
+            failsafe)     case "$value" in terminate|warn|none) FAILSAFE=$value ;; esac ;;
+            fallbacks)    FALLBACKS=$value ;;
+            verify_tries) case "$value" in ''|*[!0-9]*) ;; *) VERIFY_TRIES=$value ;; esac ;;
+        esac
+    done < "$LOCK_CONF"
+}
+
 locked_within() {
-    tries=${HYPR_DE_LOCK_VERIFY_TRIES:-20}
+    tries=$VERIFY_TRIES
     while [ "$tries" -gt 0 ]; do
         locked_hint && return 0
         tries=$((tries - 1))
@@ -82,12 +120,10 @@ lock() {
 # Restricted to lockers that return (or daemonize) as soon as the screen is
 # locked, because hypridle waits for lock_cmd before it suspends -- a locker
 # that blocks until unlock would hold off the suspend it was called for.
-fallback_candidates=${HYPR_DE_LOCK_FALLBACKS-'swaylock -f|gtklock -d|hyprlock &'}
-
 fallback_lock() {
     saved_ifs=$IFS
     IFS='|'
-    for entry in $fallback_candidates; do
+    for entry in $FALLBACKS; do
         IFS=$saved_ifs
         case "$entry" in
             *'&')
@@ -119,12 +155,12 @@ fallback_lock() {
 
 fail_closed() {
     : > "$fail_marker" 2>/dev/null || true
-    case "${HYPR_DE_LOCK_FAILSAFE:-terminate}" in
+    case "$FAILSAFE" in
         warn|none)
-            log "no locker succeeded; HYPR_DE_LOCK_FAILSAFE=warn, so the session stays up and UNLOCKED. Outputs are kept lit so it cannot pass for a locked screen."
+            log "no locker succeeded; $LOCK_CONF sets failsafe=$FAILSAFE, so the session stays up and UNLOCKED. Outputs are kept lit so it cannot pass for a locked screen."
             ;;
         *)
-            log "no locker succeeded; terminating the session rather than leaving it exposed (set HYPR_DE_LOCK_FAILSAFE=warn to keep it)"
+            log "no locker succeeded; terminating the session rather than leaving it exposed (an operator can set failsafe=warn in $LOCK_CONF to keep it)"
             sid=${XDG_SESSION_ID:-}
             [ -n "$sid" ] || sid=$(loginctl show-session self -p Id --value 2>/dev/null || true)
             if [ -n "$sid" ]; then
@@ -153,6 +189,8 @@ lock_or_fail_closed() {
     fail_closed
     return 1
 }
+
+load_policy
 
 case "${1:-}" in
     --idle)
