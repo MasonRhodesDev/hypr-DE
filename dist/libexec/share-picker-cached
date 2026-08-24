@@ -28,8 +28,26 @@
 set -u
 CACHE="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/xdph-share-picker.cache"
 TTL=15
-PICKER="${XDPH_PICKER:-hyprland-share-picker}"
-BUSCTL="${XDPH_BUSCTL:-busctl}"
+# Both are named absolutely and searched only in root-owned directories.
+# Resolving either through $PATH (or letting the environment name them) would
+# hand the session a way to disable the consent prompt entirely -- point
+# PICKER at something that prints a selection and every share is approved
+# silently, point BUSCTL at something that prints a constant client set and
+# the scoping below is neutered. desktop-commons BAR-017: a protected mode
+# must not be disableable through a file, environment value, or control path
+# the protected principal can write, and ~/.local/bin and
+# ~/.config/environment.d are both such paths.
+PICKER_CANDIDATES="/usr/local/bin/hyprland-share-picker /usr/bin/hyprland-share-picker"
+BUSCTL_CANDIDATES="/usr/bin/busctl /usr/local/bin/busctl"
+
+first_executable() {
+    for c in $1; do
+        [ -x "$c" ] && { printf '%s' "$c"; return 0; }
+    done
+    printf '%s' "${2:-}"
+}
+PICKER=$(first_executable "$PICKER_CANDIDATES" /usr/bin/hyprland-share-picker)
+BUSCTL=$(first_executable "$BUSCTL_CANDIDATES" /usr/bin/busctl)
 
 # The set of D-Bus clients currently holding a portal session, comma-wrapped.
 # Empty means "could not tell", which is never treated as a match.
