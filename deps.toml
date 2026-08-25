@@ -72,9 +72,9 @@ fedora = ["pipewire", "wireplumber", "pipewire-pulseaudio", "pipewire-alsa", "pa
 arch = ["pipewire", "wireplumber", "pipewire-pulse", "pipewire-alsa", "pavucontrol", "hyprpwcenter"]
 
 [theming]
-reason = "lmtt renders all styles (SUPER+T, autostart); matugen palette extraction; hyprstate monitor profiles/power; dials settings app (displays/power/More); logind-idle-control; qt6ct (QT_QPA_PLATFORMTHEME); gnome-keyring (uwsm/env + greetd PAM)"
-fedora = ["lmtt", "matugen", "hyprstate", "dials", "logind-idle-control", "qt6ct", "gnome-keyring"]
-arch = ["lmtt", "matugen", "hyprstate", "dials", "logind-idle-control", "qt6ct", "gnome-keyring"]
+reason = "lmtt renders all styles (SUPER+T, autostart); matugen palette extraction; hyprstate monitor profiles/power; dials settings app (displays/power/More); logind-idle-control; qt6ct (QT_QPA_PLATFORMTHEME); gnome-keyring (uwsm/env + greetd PAM) Floor is hyprstate 2.5.0: older hyprstate still runs its own locked-screen DPMS timer, a second blanker that re-blanks under the user's hands (hyprstate#24)"
+fedora = ["lmtt", "matugen", "hyprstate >= 2.5.0", "dials", "logind-idle-control", "qt6ct", "gnome-keyring"]
+arch = ["lmtt", "matugen", "hyprstate>=2.5.0", "dials", "logind-idle-control", "qt6ct", "gnome-keyring"]
 
 [hypr-ecosystem]
 reason = "Official hyprwm extras the session needs: hyprshutdown (power-menu.sh), hyprland-guiutils (hyprland-dialog), hyprland-qt-support (QML for hyprpolkitagent/hyprpwcenter). Not listed: hyprlock (vigil), hyprpaper (swaybg), hyprlauncher (fuzzel), hyprshot (grim/slurp/swappy), hyprsunset (optional night light). hyprqt6engine and hyprsysteminfo are -git/unofficial only, not extra/COPR. NVIDIA drivers are never a dep — session env applies only if the nvidia module is already loaded."

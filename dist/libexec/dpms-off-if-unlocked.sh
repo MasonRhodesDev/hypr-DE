@@ -1,10 +1,11 @@
 #!/bin/sh
 # hypridle DPMS-off listener for the unlocked idle path. Skip while locked:
 # the input-idle listener in hypridle.conf (session-locked.sh) owns every
-# locked-screen blank, and one blanker per state beats two racing. (The
+# locked-screen blank, and one blanker per state beats two racing. The
 # Aquamarine restoreAfterVT hazard -- CRTCs of disabled outputs never
-# modeset again, VT1 returns blank with the lock held -- is covered by
-# hyprstate's stuck-DPMS backstop, the same as for any locked blank.)
+# modeset again, VT1 returns blank with the lock held -- is a known,
+# untested hazard of any locked blank; Hyprland's key/mouse DPMS wake and
+# hyprstate's cursor-gated stuck-DPMS repair are the only mitigations.
 # Not session `self`: from hypridle's cgroup (app.slice) logind cannot map
 # the caller to a session, so `self` fails and the guard silently passed --
 # this listener blanked locked sessions for as long as it existed.

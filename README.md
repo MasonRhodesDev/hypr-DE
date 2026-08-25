@@ -172,11 +172,14 @@ security failsafe is an operator decision, not a session one.
 hypridle owns every DPMS-off. Unlocked sessions blank after 4 minutes idle
 (inhibitors respected). Locked sessions blank after 30 s without input,
 inhibitors or not — the listener binds the input-idle notification and gates
-on logind's `LockedHint` (`condition_cmd`), so it never blanks an unlocked
-film and a session that goes idle first and locks later still goes dark.
-Because it is input-driven, waking a locked screen never re-blanks it under
-your hands; hyprstate keeps only its stuck-DPMS repair. Needs hypridle ≥ 0.1.8
-and Hyprland ≥ 0.48.
+on the compositor lock (`condition_cmd=session-locked.sh`, `hyprctl locked`),
+so it never blanks an unlocked film and a session that goes idle first and
+locks later still goes dark. Because it is input-driven, waking a locked
+screen never re-blanks it under your hands — with hyprstate ≥ 2.5.0, which no
+longer blanks at all (older hyprstate still runs its own 30 s timer; the
+package floors it). Needs hypridle ≥ 0.1.8 and Hyprland ≥ 0.48. Known gap:
+resuming from suspend without touching anything leaves a locked screen lit
+until the next input→idle cycle (#29).
 
 ## Development
 
