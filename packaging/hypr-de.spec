@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.24
+Version:        0.2.25
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -214,6 +214,17 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Tue Aug 25 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.25-1
+- Lock scripts resolve the logind session by id: `loginctl show-session
+  self` never worked from hypridle's cgroup, so the 240 s blank ignored the
+  lock and lock-cmd.sh could not confirm one.
+- hypridle owns locked-screen blanking: a 30 s input-idle listener
+  (ignore_inhibit, condition_cmd=session-locked.sh on the compositor lock,
+  condition_retry, lock-aware on-timeout) blanks locked outputs whether or
+  not an inhibitor is held and never re-blanks a screen the user just woke
+  (hyprstate#24). Requires hypridle >= 0.1.8 and hyprstate >= 2.5.0.
+- No DPMS poke after an idle lock; tests/lock-policy.sh runs in CI.
+
 * Mon Aug 24 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.24-1
 - Require hyprland-workspace-zones on Fedora: the zones compositor plugin is
   stack-managed now (RPM pinned to the exact hyprland version) instead of a
