@@ -147,8 +147,10 @@ existing snapshot/rollback tooling covers them.
 A lock request never fails open. If `vigil-lock` cannot take the session,
 `lock-cmd.sh` retries outside its transient scope, then tries any other
 installed locker (default `swaylock -f|gtklock -d|hyprlock &`), and if nothing
-locks it **terminates the session** rather than hand back a desktop that
-hypridle is about to blank into looking locked.
+locks it **terminates the session** rather than hand back a live desktop the
+user believes is locked. (Since 0.2.25 nothing blanks an unlocked session, so
+an exposed desktop at least stays visibly exposed — but it is still exposed,
+which is what the failsafe exists to prevent.)
 
 To keep the session instead, create `/etc/hypr-de/lock.conf`:
 
@@ -169,17 +171,28 @@ security failsafe is an operator decision, not a session one.
 
 ### Idle blanking
 
-hypridle owns every DPMS-off. Unlocked sessions blank after 4 minutes idle
-(inhibitors respected). Locked sessions blank after 30 s without input,
-inhibitors or not — the listener binds the input-idle notification and gates
-on the compositor lock (`condition_cmd=session-locked.sh`, `hyprctl locked`),
-so it never blanks an unlocked film and a session that goes idle first and
-locks later still goes dark. Because it is input-driven, waking a locked
-screen never re-blanks it under your hands — with hyprstate ≥ 2.5.0, which no
-longer blanks at all (older hyprstate still runs its own 30 s timer; the
-package floors it). Needs hypridle ≥ 0.1.8 and Hyprland ≥ 0.48. Known gap:
-resuming from suspend without touching anything leaves a locked screen lit
-until the next input→idle cycle (#29).
+The session has exactly one DPMS-off, and it fires only while the compositor
+holds the lock: a hypridle listener that blanks 30 s after input stops,
+whether or not an idle inhibitor is held, gated on `hyprctl locked`
+(`condition_cmd=session-locked.sh`) by both its condition and its on-timeout.
+Because it is input-driven, waking a locked screen never re-blanks it under
+your hands — with hyprstate ≥ 2.5.0, which no longer blanks at all (older
+hyprstate still runs its own 30 s timer; the package floors it). A session
+that goes idle first and locks later still goes dark, via the condition
+retry.
+
+**An unlocked session is never blanked.** A dark screen over a live desktop
+is indistinguishable from a locked one, and the 240 s unlocked blanker
+removed in 0.2.25 could reach exactly that state whenever a lock was
+cancelled without input (an output hotplug cancels vigil's warning) — while
+hyprstate relit it a tick later regardless, so all it produced was a flash.
+An idle session locks at 3 minutes; if that lock is cancelled or fails, the
+screen stays honestly lit. The cost is power and burn-in on a session that
+is never locked at all.
+
+Needs hypridle ≥ 0.1.8 and Hyprland ≥ 0.48. Known gap: resuming from suspend
+without touching anything leaves a locked screen lit until the next
+input→idle cycle (#29).
 
 ## Development
 

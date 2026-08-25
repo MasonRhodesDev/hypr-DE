@@ -229,12 +229,22 @@ for want in 'timeout=30' 'condition_cmd=@LIBEXECDIR@/session-locked.sh' 'conditi
     printf '%s' "$block" | grep -q "^  $want" || {
         echo "hypridle.conf: the ignore_inhibit listener lost '$want'" >&2; exit 1; }
 done
-# Every DPMS-off on-timeout goes through a lock-aware script, never raw.
-if grep -E "^\s*on-timeout=.*hl\.dsp\.dpms\(.*'off'" "$conf" | grep -q .; then
-    echo "hypridle.conf: a raw dpms-off on-timeout bypasses the lock checks" >&2; exit 1
+# No raw DPMS-off anywhere in the config -- not an on-timeout, not an
+# on-resume, not after_sleep_cmd. The only blank in the session goes
+# through the lock-checking script, so a literal off dispatch here is a
+# second blanker by definition.
+if grep -F "action = 'off'" "$conf" | grep -q .; then
+    echo "hypridle.conf: a raw dpms-off dispatch bypasses the lock checks" >&2; exit 1
 fi
-[ "$(grep -c '^  on-timeout=@LIBEXECDIR@/dpms-off-if-locked.sh$' "$conf")" = 1 ] || {
-    echo "hypridle.conf: the locked listener must be the only blanker" >&2; exit 1; }
+# And the on-timeouts are exactly these two, as a set: counting one line
+# would let a re-added unlocked blanker sit beside them.
+want_timeouts="@LIBEXECDIR@/dpms-off-if-locked.sh
+@LIBEXECDIR@/lock-cmd.sh --idle"
+got_timeouts=$(sed -n 's/^  on-timeout=//p' "$conf" | sort)
+[ "$got_timeouts" = "$want_timeouts" ] || {
+    echo "hypridle.conf: on-timeout set changed -- a listener was added or repointed" >&2
+    printf 'expected:\n%s\nactual:\n%s\n' "$want_timeouts" "$got_timeouts" >&2
+    exit 1; }
 
 # --- one blanker, and it blanks only a locked compositor -------------------
 # The locked listener is the session's only DPMS-off. A blank must follow

@@ -40,11 +40,10 @@ FALLBACKS='swaylock -f|gtklock -d|hyprlock &'
 VERIFY_TRIES=20
 
 runtime_dir=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
-# The contract for any blanker: while this exists a lock attempt has failed
-# and the outputs must stay lit rather than fake a locked screen. hypridle's
-# locked listener needs no check for it (a failed lock never holds the
-# compositor lock), so nothing reads it today -- it remains the signal a
-# future blanker must honour.
+# A durable trace that a lock attempt failed and the session was kept
+# (failsafe=warn); operators and support scripts read it after the fact.
+# Nothing consumes it at runtime: blanking follows the compositor lock, and
+# a failed lock never holds that, so the outputs stay lit without it.
 fail_marker="$runtime_dir/hypr-de-lock-failed"
 
 log() { printf 'hypr-de lock: %s\n' "$*" >&2; }
