@@ -204,6 +204,12 @@ case "${1:-}" in
         # successful idle-policy outcome, not a locker failure.
         [ "$status" -eq 3 ] && exit 0
         [ "$status" -eq 0 ] || exit "$status"
+        # No DPMS poke on the idle path: the outputs are lit (the unlocked
+        # blank is at 240 s, this lock at 180 s) and the locked listener's
+        # condition retry may have blanked them the instant the lock landed
+        # -- a dpms on here would undo that and leave the locked screen lit
+        # until the next input. Manual and sleep paths keep the poke.
+        exit 0
         ;;
     --sleep)
         # before_sleep: never cancelable, and no DPMS poke on the way down
