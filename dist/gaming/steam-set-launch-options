@@ -361,11 +361,17 @@ parse_vdf_get_launch_options() {
         BEGIN { in_app=0; }
         $0 ~ "\"" appid "\"" { in_app=1; next; }
         in_app && /LaunchOptions/ {
-            match($0, /"([^"]*)"[[:space:]]*$/, arr);
-            print arr[1];
+            # Three-argument match() is a gawk extension; Fedora and Arch
+            # both ship gawk, but mawk/busybox would silently print nothing.
+            if (match($0, /"[^"]*"[[:space:]]*$/)) {
+                value = substr($0, RSTART, RLENGTH);
+                sub(/^"/, "", value);
+                sub(/"[[:space:]]*$/, "", value);
+                print value;
+            }
             exit;
         }
-        in_app && /^\s*}/ { in_app=0; }
+        in_app && /^[[:space:]]*}/ { in_app=0; }
     ' "$file"
 }
 
@@ -610,7 +616,10 @@ kill_steam() {
 
     # Force kill if still running
     if is_steam_running; then
-        pkill -9 steam steamwebhelper 2>/dev/null || true
+        # pkill takes ONE pattern -- "pkill -9 steam steamwebhelper" errors
+        # out, and the || true swallowed it, so the force-kill never ran.
+        pkill -9 -x steam 2>/dev/null || true
+        pkill -9 -x steamwebhelper 2>/dev/null || true
         sleep 1
     fi
 
