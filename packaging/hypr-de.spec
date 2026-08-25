@@ -35,7 +35,7 @@ Requires:       hyprpicker
 Requires:       hyprpolkitagent
 Requires:       hyprpwcenter
 Requires:       hyprshutdown
-Requires:       hyprstate
+Requires:       hyprstate >= 2.5.0
 Requires:       dials
 Requires:       jetbrains-mono-fonts
 # Nerd variants come from hypr-de-extras (none exist in Fedora proper); the
