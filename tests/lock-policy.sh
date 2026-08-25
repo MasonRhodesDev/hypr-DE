@@ -221,7 +221,7 @@ fi
 
 # --- the listener wiring is structural, not a single grep ------------------
 conf="$root/dist/hypr/hypridle.conf"
-[ "$(grep -c '^  ignore_inhibit=true$' "$conf")" = 1 ] || {
+[ "$(grep -cE '^[[:space:]]*ignore_inhibit=true$' "$conf")" = 1 ] || {
     echo "hypridle.conf: exactly one listener may ignore inhibitors" >&2; exit 1; }
 block=$(awk '/^listener \{/{inb=1;b="";next} inb&&/^\}/{inb=0; if (b ~ /ignore_inhibit=true/) print b; next} inb{b=b $0 "\n"}' "$conf")
 for want in 'timeout=30' 'condition_cmd=@LIBEXECDIR@/session-locked.sh' 'condition_retry=' \
@@ -236,14 +236,21 @@ done
 if grep -F "action = 'off'" "$conf" | grep -q .; then
     echo "hypridle.conf: a raw dpms-off dispatch bypasses the lock checks" >&2; exit 1
 fi
-# And the on-timeouts are exactly these two, as a set: counting one line
-# would let a re-added unlocked blanker sit beside them.
-want_timeouts="@LIBEXECDIR@/dpms-off-if-locked.sh
-@LIBEXECDIR@/lock-cmd.sh --idle"
-got_timeouts=$(sed -n 's/^  on-timeout=//p' "$conf" | sort)
-[ "$got_timeouts" = "$want_timeouts" ] || {
-    echo "hypridle.conf: on-timeout set changed -- a listener was added or repointed" >&2
-    printf 'expected:\n%s\nactual:\n%s\n' "$want_timeouts" "$got_timeouts" >&2
+# Every command hypridle can run is pinned as a set, matched with leading
+# whitespace stripped: counting one exact line let a re-added blanker sit
+# beside it, and a differently-indented or on-resume-mounted script slipped
+# past a check that only read `on-timeout=` at exactly two spaces.
+want_cmds='after_sleep_cmd=hyprctl dispatch "hl.dsp.dpms({ action = '"'"'on'"'"' })"
+before_sleep_cmd=@LIBEXECDIR@/lock-cmd.sh --sleep
+lock_cmd=@LIBEXECDIR@/lock-cmd.sh
+on-resume=hyprctl dispatch "hl.dsp.dpms({ action = '"'"'on'"'"' })"
+on-timeout=@LIBEXECDIR@/dpms-off-if-locked.sh
+on-timeout=@LIBEXECDIR@/lock-cmd.sh --idle'
+got_cmds=$(sed -n 's/^[[:space:]]*\(on-timeout\|on-resume\|after_sleep_cmd\|before_sleep_cmd\|lock_cmd\)=/\1=/p' \
+    "$conf" | sort)
+[ "$got_cmds" = "$want_cmds" ] || {
+    echo "hypridle.conf: the set of commands hypridle runs changed" >&2
+    printf 'expected:\n%s\nactual:\n%s\n' "$want_cmds" "$got_cmds" >&2
     exit 1; }
 
 # --- one blanker, and it blanks only a locked compositor -------------------
