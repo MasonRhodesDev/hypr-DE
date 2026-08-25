@@ -73,7 +73,7 @@ done
 # --- 2. presetting a unit we do not install ---------------------------------
 if [ -f "$TOML" ]; then
     # A dep may carry a version floor ("hypridle >= 0.1.8"); match on the name.
-    deps=$(grep -oE '"[a-zA-Z0-9._+-]+( ?[<>=]+ ?[0-9][0-9.]*)?"' "$TOML" \
+    deps=$(grep -oE '"[a-zA-Z0-9._+-]+( ?[<>=]+ ?[^" ]+)?"' "$TOML" \
         | tr -d '"' | sed -E 's/ ?[<>=].*//' | sort -u)
     for u in "${preset[@]}"; do
         in_list "$u" "${shipped[@]}" && continue
