@@ -230,7 +230,9 @@ assert_log ''
 mkdir -p "$work/planted"
 printf '#!/bin/sh\necho true\n' > "$work/planted/hyprctl"
 chmod +x "$work/planted/hyprctl"
-if PATH="$work/planted:$PATH" LOCK_POLICY_COMPOSITOR_LOCKED=true \
+# (Empty instance signature: the real hyprctl it then finds must fail, not
+# answer for whatever compositor the developer is sitting in.)
+if PATH="$work/planted:$PATH" HYPRLAND_INSTANCE_SIGNATURE='' LOCK_POLICY_COMPOSITOR_LOCKED=true \
     "$root/dist/libexec/session-locked.sh" 2>/dev/null; then
     echo "session-locked.sh consulted a PATH-planted hyprctl" >&2; exit 1
 fi
