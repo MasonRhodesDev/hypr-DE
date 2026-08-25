@@ -47,14 +47,18 @@ echo
 echo "== Lua dispatch values are quoted literals"
 # The two implementations must agree, so a workspace name cannot mean one
 # thing to the Python path and another to the shell path.
-py=$(cd "$root" && HYPRLAND_INSTANCE_SIGNATURE=test XDG_RUNTIME_DIR="$work" python3 - <<'PY'
-import importlib.util, sys
-spec = importlib.util.spec_from_file_location("bgf", "dist/gaming/bp-game-focus.py")
-m = importlib.util.module_from_spec(spec); sys.modules["bgf"] = m
-spec.loader.exec_module(m)
+# Take the function out of the source rather than importing the module: it
+# pulls in evdev, a runtime dependency of the gaming subpackage that is absent
+# in CI and in the RPM %check buildroot.
+py=$(cd "$root" && python3 - <<'PYX'
+src = open("dist/gaming/bp-game-focus.py").read()
+start = src.index("def lua_str(")
+end = src.index("\ndef ", start + 1)
+ns = {}
+exec(src[start:end], ns)
 for v in ['games', 'a"b', 'a\\b', 'x") os.execute("id']:
-    print(m.lua_str(v))
-PY
+    print(ns["lua_str"](v))
+PYX
 )
 # Same helper, lifted out of the shell implementation.
 eval "$(grep -m1 '^\s*lua_str()' "$root/dist/libexec/swaync-focus-sender.sh" | sed 's/^[[:space:]]*//')"
