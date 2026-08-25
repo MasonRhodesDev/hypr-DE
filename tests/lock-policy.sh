@@ -197,4 +197,16 @@ rm -f "$marker"
 "$root/dist/libexec/dpms-off-if-unlocked.sh"
 assert_log 'hyprctl:dispatch hl.dsp.dpms({ action = '\''off'\'' })'
 
+# --- the locked-screen listener blanks only a locked session ---------------
+# hypridle.conf's input-idle listener ignores inhibitors, so its condition_cmd
+# is the only thing keeping it from blanking an unlocked, inhibited session
+# 30 s into a film. Both the script and the wiring are pinned here.
+LOCK_POLICY_LOCKED_HINT=yes "$root/dist/libexec/session-locked.sh" || {
+    echo "session-locked.sh must pass when LockedHint=yes" >&2; exit 1; }
+if LOCK_POLICY_LOCKED_HINT=no "$root/dist/libexec/session-locked.sh"; then
+    echo "session-locked.sh must defer when LockedHint=no" >&2; exit 1
+fi
+grep -q '^  condition_cmd=@LIBEXECDIR@/session-locked.sh$' "$root/dist/hypr/hypridle.conf" || {
+    echo "hypridle.conf: the ignore_inhibit listener has lost its locked-only condition" >&2; exit 1; }
+
 echo "lock policy routing is correct"

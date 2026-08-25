@@ -26,7 +26,7 @@ Requires:       google-noto-sans-fonts
 Recommends:     gpu-screen-recorder
 Requires:       grim
 Requires:       gtk4
-Requires:       hypridle
+Requires:       hypridle >= 0.1.8
 Requires:       hyprland >= 0.56
 Requires:       hyprland-guiutils
 Requires:       hyprland-qt-support
