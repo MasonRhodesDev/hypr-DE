@@ -44,6 +44,7 @@ check() {
   ./packaging/check-units.sh
   ./tests/lock-policy.sh
   ./tests/command-construction.sh
+  ./tests/user-config-safety.sh
   ./tests/installer-trust.sh
   ./tests/steam-launch-options.sh
   ./tests/runtime-paths.sh

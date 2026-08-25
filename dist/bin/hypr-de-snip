@@ -32,21 +32,16 @@ for _ in $(seq 1 50); do
     hyprctl layers | grep -q "namespace: selection" || break
 done
 
-# Create swappy config for optimization
-mkdir -p ~/.config/swappy
-cat > ~/.config/swappy/config << EOF
-[Default]
-save_dir=$HOME/Pictures/Screenshots
-save_filename_format=swappy-%Y%m%d-%H%M%S.png
-show_panel=true
-line_size=5
-text_size=20
-text_font=sans-serif
-paint_mode=brush
-early_exit=true
-fill_shape=false
-auto_save=false
-EOF
+# Seed swappy's config on first use only. This used to be rewritten on every
+# single screenshot, silently discarding whatever the user had set. The
+# packaged copy is the same content and is the one source of truth for it.
+SWAPPY_CFG="${XDG_CONFIG_HOME:-$HOME/.config}/swappy/config"
+if [ ! -e "$SWAPPY_CFG" ]; then
+    mkdir -p "$(dirname "$SWAPPY_CFG")"
+    if [ -r "@DATADIR@/swappy/config" ]; then
+        cp "@DATADIR@/swappy/config" "$SWAPPY_CFG"
+    fi
+fi
 
 # Capture from the frozen overlay, then unfreeze before swappy opens so
 # it isn't buried under (and its first click eaten by) hyprpicker

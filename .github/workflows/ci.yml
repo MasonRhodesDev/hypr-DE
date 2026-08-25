@@ -46,6 +46,8 @@ jobs:
 
       - name: Command construction
         run: ./tests/command-construction.sh
+      - name: User config safety
+        run: ./tests/user-config-safety.sh
       - name: Runtime state paths
         run: ./tests/runtime-paths.sh
       - name: PAM rewrite safety
