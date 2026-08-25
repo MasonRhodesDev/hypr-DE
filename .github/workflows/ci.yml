@@ -47,5 +47,7 @@ jobs:
         run: ./tests/runtime-paths.sh
       - name: PAM rewrite safety
         run: ./tests/pam-rewrite.sh
+      - name: Lock policy routing
+        run: ./tests/lock-policy.sh
       - name: Screen-share consent scoping
         run: ./tests/share-consent.sh
