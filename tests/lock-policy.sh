@@ -221,13 +221,17 @@ fi
 
 # --- the listener wiring is structural, not a single grep ------------------
 conf="$root/dist/hypr/hypridle.conf"
-[ "$(grep -cE '^[[:space:]]*ignore_inhibit=true$' "$conf")" = 1 ] || {
-    echo "hypridle.conf: exactly one listener may ignore inhibitors" >&2; exit 1; }
-block=$(awk '/^listener \{/{inb=1;b="";next} inb&&/^\}/{inb=0; if (b ~ /ignore_inhibit=true/) print b; next} inb{b=b $0 "\n"}' "$conf")
+# No listener may ignore idle inhibitors: a held inhibitor means "do not
+# idle", and that now holds while locked too (the locked screen stays lit).
+if grep -qE '^[[:space:]]*ignore_inhibit=' "$conf"; then
+    echo "hypridle.conf: a listener ignores idle inhibitors; a held inhibitor must keep the screen lit" >&2
+    exit 1
+fi
+block=$(awk '/^listener \{/{inb=1;b="";next} inb&&/^\}/{inb=0; if (b ~ /session-locked\.sh/) print b; next} inb{b=b $0 "\n"}' "$conf")
 for want in 'timeout=30' 'condition_cmd=@LIBEXECDIR@/session-locked.sh' 'condition_retry=' \
             'on-timeout=@LIBEXECDIR@/dpms-off-if-locked.sh'; do
     printf '%s' "$block" | grep -q "^  $want" || {
-        echo "hypridle.conf: the ignore_inhibit listener lost '$want'" >&2; exit 1; }
+        echo "hypridle.conf: the locked-screen listener lost '$want'" >&2; exit 1; }
 done
 # No raw DPMS-off anywhere in the config -- not an on-timeout, not an
 # on-resume, not after_sleep_cmd. The only blank in the session goes

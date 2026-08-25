@@ -173,8 +173,11 @@ security failsafe is an operator decision, not a session one.
 
 The session has exactly one DPMS-off, and it fires only while the compositor
 holds the lock: a hypridle listener that blanks 30 s after input stops,
-whether or not an idle inhibitor is held, gated on `hyprctl locked`
-(`condition_cmd=session-locked.sh`) by both its condition and its on-timeout.
+gated on `hyprctl locked` (`condition_cmd=session-locked.sh`) by both its
+condition and its on-timeout. **A held idle inhibitor keeps the screen lit,
+locked or not** — an inhibitor means "do not idle", and a locked screen is
+no exception. A stuck inhibitor therefore keeps the panels lit indefinitely;
+that is the accepted trade.
 Because it is input-driven, waking a locked screen never re-blanks it under
 your hands — with hyprstate ≥ 2.5.0, which no longer blanks at all (older
 hyprstate still runs its own 30 s timer; the package floors it). A session
