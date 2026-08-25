@@ -12,6 +12,8 @@ BuildRequires:  systemd-rpm-macros
 BuildRequires:  file
 # %%check's gen-deps.sh drift gate parses deps.toml with python3/tomllib
 BuildRequires:  python3
+# %check drives the waybar colorpicker, which builds its JSON with jq.
+BuildRequires:  jq
 
 # Runtime deps are generated from deps.toml — edit THAT file and re-run
 # packaging/gen-deps.sh print fedora main; CI (gen-deps.sh check) gates drift.
