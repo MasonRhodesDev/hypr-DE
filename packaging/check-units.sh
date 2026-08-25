@@ -72,7 +72,9 @@ done
 
 # --- 2. presetting a unit we do not install ---------------------------------
 if [ -f "$TOML" ]; then
-    deps=$(grep -oE '"[a-zA-Z0-9._+-]+"' "$TOML" | tr -d '"' | sort -u)
+    # A dep may carry a version floor ("hypridle >= 0.1.8"); match on the name.
+    deps=$(grep -oE '"[a-zA-Z0-9._+-]+(\s*[<>=]+\s*[^" ]+)?"' "$TOML" \
+        | tr -d '"' | sed -E 's/\s*[<>=].*//' | sort -u)
     for u in "${preset[@]}"; do
         in_list "$u" "${shipped[@]}" && continue
         pkg="${UNIT_PKG[$u]:-${u%.*}}"

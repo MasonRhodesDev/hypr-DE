@@ -26,6 +26,16 @@ mk_lock() {  # mk_lock [fallbacks] [failsafe]
     chmod +x "$work/lock-cmd.sh"
 }
 
+# The libexec helpers pin PATH to root-owned directories (BAR-017), so the
+# suite runs copies whose pin is redirected at the fixtures, exactly as
+# mk_lock rewrites lock-cmd.sh's constants.
+mk_libexec() {  # mk_libexec <script>
+    grep -q '^PATH=/usr/local/bin:/usr/bin:/bin; export PATH$' "$root/dist/libexec/$1" || {
+        echo "$1 must pin PATH to root-owned directories" >&2; exit 1; }
+    sed -e "s|^PATH=.*|PATH=$fixtures:/usr/bin:/bin; export PATH|" \
+        "$root/dist/libexec/$1" > "$work/$1"
+    chmod +x "$work/$1"
+}
 status=0
 run_lock() {
     status=0
@@ -61,8 +71,7 @@ hyprctl:dispatch hl.dsp.dpms({ action = '\''on'\'' })'
 
 : > "$LOCK_POLICY_LOG"
 VIGIL_IDLE_WARNING_SECONDS=7 run_lock --idle
-assert_log 'vigil-lock:--wait --warn 7
-hyprctl:dispatch hl.dsp.dpms({ action = '\''on'\'' })'
+assert_log 'vigil-lock:--wait --warn 7'
 
 : > "$LOCK_POLICY_LOG"
 LOCK_POLICY_VIGIL_STATUS=3 run_lock --idle
@@ -179,22 +188,89 @@ vigil-lock:--wait --no-warn'
 fi
 rm -f "$lock_conf" 2>/dev/null || sudo -n rm -f "$lock_conf"
 
-# --- the blanking listener must not fake a locked screen -------------------
-# A locked session is never blanked here, whether the user manager exported
-# XDG_SESSION_ID or logind has to resolve `auto`. (The fixture rejects
-# session `self`, the way logind does for hypridle's cgroup.)
+# --- the locked-screen listener: compositor truth, never a hint ----------
+# hypridle.conf's input-idle listener ignores inhibitors, so its condition is
+# the only thing keeping it from blanking an unlocked, inhibited session 30 s
+# into a film. It must follow the compositor lock, not logind's LockedHint (a
+# hint can outlive its locker).
+mk_libexec session-locked.sh
+mk_libexec dpms-off-if-locked.sh
+LOCK_POLICY_COMPOSITOR_LOCKED=true "$work/session-locked.sh" || {
+    echo "session-locked.sh must pass while the compositor is locked" >&2; exit 1; }
+if LOCK_POLICY_COMPOSITOR_LOCKED=false LOCK_POLICY_LOCKED_HINT=yes "$work/session-locked.sh"; then
+    echo "session-locked.sh: a stale LockedHint must not authorise a blank" >&2; exit 1
+fi
+# The on-timeout re-checks the lock itself: safe even without condition_cmd.
 : > "$LOCK_POLICY_LOG"
-LOCK_POLICY_LOCKED_HINT=yes XDG_SESSION_ID=7 "$root/dist/libexec/dpms-off-if-unlocked.sh"
-assert_log ''
-env -u XDG_SESSION_ID LOCK_POLICY_LOCKED_HINT=yes "$root/dist/libexec/dpms-off-if-unlocked.sh"
-assert_log ''
-: > "$LOCK_POLICY_LOG"
-: > "$marker"
-"$root/dist/libexec/dpms-off-if-unlocked.sh"
-assert_log ''
-rm -f "$marker"
-: > "$LOCK_POLICY_LOG"
-"$root/dist/libexec/dpms-off-if-unlocked.sh"
+LOCK_POLICY_COMPOSITOR_LOCKED=true "$work/dpms-off-if-locked.sh"
 assert_log 'hyprctl:dispatch hl.dsp.dpms({ action = '\''off'\'' })'
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_COMPOSITOR_LOCKED=false LOCK_POLICY_LOCKED_HINT=yes "$work/dpms-off-if-locked.sh"
+assert_log ''
+# A hyprctl planted earlier in the caller's PATH is never consulted: the
+# unmodified script resets PATH before asking the compositor.
+mkdir -p "$work/planted"
+printf '#!/bin/sh\necho true\n' > "$work/planted/hyprctl"
+chmod +x "$work/planted/hyprctl"
+# (Empty instance signature: the real hyprctl it then finds must fail, not
+# answer for whatever compositor the developer is sitting in.)
+if PATH="$work/planted:$PATH" HYPRLAND_INSTANCE_SIGNATURE='' LOCK_POLICY_COMPOSITOR_LOCKED=true \
+    "$root/dist/libexec/session-locked.sh" 2>/dev/null; then
+    echo "session-locked.sh consulted a PATH-planted hyprctl" >&2; exit 1
+fi
+
+# --- the listener wiring is structural, not a single grep ------------------
+conf="$root/dist/hypr/hypridle.conf"
+[ "$(grep -cE '^[[:space:]]*ignore_inhibit=true$' "$conf")" = 1 ] || {
+    echo "hypridle.conf: exactly one listener may ignore inhibitors" >&2; exit 1; }
+block=$(awk '/^listener \{/{inb=1;b="";next} inb&&/^\}/{inb=0; if (b ~ /ignore_inhibit=true/) print b; next} inb{b=b $0 "\n"}' "$conf")
+for want in 'timeout=30' 'condition_cmd=@LIBEXECDIR@/session-locked.sh' 'condition_retry=' \
+            'on-timeout=@LIBEXECDIR@/dpms-off-if-locked.sh'; do
+    printf '%s' "$block" | grep -q "^  $want" || {
+        echo "hypridle.conf: the ignore_inhibit listener lost '$want'" >&2; exit 1; }
+done
+# No raw DPMS-off anywhere in the config -- not an on-timeout, not an
+# on-resume, not after_sleep_cmd. The only blank in the session goes
+# through the lock-checking script, so a literal off dispatch here is a
+# second blanker by definition.
+if grep -F "action = 'off'" "$conf" | grep -q .; then
+    echo "hypridle.conf: a raw dpms-off dispatch bypasses the lock checks" >&2; exit 1
+fi
+# Every command hypridle can run is pinned as a set, matched with leading
+# whitespace stripped: counting one exact line let a re-added blanker sit
+# beside it, and a differently-indented or on-resume-mounted script slipped
+# past a check that only read `on-timeout=` at exactly two spaces.
+want_cmds='after_sleep_cmd=hyprctl dispatch "hl.dsp.dpms({ action = '"'"'on'"'"' })"
+before_sleep_cmd=@LIBEXECDIR@/lock-cmd.sh --sleep
+lock_cmd=@LIBEXECDIR@/lock-cmd.sh
+on-resume=hyprctl dispatch "hl.dsp.dpms({ action = '"'"'on'"'"' })"
+on-timeout=@LIBEXECDIR@/dpms-off-if-locked.sh
+on-timeout=@LIBEXECDIR@/lock-cmd.sh --idle'
+got_cmds=$(sed -n 's/^[[:space:]]*\(on-timeout\|on-resume\|after_sleep_cmd\|before_sleep_cmd\|lock_cmd\)=/\1=/p' \
+    "$conf" | sort)
+[ "$got_cmds" = "$want_cmds" ] || {
+    echo "hypridle.conf: the set of commands hypridle runs changed" >&2
+    printf 'expected:\n%s\nactual:\n%s\n' "$want_cmds" "$got_cmds" >&2
+    exit 1; }
+
+# --- one blanker, and it blanks only a locked compositor -------------------
+# The locked listener is the session's only DPMS-off. A blank must follow
+# the compositor lock and nothing else: not logind's LockedHint (a hint
+# outlives a locker that died) and never an unlocked session, whose dark
+# screen would be indistinguishable from a locked one.
+blanker() {  # blanker <compositor-locked> <hint>; echoes locked|none
+    : > "$LOCK_POLICY_LOG"
+    LOCK_POLICY_COMPOSITOR_LOCKED=$1 LOCK_POLICY_LOCKED_HINT=$2 "$work/session-locked.sh" \
+        && LOCK_POLICY_COMPOSITOR_LOCKED=$1 LOCK_POLICY_LOCKED_HINT=$2 "$work/dpms-off-if-locked.sh"
+    if [ -s "$LOCK_POLICY_LOG" ]; then echo locked; else echo none; fi
+    : > "$LOCK_POLICY_LOG"
+}
+for case in "true yes locked" "true no locked" "false no none" "false yes none"; do
+    set -- $case
+    got=$(blanker "$1" "$2")
+    [ "$got" = "$3" ] || {
+        echo "compositor_locked=$1 hint=$2: expected the $3 listener to blank, got $got" >&2
+        exit 1; }
+done
 
 echo "lock policy routing is correct"

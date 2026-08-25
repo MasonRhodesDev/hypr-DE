@@ -19,9 +19,10 @@
 #
 # THIS SCRIPT MUST NEVER FAIL OPEN. A lock request that ends with the session
 # still unlocked is a security failure, not a logged inconvenience: hypridle
-# moves on, dpms-off-if-unlocked.sh blanks the outputs, and the user walks
-# away from what looks exactly like a locked screen but is a live desktop one
-# keypress away. So a failed locker escalates -- retry unscoped, then any
+# moves on and the user walks away from a live desktop. (Nothing blanks an
+# unlocked session any more -- hypridle only blanks while the compositor
+# holds the lock -- so the screen at least stays honestly lit, but the
+# session is still exposed.) So a failed locker escalates -- retry unscoped, then any
 # other installed locker, then terminate the session -- and only gives up on
 # locking by taking the session down with it.
 set -u
@@ -39,14 +40,16 @@ FALLBACKS='swaylock -f|gtklock -d|hyprlock &'
 VERIFY_TRIES=20
 
 runtime_dir=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
-# Read by dpms-off-if-unlocked.sh: while this exists a lock attempt has
-# failed, so the outputs must stay lit rather than fake a locked screen.
+# A durable trace that a lock attempt failed and the session was kept
+# (failsafe=warn); operators and support scripts read it after the fact.
+# Nothing consumes it at runtime: blanking follows the compositor lock, and
+# a failed lock never holds that, so the outputs stay lit without it.
 fail_marker="$runtime_dir/hypr-de-lock-failed"
 
 log() { printf 'hypr-de lock: %s\n' "$*" >&2; }
 
-# logind's LockedHint is the same signal dpms-off-if-unlocked.sh trusts, so it
-# is the authority on "is this session actually locked". Never ask for
+# logind's LockedHint is what the session's peers (hyprstate, logind
+# consumers) read, so it is the authority on "did this lock take". Never ask for
 # session `self`: logind resolves it from the caller's cgroup, and hypridle
 # (hence this script) runs in app.slice, not the session scope, so `self`
 # fails and the hint reads as empty. Use the id the user manager exports,
@@ -204,6 +207,12 @@ case "${1:-}" in
         # successful idle-policy outcome, not a locker failure.
         [ "$status" -eq 3 ] && exit 0
         [ "$status" -eq 0 ] || exit "$status"
+        # No DPMS poke on the idle path: the outputs are lit (the unlocked
+        # blank is at 240 s, this lock at 180 s) and the locked listener's
+        # condition retry may have blanked them the instant the lock landed
+        # -- a dpms on here would undo that and leave the locked screen lit
+        # until the next input. Manual and sleep paths keep the poke.
+        exit 0
         ;;
     --sleep)
         # before_sleep: never cancelable, and no DPMS poke on the way down
