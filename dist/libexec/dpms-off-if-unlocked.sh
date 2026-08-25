@@ -2,7 +2,10 @@
 # hypridle DPMS-off listener. Skip while locked: Aquamarine restoreAfterVT
 # releases CRTCs from disabled outputs and never modesets them, so VT1
 # comes back blank with the lock still held.
-hint=$(loginctl show-session self -p LockedHint --value 2>/dev/null || true)
+# Not session `self`: from hypridle's cgroup (app.slice) logind cannot map
+# the caller to a session, so `self` fails and the guard silently passed --
+# this listener blanked locked sessions for as long as it existed.
+hint=$(loginctl show-session "${XDG_SESSION_ID:-auto}" -p LockedHint --value 2>/dev/null || true)
 [ "$hint" = yes ] && exit 0
 
 # Also skip when a lock attempt failed (lock-cmd.sh leaves this marker and

@@ -180,6 +180,14 @@ fi
 rm -f "$lock_conf" 2>/dev/null || sudo -n rm -f "$lock_conf"
 
 # --- the blanking listener must not fake a locked screen -------------------
+# A locked session is never blanked here, whether the user manager exported
+# XDG_SESSION_ID or logind has to resolve `auto`. (The fixture rejects
+# session `self`, the way logind does for hypridle's cgroup.)
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_LOCKED_HINT=yes XDG_SESSION_ID=7 "$root/dist/libexec/dpms-off-if-unlocked.sh"
+assert_log ''
+env -u XDG_SESSION_ID LOCK_POLICY_LOCKED_HINT=yes "$root/dist/libexec/dpms-off-if-unlocked.sh"
+assert_log ''
 : > "$LOCK_POLICY_LOG"
 : > "$marker"
 "$root/dist/libexec/dpms-off-if-unlocked.sh"

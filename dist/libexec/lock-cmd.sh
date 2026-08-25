@@ -46,9 +46,13 @@ fail_marker="$runtime_dir/hypr-de-lock-failed"
 log() { printf 'hypr-de lock: %s\n' "$*" >&2; }
 
 # logind's LockedHint is the same signal dpms-off-if-unlocked.sh trusts, so it
-# is the authority on "is this session actually locked".
+# is the authority on "is this session actually locked". Never ask for
+# session `self`: logind resolves it from the caller's cgroup, and hypridle
+# (hence this script) runs in app.slice, not the session scope, so `self`
+# fails and the hint reads as empty. Use the id the user manager exports,
+# falling back to logind's `auto` (the user's display session).
 locked_hint() {
-    [ "$(loginctl show-session self -p LockedHint --value 2>/dev/null || true)" = yes ]
+    [ "$(loginctl show-session "${XDG_SESSION_ID:-auto}" -p LockedHint --value 2>/dev/null || true)" = yes ]
 }
 
 # The hint can land just after the locker returns; give it a moment before
@@ -162,7 +166,7 @@ fail_closed() {
         *)
             log "no locker succeeded; terminating the session rather than leaving it exposed (an operator can set failsafe=warn in $LOCK_CONF to keep it)"
             sid=${XDG_SESSION_ID:-}
-            [ -n "$sid" ] || sid=$(loginctl show-session self -p Id --value 2>/dev/null || true)
+            [ -n "$sid" ] || sid=$(loginctl show-session "${XDG_SESSION_ID:-auto}" -p Id --value 2>/dev/null || true)
             if [ -n "$sid" ]; then
                 loginctl terminate-session "$sid"
             else
