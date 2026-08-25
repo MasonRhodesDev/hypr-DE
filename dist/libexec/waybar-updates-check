@@ -4,7 +4,27 @@
 # serves Fedora and Arch.
 set -u
 
-TERM_CMD="${TERMINAL:-kitty}"
+# The terminal this opens is the one place in the bar that asks for a root
+# password, so the program that appears must not be nameable by anything that
+# can write the session environment -- $TERMINAL is settable from
+# ~/.config/environment.d and would otherwise be a bar click away from
+# running an attacker's binary while the user is expecting a sudo prompt.
+# The preference is honoured by NAME, but only ever resolved inside a
+# root-owned directory.
+resolve_terminal() {
+    local candidate dir
+    for candidate in "${TERMINAL:-}" kitty foot alacritty wezterm ghostty konsole xterm; do
+        [ -n "$candidate" ] || continue
+        case "$candidate" in */*) continue ;; esac   # a path, not a name
+        for dir in /usr/local/bin /usr/bin /bin; do
+            if [ -x "$dir/$candidate" ]; then
+                printf '%s' "$dir/$candidate"
+                return 0
+            fi
+        done
+    done
+    return 1
+}
 
 # Emits waybar JSON: {"text": N, "class": "de-update"?, "tooltip": ...}.
 # The class highlights the module (see lmtt waybar template) when hypr-de
@@ -31,13 +51,34 @@ count() {
         '{text: $text, class: $class, tooltip: $tooltip}'
 }
 
+# Show the command before running it. A bar click that goes straight to a
+# password prompt teaches "type the root password into whatever window
+# appears"; naming the command first makes it a decision instead of a reflex.
+run_upgrade() {  # run_upgrade <command line>
+    local term
+    term=$(resolve_terminal) || {
+        notify-send -a "updates" "No terminal found" \
+            "Install one of kitty, foot, alacritty, wezterm, ghostty or xterm." 2>/dev/null
+        echo "waybar-updates-check: no terminal in a root-owned directory" >&2
+        exit 1
+    }
+    exec "$term" sh -c '
+        printf "About to run:\n\n    %s\n\n" "$1"
+        printf "This will ask for your password. Press enter to continue, Ctrl-C to abort: "
+        read -r _
+        sh -c "$1"
+        echo "Done - Press enter to exit"
+        read -r _
+    ' sh "$1"
+}
+
 upgrade() {
     if command -v dnf >/dev/null 2>&1; then
-        exec "$TERM_CMD" sh -c 'sudo dnf upgrade; echo "Done - Press enter to exit"; read'
+        run_upgrade 'sudo dnf upgrade'
     elif command -v yay >/dev/null 2>&1; then
-        exec "$TERM_CMD" sh -c 'yay -Syu; echo "Done - Press enter to exit"; read'
+        run_upgrade 'yay -Syu'
     else
-        exec "$TERM_CMD" sh -c 'sudo pacman -Syu; echo "Done - Press enter to exit"; read'
+        run_upgrade 'sudo pacman -Syu'
     fi
 }
 

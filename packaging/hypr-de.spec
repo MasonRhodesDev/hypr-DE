@@ -140,6 +140,7 @@ find dist-build/bin dist-build/libexec -type f -exec sh -c 'head -1 "$1" | grep 
 ./tests/lock-policy.sh
 ./tests/command-construction.sh
 ./tests/user-config-safety.sh
+./tests/privacy-privilege.sh
 ./tests/installer-trust.sh
 ./tests/steam-launch-options.sh
 ./tests/runtime-paths.sh
