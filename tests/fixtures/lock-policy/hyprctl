@@ -1,2 +1,7 @@
 #!/bin/sh
+# Stand-in for hyprctl: answers the compositor-lock query from the
+# environment and logs every dispatch so effects are observable.
+case "${1:-}" in
+    locked) printf '%s\n' "${LOCK_POLICY_COMPOSITOR_LOCKED:-false}"; exit 0 ;;
+esac
 printf 'hyprctl:%s\n' "$*" >> "$LOCK_POLICY_LOG"

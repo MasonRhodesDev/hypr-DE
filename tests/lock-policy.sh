@@ -26,6 +26,16 @@ mk_lock() {  # mk_lock [fallbacks] [failsafe]
     chmod +x "$work/lock-cmd.sh"
 }
 
+# The libexec helpers pin PATH to root-owned directories (BAR-017), so the
+# suite runs copies whose pin is redirected at the fixtures, exactly as
+# mk_lock rewrites lock-cmd.sh's constants.
+mk_libexec() {  # mk_libexec <script>
+    grep -q '^PATH=/usr/local/bin:/usr/bin:/bin; export PATH$' "$root/dist/libexec/$1" || {
+        echo "$1 must pin PATH to root-owned directories" >&2; exit 1; }
+    sed -e "s|^PATH=.*|PATH=$fixtures:/usr/bin:/bin; export PATH|" \
+        "$root/dist/libexec/$1" > "$work/$1"
+    chmod +x "$work/$1"
+}
 status=0
 run_lock() {
     status=0
@@ -196,16 +206,48 @@ rm -f "$marker"
 "$root/dist/libexec/dpms-off-if-unlocked.sh"
 assert_log 'hyprctl:dispatch hl.dsp.dpms({ action = '\''off'\'' })'
 
-# --- the locked-screen listener blanks only a locked session ---------------
-# hypridle.conf's input-idle listener ignores inhibitors, so its condition_cmd
-# is the only thing keeping it from blanking an unlocked, inhibited session
-# 30 s into a film. Both the script and the wiring are pinned here.
-LOCK_POLICY_LOCKED_HINT=yes "$root/dist/libexec/session-locked.sh" || {
-    echo "session-locked.sh must pass when LockedHint=yes" >&2; exit 1; }
-if LOCK_POLICY_LOCKED_HINT=no "$root/dist/libexec/session-locked.sh"; then
-    echo "session-locked.sh must defer when LockedHint=no" >&2; exit 1
+# --- the locked-screen listener: compositor truth, never a hint ----------
+# hypridle.conf's input-idle listener ignores inhibitors, so its condition is
+# the only thing keeping it from blanking an unlocked, inhibited session 30 s
+# into a film. It must follow the compositor lock, not logind's LockedHint (a
+# hint can outlive its locker).
+mk_libexec session-locked.sh
+mk_libexec dpms-off-if-locked.sh
+LOCK_POLICY_COMPOSITOR_LOCKED=true "$work/session-locked.sh" || {
+    echo "session-locked.sh must pass while the compositor is locked" >&2; exit 1; }
+if LOCK_POLICY_COMPOSITOR_LOCKED=false LOCK_POLICY_LOCKED_HINT=yes "$work/session-locked.sh"; then
+    echo "session-locked.sh: a stale LockedHint must not authorise a blank" >&2; exit 1
 fi
-grep -q '^  condition_cmd=@LIBEXECDIR@/session-locked.sh$' "$root/dist/hypr/hypridle.conf" || {
-    echo "hypridle.conf: the ignore_inhibit listener has lost its locked-only condition" >&2; exit 1; }
+# The on-timeout re-checks the lock itself: safe even without condition_cmd.
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_COMPOSITOR_LOCKED=true "$work/dpms-off-if-locked.sh"
+assert_log 'hyprctl:dispatch hl.dsp.dpms({ action = '\''off'\'' })'
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_COMPOSITOR_LOCKED=false LOCK_POLICY_LOCKED_HINT=yes "$work/dpms-off-if-locked.sh"
+assert_log ''
+# A hyprctl planted earlier in the caller's PATH is never consulted: the
+# unmodified script resets PATH before asking the compositor.
+mkdir -p "$work/planted"
+printf '#!/bin/sh\necho true\n' > "$work/planted/hyprctl"
+chmod +x "$work/planted/hyprctl"
+if PATH="$work/planted:$PATH" LOCK_POLICY_COMPOSITOR_LOCKED=true \
+    "$root/dist/libexec/session-locked.sh" 2>/dev/null; then
+    echo "session-locked.sh consulted a PATH-planted hyprctl" >&2; exit 1
+fi
+
+# --- the listener wiring is structural, not a single grep ------------------
+conf="$root/dist/hypr/hypridle.conf"
+[ "$(grep -c '^  ignore_inhibit=true$' "$conf")" = 1 ] || {
+    echo "hypridle.conf: exactly one listener may ignore inhibitors" >&2; exit 1; }
+block=$(awk '/^listener \{/{inb=1;b="";next} inb&&/^\}/{inb=0; if (b ~ /ignore_inhibit=true/) print b; next} inb{b=b $0 "\n"}' "$conf")
+for want in 'timeout=30' 'condition_cmd=@LIBEXECDIR@/session-locked.sh' 'condition_retry=' \
+            'on-timeout=@LIBEXECDIR@/dpms-off-if-locked.sh'; do
+    printf '%s' "$block" | grep -q "^  $want" || {
+        echo "hypridle.conf: the ignore_inhibit listener lost '$want'" >&2; exit 1; }
+done
+# Every DPMS-off on-timeout goes through a lock-aware script, never raw.
+if grep -E "^\s*on-timeout=.*hl\.dsp\.dpms\(.*'off'" "$conf" | grep -q .; then
+    echo "hypridle.conf: a raw dpms-off on-timeout bypasses the lock checks" >&2; exit 1
+fi
 
 echo "lock policy routing is correct"

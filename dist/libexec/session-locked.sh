@@ -1,9 +1,12 @@
 #!/bin/sh
 # hypridle condition_cmd for the locked-screen blanking listener in
-# hypr/hypridle.conf. Exit 0 only while logind reports this session locked --
-# the same LockedHint lock-cmd.sh and dpms-off-if-unlocked.sh trust -- so an
-# input-idle timeout blanks locked outputs and defers (condition_retry) for
-# everything else. A failed lock never sets the hint, so the fail-open guard
-# lock-cmd.sh maintains needs no marker check here.
-hint=$(loginctl show-session self -p LockedHint --value 2>/dev/null || true)
-[ "$hint" = yes ]
+# hypr/hypridle.conf: exit 0 only while the compositor holds the session
+# lock. This is the property the invariant is about -- a lock surface is
+# covering the outputs -- and it is immune to two things logind's
+# LockedHint is not: hint resolution (hypridle runs in app.slice, so
+# `loginctl show-session self` fails there) and a hint left set by a locker
+# that died (hyprstate aborts suspend on exactly that). A stale "locked"
+# must never authorise a blank over a live desktop; a failed lock never
+# holds the compositor lock, so no marker check is needed here.
+PATH=/usr/local/bin:/usr/bin:/bin; export PATH
+[ "$(hyprctl locked 2>/dev/null)" = true ]
