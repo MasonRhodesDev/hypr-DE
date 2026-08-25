@@ -1,0 +1,5 @@
+#!/bin/sh
+# Stand-in for logind-idle-control: logs the verb so the lock paths that
+# release the idle inhibitor are observable.
+printf 'logind-idle-control:%s\n' "$*" >> "$LOCK_POLICY_LOG"
+exit "${LOCK_POLICY_INHIBIT_STATUS:-0}"

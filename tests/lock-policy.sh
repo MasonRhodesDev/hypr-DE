@@ -67,6 +67,7 @@ mk_lock
 : > "$LOCK_POLICY_LOG"
 run_lock
 assert_log 'vigil-lock:--wait --no-warn
+logind-idle-control:disable
 hyprctl:dispatch hl.dsp.dpms({ action = '\''on'\'' })'
 
 : > "$LOCK_POLICY_LOG"
@@ -88,6 +89,7 @@ LOCK_POLICY_SCOPE_STATUS=1 run_lock
 assert_status 0
 assert_log 'systemd-run:scope-failed
 vigil-lock:--wait --no-warn
+logind-idle-control:disable
 hyprctl:dispatch hl.dsp.dpms({ action = '\''on'\'' })'
 assert_marker no
 
@@ -100,6 +102,7 @@ assert_status 0
 assert_log 'vigil-lock:--wait --no-warn
 vigil-lock:--wait --no-warn
 swaylock:-f
+logind-idle-control:disable
 hyprctl:dispatch hl.dsp.dpms({ action = '\''on'\'' })'
 assert_marker no
 
@@ -187,6 +190,31 @@ vigil-lock:--wait --no-warn'
     echo "operator policy honoured when root owns it (spaced syntax parsed)"
 fi
 rm -f "$lock_conf" 2>/dev/null || sudo -n rm -f "$lock_conf"
+
+# --- an intentional lock releases the idle inhibitor ----------------------
+# Locking on purpose says "I am done with this session", so a held idle
+# inhibitor must not then keep the screen lit all night. The idle path is
+# NOT intentional: it fires because the user walked away, and an inhibitor
+# is precisely the signal that they meant the session to stay awake.
+: > "$LOCK_POLICY_LOG"
+run_lock
+assert_log 'vigil-lock:--wait --no-warn
+logind-idle-control:disable
+hyprctl:dispatch hl.dsp.dpms({ action = '\''on'\'' })'
+
+: > "$LOCK_POLICY_LOG"
+run_lock --sleep
+assert_log 'vigil-lock:--wait --no-warn
+logind-idle-control:disable'
+
+: > "$LOCK_POLICY_LOG"
+run_lock --idle
+assert_log 'vigil-lock:--wait --warn 10'
+
+# A failing or absent inhibitor CLI must never fail the lock.
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_INHIBIT_STATUS=1 run_lock
+assert_status 0
 
 # --- the locked-screen listener: compositor truth, never a hint ----------
 # hypridle.conf's input-idle listener ignores inhibitors, so its condition is
