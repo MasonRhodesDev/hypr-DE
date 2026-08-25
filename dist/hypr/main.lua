@@ -406,7 +406,11 @@ hl.window_rule({ name = "satty",            match = { class = "^(com.gabm.satty)
 -- — see local.lua.example.
 ----------------------------------------------------------------------
 hl.on("hyprland.start", function()
-    hl.exec_cmd("dbus-update-activation-environment --all")
+    -- Enumerated, not --all: --all pushes the entire session environment
+    -- (including anything a shell profile happens to export) into the D-Bus
+    -- and systemd activation environments, where every activated service
+    -- inherits it. These are the variables activated services actually need.
+    hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE XDG_SESSION_TYPE XDG_SESSION_ID XDG_SESSION_DESKTOP")
     hl.exec_cmd("sleep 1 & dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP")
     hl.exec_cmd("@LIBEXECDIR@/hypr-de-welcome")  -- one-time help window; marker-gated
 end)

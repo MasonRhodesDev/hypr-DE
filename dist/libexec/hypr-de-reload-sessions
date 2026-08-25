@@ -28,6 +28,11 @@ for sock in /run/user/*/hypr/*/.socket.sock; do
 
     user=$(id -nu "$uid" 2>/dev/null) || continue
 
+    # The glob walked /run/user/<uid>/, which that user owns, so confirm the
+    # socket really belongs to the uid the path claims before running
+    # anything as them.
+    [ "$(stat -c %u "$sock" 2>/dev/null)" = "$uid" ] || continue
+
     # A socket can outlive its compositor; only talk to a live one.
     pgrep -u "$uid" -x Hyprland >/dev/null 2>&1 || continue
 
