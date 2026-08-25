@@ -167,6 +167,17 @@ failsafe off and durably re-open the hole this closes
 (desktop-commons `BAR-017`, no-unprivileged-security-bypass). Loosening a
 security failsafe is an operator decision, not a session one.
 
+### Idle blanking
+
+hypridle owns every DPMS-off. Unlocked sessions blank after 4 minutes idle
+(inhibitors respected). Locked sessions blank after 30 s without input,
+inhibitors or not — the listener binds the input-idle notification and gates
+on logind's `LockedHint` (`condition_cmd`), so it never blanks an unlocked
+film and a session that goes idle first and locks later still goes dark.
+Because it is input-driven, waking a locked screen never re-blanks it under
+your hands; hyprstate keeps only its stuck-DPMS repair. Needs hypridle ≥ 0.1.8
+and Hyprland ≥ 0.48.
+
 ## Development
 
 - All install paths in `dist/` are `@TOKENS@` substituted at build time from

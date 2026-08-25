@@ -9,9 +9,9 @@ fedora = ["hyprland >= 0.56"]
 arch = ["hyprland>=0.56"]
 
 [lock-idle]
-reason = "vigil (vigil-lock lock_cmd / before_sleep_cmd), hypridle (idle policy in hypr/hypridle.conf); SUPER+L is loginctl lock-session which hypridle answers. Floor is vigil 0.3: lock-cmd.sh and hypridle.conf use --wait/--warn/--no-warn, which 0.2.x rejects — an unversioned dep let hypr-de 0.2.14 pair with vigil 0.2.16 and silently break idle/suspend locking."
-fedora = ["vigil >= 0.3.0", "hypridle"]
-arch = ["vigil>=0.3.0", "hypridle"]
+reason = "vigil (vigil-lock lock_cmd / before_sleep_cmd), hypridle (idle policy in hypr/hypridle.conf); SUPER+L is loginctl lock-session which hypridle answers. Floor is vigil 0.3: lock-cmd.sh and hypridle.conf use --wait/--warn/--no-warn, which 0.2.x rejects — an unversioned dep let hypr-de 0.2.14 pair with vigil 0.2.16 and silently break idle/suspend locking. Floor is hypridle 0.1.8: the locked-screen listener needs per-listener condition_cmd/condition_retry (0.1.8) and ignore_inhibit (0.1.6); an older hypridle drops the unknown keys and would blank 30 s into any idle, locked or not."
+fedora = ["vigil >= 0.3.0", "hypridle >= 0.1.8"]
+arch = ["vigil>=0.3.0", "hypridle>=0.1.8"]
 units = ["hypridle.service", "logind-idle-control.service", "logind-idle-control-tray.service"]
 
 [bar]
