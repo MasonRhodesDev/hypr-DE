@@ -19,9 +19,10 @@
 #
 # THIS SCRIPT MUST NEVER FAIL OPEN. A lock request that ends with the session
 # still unlocked is a security failure, not a logged inconvenience: hypridle
-# moves on, dpms-off-if-unlocked.sh blanks the outputs, and the user walks
-# away from what looks exactly like a locked screen but is a live desktop one
-# keypress away. So a failed locker escalates -- retry unscoped, then any
+# moves on and the user walks away from a live desktop. (Nothing blanks an
+# unlocked session any more -- hypridle only blanks while the compositor
+# holds the lock -- so the screen at least stays honestly lit, but the
+# session is still exposed.) So a failed locker escalates -- retry unscoped, then any
 # other installed locker, then terminate the session -- and only gives up on
 # locking by taking the session down with it.
 set -u
@@ -39,14 +40,17 @@ FALLBACKS='swaylock -f|gtklock -d|hyprlock &'
 VERIFY_TRIES=20
 
 runtime_dir=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
-# Read by dpms-off-if-unlocked.sh: while this exists a lock attempt has
-# failed, so the outputs must stay lit rather than fake a locked screen.
+# The contract for any blanker: while this exists a lock attempt has failed
+# and the outputs must stay lit rather than fake a locked screen. hypridle's
+# locked listener needs no check for it (a failed lock never holds the
+# compositor lock), so nothing reads it today -- it remains the signal a
+# future blanker must honour.
 fail_marker="$runtime_dir/hypr-de-lock-failed"
 
 log() { printf 'hypr-de lock: %s\n' "$*" >&2; }
 
-# logind's LockedHint is the same signal dpms-off-if-unlocked.sh trusts, so it
-# is the authority on "is this session actually locked". Never ask for
+# logind's LockedHint is what the session's peers (hyprstate, logind
+# consumers) read, so it is the authority on "did this lock take". Never ask for
 # session `self`: logind resolves it from the caller's cgroup, and hypridle
 # (hence this script) runs in app.slice, not the session scope, so `self`
 # fails and the hint reads as empty. Use the id the user manager exports,

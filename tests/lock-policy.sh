@@ -188,19 +188,6 @@ vigil-lock:--wait --no-warn'
 fi
 rm -f "$lock_conf" 2>/dev/null || sudo -n rm -f "$lock_conf"
 
-# --- the blanking listener must not fake a locked screen -------------------
-# A failed lock (marker present) is the dangerous state: blanking there is
-# what turns an exposed desktop into something that passes for locked.
-mk_libexec dpms-off-if-unlocked.sh
-: > "$LOCK_POLICY_LOG"
-: > "$marker"
-"$work/dpms-off-if-unlocked.sh"
-assert_log ''
-rm -f "$marker"
-: > "$LOCK_POLICY_LOG"
-"$work/dpms-off-if-unlocked.sh"
-assert_log 'hyprctl:dispatch hl.dsp.dpms({ action = '\''off'\'' })'
-
 # --- the locked-screen listener: compositor truth, never a hint ----------
 # hypridle.conf's input-idle listener ignores inhibitors, so its condition is
 # the only thing keeping it from blanking an unlocked, inhibited session 30 s
@@ -246,28 +233,22 @@ done
 if grep -E "^\s*on-timeout=.*hl\.dsp\.dpms\(.*'off'" "$conf" | grep -q .; then
     echo "hypridle.conf: a raw dpms-off on-timeout bypasses the lock checks" >&2; exit 1
 fi
+[ "$(grep -c '^  on-timeout=@LIBEXECDIR@/dpms-off-if-locked.sh$' "$conf")" = 1 ] || {
+    echo "hypridle.conf: the locked listener must be the only blanker" >&2; exit 1; }
 
-# --- exactly one blanker owns every state ---------------------------------
-# The two listeners split the work by lock state, so every combination must
-# have exactly one owner. They must therefore agree on what "locked" means:
-# when they disagreed (compositor truth here, a logind hint there) a stale
-# LockedHint left an unlocked idle desktop lit for ever -- both deferred to
-# each other.
-mk_libexec dpms-off-if-unlocked.sh
-blanker() {  # blanker <compositor-locked> <hint>; echoes locked|unlocked|none|both
-    : > "$LOCK_POLICY_LOG"
-    LOCK_POLICY_COMPOSITOR_LOCKED=$1 LOCK_POLICY_LOCKED_HINT=$2 "$work/dpms-off-if-unlocked.sh"
-    unlocked=$(wc -l < "$LOCK_POLICY_LOG")
+# --- one blanker, and it blanks only a locked compositor -------------------
+# The locked listener is the session's only DPMS-off. A blank must follow
+# the compositor lock and nothing else: not logind's LockedHint (a hint
+# outlives a locker that died) and never an unlocked session, whose dark
+# screen would be indistinguishable from a locked one.
+blanker() {  # blanker <compositor-locked> <hint>; echoes locked|none
     : > "$LOCK_POLICY_LOG"
     LOCK_POLICY_COMPOSITOR_LOCKED=$1 LOCK_POLICY_LOCKED_HINT=$2 "$work/session-locked.sh" \
         && LOCK_POLICY_COMPOSITOR_LOCKED=$1 LOCK_POLICY_LOCKED_HINT=$2 "$work/dpms-off-if-locked.sh"
-    locked=$(wc -l < "$LOCK_POLICY_LOG")
+    if [ -s "$LOCK_POLICY_LOG" ]; then echo locked; else echo none; fi
     : > "$LOCK_POLICY_LOG"
-    case "$unlocked$locked" in
-        00) echo none ;; 01) echo locked ;; 10) echo unlocked ;; *) echo both ;;
-    esac
 }
-for case in "true yes locked" "true no locked" "false no unlocked" "false yes unlocked"; do
+for case in "true yes locked" "true no locked" "false no none" "false yes none"; do
     set -- $case
     got=$(blanker "$1" "$2")
     [ "$got" = "$3" ] || {
