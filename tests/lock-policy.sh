@@ -189,21 +189,16 @@ fi
 rm -f "$lock_conf" 2>/dev/null || sudo -n rm -f "$lock_conf"
 
 # --- the blanking listener must not fake a locked screen -------------------
-# A locked session is never blanked here, whether the user manager exported
-# XDG_SESSION_ID or logind has to resolve `auto`. (The fixture rejects
-# session `self`, the way logind does for hypridle's cgroup.)
-: > "$LOCK_POLICY_LOG"
-LOCK_POLICY_LOCKED_HINT=yes XDG_SESSION_ID=7 "$root/dist/libexec/dpms-off-if-unlocked.sh"
-assert_log ''
-env -u XDG_SESSION_ID LOCK_POLICY_LOCKED_HINT=yes "$root/dist/libexec/dpms-off-if-unlocked.sh"
-assert_log ''
+# A failed lock (marker present) is the dangerous state: blanking there is
+# what turns an exposed desktop into something that passes for locked.
+mk_libexec dpms-off-if-unlocked.sh
 : > "$LOCK_POLICY_LOG"
 : > "$marker"
-"$root/dist/libexec/dpms-off-if-unlocked.sh"
+"$work/dpms-off-if-unlocked.sh"
 assert_log ''
 rm -f "$marker"
 : > "$LOCK_POLICY_LOG"
-"$root/dist/libexec/dpms-off-if-unlocked.sh"
+"$work/dpms-off-if-unlocked.sh"
 assert_log 'hyprctl:dispatch hl.dsp.dpms({ action = '\''off'\'' })'
 
 # --- the locked-screen listener: compositor truth, never a hint ----------
@@ -251,5 +246,33 @@ done
 if grep -E "^\s*on-timeout=.*hl\.dsp\.dpms\(.*'off'" "$conf" | grep -q .; then
     echo "hypridle.conf: a raw dpms-off on-timeout bypasses the lock checks" >&2; exit 1
 fi
+
+# --- exactly one blanker owns every state ---------------------------------
+# The two listeners split the work by lock state, so every combination must
+# have exactly one owner. They must therefore agree on what "locked" means:
+# when they disagreed (compositor truth here, a logind hint there) a stale
+# LockedHint left an unlocked idle desktop lit for ever -- both deferred to
+# each other.
+mk_libexec dpms-off-if-unlocked.sh
+blanker() {  # blanker <compositor-locked> <hint>; echoes locked|unlocked|none|both
+    : > "$LOCK_POLICY_LOG"
+    LOCK_POLICY_COMPOSITOR_LOCKED=$1 LOCK_POLICY_LOCKED_HINT=$2 "$work/dpms-off-if-unlocked.sh"
+    unlocked=$(wc -l < "$LOCK_POLICY_LOG")
+    : > "$LOCK_POLICY_LOG"
+    LOCK_POLICY_COMPOSITOR_LOCKED=$1 LOCK_POLICY_LOCKED_HINT=$2 "$work/session-locked.sh" \
+        && LOCK_POLICY_COMPOSITOR_LOCKED=$1 LOCK_POLICY_LOCKED_HINT=$2 "$work/dpms-off-if-locked.sh"
+    locked=$(wc -l < "$LOCK_POLICY_LOG")
+    : > "$LOCK_POLICY_LOG"
+    case "$unlocked$locked" in
+        00) echo none ;; 01) echo locked ;; 10) echo unlocked ;; *) echo both ;;
+    esac
+}
+for case in "true yes locked" "true no locked" "false no unlocked" "false yes unlocked"; do
+    set -- $case
+    got=$(blanker "$1" "$2")
+    [ "$got" = "$3" ] || {
+        echo "compositor_locked=$1 hint=$2: expected the $3 listener to blank, got $got" >&2
+        exit 1; }
+done
 
 echo "lock policy routing is correct"

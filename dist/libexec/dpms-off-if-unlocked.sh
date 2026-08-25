@@ -6,11 +6,14 @@
 # modeset again, VT1 returns blank with the lock held -- is a known,
 # untested hazard of any locked blank; Hyprland's key/mouse DPMS wake and
 # hyprstate's cursor-gated stuck-DPMS repair are the only mitigations.
-# Not session `self`: from hypridle's cgroup (app.slice) logind cannot map
-# the caller to a session, so `self` fails and the guard silently passed --
-# this listener blanked locked sessions for as long as it existed.
-hint=$(loginctl show-session "${XDG_SESSION_ID:-auto}" -p LockedHint --value 2>/dev/null || true)
-[ "$hint" = yes ] && exit 0
+# Same authority as the locked listener: the compositor's own lock, never
+# logind's LockedHint. The two must agree or a state falls between them --
+# a hint left set by a dead locker made this script defer to a listener
+# whose condition (correctly) said unlocked, and the idle desktop stayed
+# lit for ever. (`loginctl show-session self` never resolved from
+# hypridle's cgroup either, so this guard has never actually held.)
+PATH=/usr/local/bin:/usr/bin:/bin; export PATH
+[ "$(hyprctl locked 2>/dev/null)" = true ] && exit 0
 
 # Also skip when a lock attempt failed (lock-cmd.sh leaves this marker and
 # HYPR_DE_LOCK_FAILSAFE=warn kept the session). Blanking here is what turns a
