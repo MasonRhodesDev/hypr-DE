@@ -61,8 +61,7 @@ hyprctl:dispatch hl.dsp.dpms({ action = '\''on'\'' })'
 
 : > "$LOCK_POLICY_LOG"
 VIGIL_IDLE_WARNING_SECONDS=7 run_lock --idle
-assert_log 'vigil-lock:--wait --warn 7
-hyprctl:dispatch hl.dsp.dpms({ action = '\''on'\'' })'
+assert_log 'vigil-lock:--wait --warn 7'
 
 : > "$LOCK_POLICY_LOG"
 LOCK_POLICY_VIGIL_STATUS=3 run_lock --idle
