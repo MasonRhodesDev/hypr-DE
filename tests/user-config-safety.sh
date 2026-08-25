@@ -36,8 +36,11 @@ if [ -z "$block" ]; then
     block='false'
 fi
 
+# Pin XDG_CONFIG_HOME too: a runner that already exports it (CI does) would
+# otherwise send the seeded file outside the fixture, and the case would read
+# as "no config seeded".
 home1="$work/h1"; mkdir -p "$home1"
-HOME="$home1" bash -c "$block"
+HOME="$home1" XDG_CONFIG_HOME="$home1/.config" bash -c "$block"
 if [ -e "$home1/.config/swappy/config" ]; then
     ok "seeded a config when the user had none"
     cmp -s "$home1/.config/swappy/config" "$datadir/swappy/config" \
@@ -50,7 +53,7 @@ fi
 home2="$work/h2"; mkdir -p "$home2/.config/swappy"
 printf '[Default]\nsave_dir=%s/Elsewhere\nline_size=1\n' "$home2" > "$home2/.config/swappy/config"
 before=$(cat "$home2/.config/swappy/config")
-HOME="$home2" bash -c "$block"
+HOME="$home2" XDG_CONFIG_HOME="$home2/.config" bash -c "$block"
 if [ "$block" = false ]; then
     bad "no seeding block ran, so 'left it alone' proves nothing"
 elif [ "$(cat "$home2/.config/swappy/config")" = "$before" ]; then
