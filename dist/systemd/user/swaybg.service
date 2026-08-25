@@ -2,9 +2,17 @@
 Description=swaybg wallpaper daemon
 PartOf=graphical-session.target
 After=graphical-session.target
+# hypr-de-set-wallpaper writes WALLPAPER_PATH into ~/.config/environment.d/,
+# which the user manager imports. With it unset, ${WALLPAPER_PATH} expands to
+# an empty argument, swaybg fails to load an image, and Restart=on-failure
+# retries every 3s forever. Skip the unit instead until a wallpaper is set.
+ConditionEnvironment=WALLPAPER_PATH
 
 [Service]
 Type=simple
+# Braced deliberately: systemd expands ${VAR} as a single argument, while
+# $VAR is split on whitespace. A wallpaper path containing a space survives
+# the braced form and would be torn in half by the bare one.
 ExecStart=/usr/bin/swaybg -i ${WALLPAPER_PATH} -m fill
 Restart=on-failure
 RestartSec=3

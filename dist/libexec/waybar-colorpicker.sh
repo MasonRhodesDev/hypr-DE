@@ -16,30 +16,37 @@ limit=10
   exit
 }
 
+# Pango markup and JSON, built from ~/.cache/colorpicker/colors. That file is
+# the user's own, but a malformed line used to produce invalid JSON or invalid
+# markup, and waybar drops the whole module when either happens. Values are
+# validated as colors, escaped for markup, and the object is built by jq.
+pango_escape() { printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'; }
+is_color()     { printf '%s' "$1" | grep -qE '^#[0-9A-Fa-f]{3,8}$'; }
+
+emit_json() {  # emit_json <text-markup> <tooltip-markup>
+  jq -cn --arg text "$1" --arg tooltip "$2" '{text: $text, tooltip: $tooltip}'
+}
+
 [[ $# -eq 1 && $1 = "-j" ]] && {
   text="$(head -n 1 "$loc/colors")"
 
   # If no color saved yet, use default placeholder
-  if [[ -z "$text" ]]; then
-    cat <<EOF
-{ "text":"󰉦", "tooltip":"<b>   COLORS</b>\n\nNo colors picked yet"}
-EOF
+  if [[ -z "$text" ]] || ! is_color "$text"; then
+    emit_json "󰉦" $'<b>   COLORS</b>\n\nNo colors picked yet'
     exit
   fi
 
   mapfile -t allcolors < <(tail -n +2 "$loc/colors")
-  # allcolors=($(tail -n +2 "$loc/colors"))
-  tooltip="<b>   COLORS</b>\n\n"
-
-  tooltip+="-> <b>$text</b>  <span color='$text'></span>  \n"
+  tooltip=$'<b>   COLORS</b>\n\n'
+  tooltip+="-> <b>$(pango_escape "$text")</b>  <span color='$text'></span>  "
+  tooltip+=$'\n'
   for i in "${allcolors[@]}"; do
-    [[ -n "$i" ]] && tooltip+="   <b>$i</b>  <span color='$i'></span>  \n"
+    is_color "$i" || continue
+    tooltip+="   <b>$(pango_escape "$i")</b>  <span color='$i'></span>  "
+    tooltip+=$'\n'
   done
 
-  cat <<EOF
-{ "text":"<span color='$text'></span>", "tooltip":"$tooltip"}
-EOF
-
+  emit_json "<span color='$text'></span>" "$tooltip"
   exit
 }
 
