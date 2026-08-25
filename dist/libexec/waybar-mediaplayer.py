@@ -14,15 +14,18 @@ players = [
 ]
 
 
-def run(cmd):
+def run(*args):
+    """Run a command as argv. Never a shell: `player` comes from
+    `playerctl -l`, i.e. from whatever registered an MPRIS name, and an
+    f-string into `sh -c` would make that name a command line."""
     try:
-        return subprocess.check_output(cmd, shell=True, stderr=subprocess.DEVNULL).decode().strip()
+        return subprocess.check_output(args, stderr=subprocess.DEVNULL).decode().strip()
     except Exception:
         return ""
 
 
 def get_active_player():
-    names = run("playerctl -l").splitlines()
+    names = run("playerctl", "-l").splitlines()
     for candidate in players:
         if any(candidate in n for n in names):
             return candidate
@@ -34,9 +37,9 @@ def now_playing():
     if not player:
         return {"text": "", "alt": "", "tooltip": "", "class": "", "percentage": 0}
 
-    artist = run(f"playerctl -p {player} metadata artist")
-    title = run(f"playerctl -p {player} metadata title")
-    status = run(f"playerctl -p {player} status").lower()
+    artist = run("playerctl", "-p", player, "metadata", "artist")
+    title = run("playerctl", "-p", player, "metadata", "title")
+    status = run("playerctl", "-p", player, "status").lower()
 
     icon = ICON_SPOTIFY if "spotify" in player else ICON_DEFAULT
     state_icon = "" if status == "playing" else "" if status == "paused" else ""

@@ -136,6 +136,7 @@ find dist-build/bin dist-build/libexec -type f -exec sh -c 'head -1 "$1" | grep 
 ./packaging/gen-deps.sh check
 ./packaging/check-units.sh
 ./tests/lock-policy.sh
+./tests/command-construction.sh
 ./tests/installer-trust.sh
 ./tests/steam-launch-options.sh
 ./tests/runtime-paths.sh

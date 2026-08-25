@@ -103,8 +103,13 @@ if [ -n "${address:-}" ]; then
     # doesn't pull a window out of them, so explicitly show the special
     # workspace on the current monitor first.
     # hypr-DE is Lua-config only. Classic string dispatchers fail.
-    dispatch_toggle_special() { hyprctl dispatch "hl.dsp.workspace.toggle_special(\"$1\")" >/dev/null; }
-    dispatch_focus_window()   { hyprctl dispatch "hl.dsp.focus({ window = \"address:$1\" })" >/dev/null; }
+    # Quote as a Lua string literal: these values are interpolated into Lua
+    # source Hyprland parses, and a workspace name carrying a quote or a
+    # backslash would end the literal and leave the rest as code. Not
+    # app-settable today; defense in depth.
+    lua_str() { printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"; }
+    dispatch_toggle_special() { hyprctl dispatch "hl.dsp.workspace.toggle_special($(lua_str "$1"))" >/dev/null; }
+    dispatch_focus_window()   { hyprctl dispatch "hl.dsp.focus({ window = $(lua_str "address:$1") })" >/dev/null; }
 
     if [[ "$workspace" == special:* ]]; then
         special_name="${workspace#special:}"

@@ -69,6 +69,18 @@ RESTART_DEBOUNCE = 300.0  # s; never auto-restart more often than this
 _log_file = open(LOG_PATH, "w", buffering=1)
 
 
+def lua_str(value: str) -> str:
+    """Quote a value as a Lua string literal for a Hyprland dispatch.
+
+    Workspace names and window addresses are interpolated into Lua source
+    that Hyprland parses. They are not app-settable today, so this is
+    defense in depth -- but a name carrying a quote or a backslash would
+    otherwise end the literal and the rest would parse as code.
+    """
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
+
+
 def log(msg: str) -> None:
     _log_file.write(f"{time.strftime('%H:%M:%S')} {msg}\n")
 
@@ -104,7 +116,7 @@ def close_special_except(keep: str | None) -> None:
         name = mon.get("specialWorkspace", {}).get("name", "")
         if name and name != keep:
             log(f"closing special workspace {name}")
-            hyprctl("dispatch", f'hl.dsp.workspace.toggle_special("{name.removeprefix("special:")}")')
+            hyprctl("dispatch", f'hl.dsp.workspace.toggle_special({lua_str(name.removeprefix("special:"))})')
 
 
 def ensure_webhelper_patch() -> None:
@@ -287,13 +299,13 @@ class SteamSession:
     async def focus_bp(self, addr: str) -> None:
         # Single focus dispatch (minimise window churn). Then close any special
         # overlay and assert fullscreen once if BP didn't come up fullscreen.
-        hyprctl("dispatch", f'hl.dsp.focus({{ window = "address:{addr}" }})')
+        hyprctl("dispatch", f'hl.dsp.focus({{ window = {lua_str(f"address:{addr}")} }})')
         close_special_except(window_workspace(addr))
         await asyncio.sleep(FULLSCREEN_GRACE)
         self.ensure_bp_fullscreen()
 
     async def focus_fullscreen(self, addr: str) -> None:
-        hyprctl("dispatch", f'hl.dsp.focus({{ window = "address:{addr}" }})')
+        hyprctl("dispatch", f'hl.dsp.focus({{ window = {lua_str(f"address:{addr}")} }})')
         close_special_except(window_workspace(addr))
         await asyncio.sleep(FULLSCREEN_GRACE)
         aw = active_window()
