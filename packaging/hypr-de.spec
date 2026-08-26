@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.27
+Version:        0.2.28
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -219,6 +219,13 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Wed Aug 26 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.28-1
+- Drop the idle-inhibitor check from the locked-screen condition. Being
+  locked while the toggle is held is unreachable -- the idle lock obeys the
+  toggle rather than surviving it, every deliberate lock releases it, and
+  the tray is behind the lock surface -- so the check was dead code that
+  also put a subprocess on hypridle's synchronous condition path.
+
 * Tue Aug 26 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.27-1
 - Require logind-idle-control >= 0.2.4. Below that it holds only a logind
   idle inhibitor, which hypridle cannot see, so the toggle never suppressed

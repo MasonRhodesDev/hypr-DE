@@ -241,13 +241,17 @@ if LOCK_POLICY_COMPOSITOR_LOCKED=false LOCK_POLICY_LOCKED_HINT=yes "$work/sessio
     echo "session-locked.sh: a stale LockedHint must not authorise a blank" >&2; exit 1
 fi
 
-# The user's own idle inhibitor defers the blank; nothing else can, because
-# the listener ignores hypridle's inhibitor accounting entirely.
-if LOCK_POLICY_COMPOSITOR_LOCKED=true LOCK_POLICY_INHIBIT_ENABLED=1 "$work/session-locked.sh"; then
-    echo "session-locked.sh: the user's idle inhibitor must defer the blank" >&2; exit 1
-fi
-LOCK_POLICY_COMPOSITOR_LOCKED=true LOCK_POLICY_INHIBIT_ENABLED=0 "$work/session-locked.sh" || {
-    echo "session-locked.sh must blank a locked screen with the inhibitor off" >&2; exit 1; }
+# The condition is the compositor lock and nothing else. It deliberately
+# does NOT consult the idle-inhibitor toggle: "locked while the toggle is
+# held" is unreachable (the idle-lock listener obeys inhibitors, every
+# deliberate lock path releases the toggle first, and once locked the tray
+# cannot be reached), and consulting it put a subprocess on hypridle's
+# synchronous condition path for a branch that can never be taken.
+LOCK_POLICY_COMPOSITOR_LOCKED=true LOCK_POLICY_INHIBIT_ENABLED=1 "$work/session-locked.sh" || {
+    echo "session-locked.sh must blank a locked screen regardless of the toggle" >&2; exit 1; }
+grep -q 'logind-idle-control' "$root/dist/libexec/session-locked.sh" && {
+    echo "session-locked.sh must not fork the toggle daemon on hypridle's condition path" >&2
+    exit 1; }
 
 # A wedged toggle daemon must not stall the condition. hypridle runs
 # condition_cmd through CProcess::runSync, which waits for the child to
