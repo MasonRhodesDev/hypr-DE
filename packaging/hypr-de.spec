@@ -224,7 +224,9 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 - Restart hypridle after an upgrade that rewrote its config. It reads the
   file once at startup and never watches it, so until now a new idle policy
   sat inert until the next login -- observed with a four-day-old hypridle
-  running no locked-screen listener on a fully up-to-date machine.
+  running no locked-screen listener on a fully up-to-date machine. Skipped
+  while the session is locked: hypridle is KillMode=control-group and a
+  locker in its cgroup would die with it.
 
 * Tue Aug 26 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.27-1
 - Require logind-idle-control >= 0.2.4. Below that it holds only a logind

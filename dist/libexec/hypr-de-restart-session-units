@@ -9,29 +9,61 @@
 # OLD policy live until the user next logs in -- with nothing to indicate
 # anything is pending. Observed on 2026-08-26: hypr-DE 0.2.22 -> 0.2.27
 # installed cleanly while the running hypridle, four days old, still had no
-# locked-screen listener at all. A fix that ships and does not take effect
-# is worse than one that has not shipped: the reporter retests, still sees
-# the bug, and concludes the fix was wrong.
+# locked-screen listener at all.
 #
 # Only units whose configuration THIS package owns belong here. A daemon
 # whose own package was upgraded should be restarted by that package --
-# hyprstate and logind-idle-control each own their unit and their binary.
+# hyprstate and logind-idle-control each own their unit and binary.
 #
-# try-restart, not restart: a unit that is not running stays not running.
+# DELIBERATELY NOT COVERED, and left to the next login: waybar reads the
+# packaged config.jsonc once (waybar-reload.path watches only the
+# lmtt-rendered stylesheet), swaync likewise reads its packaged config.json
+# once, and the service drop-ins need a restart rather than a daemon-reload.
+# Restarting those is visible mid-session -- bars and notification daemons
+# blinking during an upgrade -- so the trade is different from hypridle,
+# whose restart is invisible unless it goes wrong.
 #
-# One accepted risk, stated plainly: hypridle holds the logind sleep
-# inhibitor that makes before_sleep_cmd lock before a suspend. Restarting
-# it drops that inhibitor for a fraction of a second, so a suspend landing
-# in exactly that window could proceed without hypridle locking. hyprstate
-# locks before the suspends it initiates, which covers the common lid path,
-# and the window is far smaller than the alternative -- an idle policy that
-# stays stale until the next login.
+# WHY IT SKIPS A LOCKED SESSION. hypridle.service is KillMode=control-group,
+# and lock-cmd.sh documents what that means: a locker that landed in
+# hypridle's cgroup dies with it, leaving "the lockscreen app died" and no
+# way in but a TTY. The scoped path puts the locker in its own transient
+# scope, but the unscoped retry, the no-systemd-run fallback and every
+# fallback_lock locker (swaylock/gtklock/hyprlock) all run in hypridle's
+# cgroup. Upgrading while the screen is locked would turn a rare hazard
+# into a scheduled one, so a locked session keeps its old idle policy until
+# the next unlock-and-login. A stale policy for one session beats a lockout.
+#
+# WHAT RESTARTING COSTS, on an unlocked session:
+#   - hypridle holds the logind sleep inhibitor that makes before_sleep_cmd
+#     lock before a suspend. Restarting drops it briefly. hyprstate proves a
+#     live locker before the suspends IT initiates and holds a lid-switch
+#     block inhibitor, so the lid path is covered -- but a manual
+#     `systemctl suspend` or a critical-battery suspend landing in that
+#     window is not, and would suspend unlocked.
+#   - the 180s idle-to-lock countdown restarts, so a session idle for 170s
+#     gets a fresh 180s of unlocked desktop.
+# Both are bounded by how long a restart takes; neither has been measured
+# under a package transaction's I/O, so they are stated as real rather than
+# dismissed as negligible.
 #
 # Never fails the transaction: every step is best-effort and it always
 # exits 0.
 set -uo pipefail
 
 UNITS=(hypridle.service)
+
+# Bounded, because $XDG_RUNTIME_DIR/systemd/private belongs to the user:
+# a socket that accepts and never answers makes `systemctl --user` block
+# with no deadline of its own, which would hold pacman's db.lck for ever
+# and leave the machine unable to install anything, security updates
+# included. Any local user can arrange that, so this is a hard bound and
+# not a nicety. (The sibling is immune only because hyprctl self-times-out.)
+run_as() { # run_as <user> <runtime-dir> <cmd...>
+    timeout -k 5 15 runuser -u "$1" -- env \
+        XDG_RUNTIME_DIR="$2" \
+        DBUS_SESSION_BUS_ADDRESS="unix:path=$2/bus" \
+        "${@:3}"
+}
 
 restarted=0
 for run in /run/user/*; do
@@ -43,13 +75,30 @@ for run in /run/user/*; do
     # directory really belongs to the uid the path claims before running
     # anything as them.
     [ "$(stat -c %u "$run" 2>/dev/null)" = "$uid" ] || continue
+
+    # A locked session keeps its old policy: see above.
+    if run_as "$user" "$run" hyprctl locked 2>/dev/null | grep -qx true; then
+        echo "hypr-DE: $user is locked; leaving the idle policy until next login"
+        continue
+    fi
+
     for unit in "${UNITS[@]}"; do
-        if runuser -u "$user" -- env \
-            XDG_RUNTIME_DIR="$run" \
-            DBUS_SESSION_BUS_ADDRESS="unix:path=$run/bus" \
-            systemctl --user try-restart "$unit" >/dev/null 2>&1
-        then
+        # try-restart: a unit that is not running stays that way. It also
+        # returns 0 for inactive, masked and FAILED units without doing
+        # anything, so success is measured by the unit actually coming up
+        # with a new start time rather than by the exit status.
+        before=$(run_as "$user" "$run" systemctl --user show "$unit" \
+            -p ExecMainStartTimestampMonotonic --value 2>/dev/null)
+        run_as "$user" "$run" systemctl --user try-restart "$unit" >/dev/null 2>&1
+        after=$(run_as "$user" "$run" systemctl --user show "$unit" \
+            -p ExecMainStartTimestampMonotonic --value 2>/dev/null)
+        if [ -n "$after" ] && [ "$after" != "$before" ] && [ "$after" != "0" ]; then
             restarted=$((restarted + 1))
+        elif run_as "$user" "$run" systemctl --user is-failed "$unit" >/dev/null 2>&1; then
+            # try-restart leaves a failed unit failed and still exits 0. The
+            # user has no idle policy at all; saying so beats counting it as
+            # a success.
+            echo "hypr-DE: $user has $unit in a failed state; it was not restarted"
         fi
     done
 done

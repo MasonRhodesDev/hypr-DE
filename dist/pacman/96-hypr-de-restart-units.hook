@@ -1,0 +1,19 @@
+# Restart session units whose packaged config this transaction replaced.
+# hypridle reads its config once at startup and never watches it, so an
+# upgrade that rewrites the idle policy is otherwise inert until the user
+# next logs in.
+#
+# A SEPARATE hook file, not a second Exec in 95: `Exec` is not repeatable
+# in an alpm hook. pacman does not reject a second one, it overwrites the
+# first and warns -- so adding one here would have silently stopped the
+# config-reload that hook 95 exists for.
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Path
+Target = usr/share/hypr-de/hypr/hypridle.conf
+
+[Action]
+Description = Restarting session units onto the new config...
+When = PostTransaction
+Exec = @LIBEXECDIR@/hypr-de-restart-session-units

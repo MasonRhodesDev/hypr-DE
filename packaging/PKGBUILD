@@ -78,6 +78,10 @@ package_hypr-de() {
   # upgrade cannot leave a stale "config has errors" banner on screen.
   install -Dm644 dist-build/pacman/95-hypr-de-reload.hook \
     "$pkgdir/usr/share/libalpm/hooks/95-hypr-de-reload.hook"
+  # Its own file: alpm's Exec is not repeatable, so a second Exec in 95
+  # would overwrite the reload rather than run alongside it.
+  install -Dm644 dist-build/pacman/96-hypr-de-restart-units.hook \
+    "$pkgdir/usr/share/libalpm/hooks/96-hypr-de-restart-units.hook"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/hypr-de/LICENSE"
 }
 

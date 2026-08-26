@@ -12,6 +12,3 @@ Target = usr/share/hypr-de/hypr/*
 Description = Reloading live Hyprland sessions...
 When = PostTransaction
 Exec = @LIBEXECDIR@/hypr-de-reload-sessions
-# hypridle reads its config once at startup and never watches it, so an
-# upgrade that rewrites the idle policy is inert until this runs.
-Exec = @LIBEXECDIR@/hypr-de-restart-session-units
