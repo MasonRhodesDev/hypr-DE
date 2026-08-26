@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.26
+Version:        0.2.27
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -219,6 +219,11 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Tue Aug 26 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.27-1
+- Require logind-idle-control >= 0.2.4. Below that it holds only a logind
+  idle inhibitor, which hypridle cannot see, so the toggle never suppressed
+  the 180 s idle lock and the session locked itself with the inhibitor on.
+
 * Tue Aug 25 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.26-1
 - A locked screen now stays lit while the user's own idle inhibitor is on.
   0.2.25 blanked it regardless, which defeated the point of holding one.
