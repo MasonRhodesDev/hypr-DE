@@ -48,6 +48,21 @@ fail_marker="$runtime_dir/hypr-de-lock-failed"
 
 log() { printf 'hypr-de lock: %s\n' "$*" >&2; }
 
+# Locking on purpose ends the session's claim to stay awake, so release a
+# held idle inhibitor -- otherwise it keeps the locked screen lit all night
+# (hypridle obeys inhibitors, and hyprstate reads the logind one). The idle
+# path deliberately does NOT call this: that lock fires because the user
+# walked away, and an inhibitor is exactly the signal they meant the session
+# to stay awake. Best effort in every direction: a missing or failing CLI
+# must never affect the lock, which has already been taken by the time this
+# runs.
+release_idle_inhibitor() {
+    command -v logind-idle-control >/dev/null 2>&1 || return 0
+    timeout 2 logind-idle-control disable >/dev/null 2>&1 || \
+        log "could not release the idle inhibitor; the locked screen may stay lit"
+    return 0
+}
+
 # logind's LockedHint is what the session's peers (hyprstate, logind
 # consumers) read, so it is the authority on "did this lock take". Never ask for
 # session `self`: logind resolves it from the caller's cgroup, and hypridle
@@ -218,6 +233,7 @@ case "${1:-}" in
         # before_sleep: never cancelable, and no DPMS poke on the way down
         # (after_sleep_cmd turns the outputs back on when we resume).
         lock_or_fail_closed --wait --no-warn || exit $?
+        release_idle_inhibitor
         exit 0
         ;;
     *)
@@ -226,6 +242,7 @@ case "${1:-}" in
         # be cancelable (a nudged mouse during lid-close would suspend
         # unlocked).
         lock_or_fail_closed --wait --no-warn || exit $?
+        release_idle_inhibitor
         ;;
 esac
 

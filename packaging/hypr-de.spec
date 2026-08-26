@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.25
+Version:        0.2.26
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -219,6 +219,18 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Tue Aug 25 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.26-1
+- A locked screen now stays lit while the user's own idle inhibitor is on.
+  0.2.25 blanked it regardless, which defeated the point of holding one.
+  Only the deliberate logind-idle-control toggle counts: the listener keeps
+  ignore_inhibit, so Wayland surface inhibitors and ScreenSaver D-Bus
+  cookies -- which video players and browsers set silently -- cannot hold a
+  locked screen lit, and session-locked.sh re-admits the toggle alone.
+- Locking on purpose (manual or before-sleep) releases a held idle
+  inhibitor: deliberately locking ends the session's claim to stay awake,
+  so the screen is free to blank. The idle lock deliberately does not --
+  an inhibitor is exactly the signal that the session was meant to stay up.
+
 * Tue Aug 25 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.25-1
 - Lock scripts resolve the logind session by id: `loginctl show-session
   self` never worked from hypridle's cgroup, so the 240 s blank ignored the
