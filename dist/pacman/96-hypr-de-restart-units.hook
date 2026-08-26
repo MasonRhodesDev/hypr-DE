@@ -12,6 +12,10 @@ Operation = Install
 Operation = Upgrade
 Type = Path
 Target = usr/share/hypr-de/hypr/hypridle.conf
+# The drop-in sets hypridle's ExecStart, so changing it is equally inert
+# until a restart. rpm's %posttrans is ungated and already covers this;
+# without the line Arch would silently do less.
+Target = usr/lib/systemd/user/hypridle.service.d/*
 
 [Action]
 Description = Restarting session units onto the new config...

@@ -58,11 +58,42 @@ UNITS=(hypridle.service)
 # and leave the machine unable to install anything, security updates
 # included. Any local user can arrange that, so this is a hard bound and
 # not a nicety. (The sibling is immune only because hyprctl self-times-out.)
-run_as() { # run_as <user> <runtime-dir> <cmd...>
-    timeout -k 5 15 runuser -u "$1" -- env \
-        XDG_RUNTIME_DIR="$2" \
-        DBUS_SESSION_BUS_ADDRESS="unix:path=$2/bus" \
-        "${@:3}"
+run_as() { # run_as <user> <runtime-dir> <sig-or-empty> <cmd...>
+    local envs=(XDG_RUNTIME_DIR="$2" DBUS_SESSION_BUS_ADDRESS="unix:path=$2/bus")
+    # Unset before setting: an admin running the upgrade from inside their
+    # own Hyprland terminal would otherwise leak their signature in, and
+    # every user's lock state would be answered by the admin's compositor.
+    [ -n "$3" ] && envs+=(HYPRLAND_INSTANCE_SIGNATURE="$3")
+    timeout -k 5 15 runuser -u "$1" -- env -u HYPRLAND_INSTANCE_SIGNATURE \
+        "${envs[@]}" "${@:4}"
+}
+
+# Locked, or unreadable while a compositor is present. hyprctl needs
+# HYPRLAND_INSTANCE_SIGNATURE and does not auto-detect it; root's
+# environment under a package hook has none, so it must be derived from the
+# socket path exactly as hypr-de-reload-sessions does. Getting this wrong is
+# silent: hyprctl prints "HYPRLAND_INSTANCE_SIGNATURE not set!" to STDOUT
+# and exits 1, which reads as "not locked" and defeats the guard entirely.
+#
+# Fails CLOSED: a session with a live Hyprland socket whose lock state
+# cannot be read is treated as locked. The cost of guessing wrong that way
+# is one session keeping its old idle policy; the cost of guessing wrong
+# the other way is a locked-out user. A uid with no Hyprland socket at all
+# is not locked -- hypridle users outside Hyprland still get their restart.
+session_locked() { # session_locked <user> <runtime-dir>
+    local sock sig answer
+    for sock in "$2"/hypr/*/.socket.sock; do
+        [ -S "$sock" ] || continue
+        sig=${sock%/.socket.sock}
+        sig=${sig##*/}
+        answer=$(run_as "$1" "$2" "$sig" hyprctl locked 2>/dev/null)
+        case "$answer" in
+            false) ;;
+            true) return 0 ;;
+            *) return 0 ;;
+        esac
+    done
+    return 1
 }
 
 restarted=0
@@ -77,29 +108,46 @@ for run in /run/user/*; do
     [ "$(stat -c %u "$run" 2>/dev/null)" = "$uid" ] || continue
 
     # A locked session keeps its old policy: see above.
-    if run_as "$user" "$run" hyprctl locked 2>/dev/null | grep -qx true; then
+    if session_locked "$user" "$run"; then
         echo "hypr-DE: $user is locked; leaving the idle policy until next login"
         continue
     fi
 
     for unit in "${UNITS[@]}"; do
-        # try-restart: a unit that is not running stays that way. It also
-        # returns 0 for inactive, masked and FAILED units without doing
-        # anything, so success is measured by the unit actually coming up
-        # with a new start time rather than by the exit status.
-        before=$(run_as "$user" "$run" systemctl --user show "$unit" \
-            -p ExecMainStartTimestampMonotonic --value 2>/dev/null)
-        run_as "$user" "$run" systemctl --user try-restart "$unit" >/dev/null 2>&1
-        after=$(run_as "$user" "$run" systemctl --user show "$unit" \
-            -p ExecMainStartTimestampMonotonic --value 2>/dev/null)
-        if [ -n "$after" ] && [ "$after" != "$before" ] && [ "$after" != "0" ]; then
-            restarted=$((restarted + 1))
-        elif run_as "$user" "$run" systemctl --user is-failed "$unit" >/dev/null 2>&1; then
-            # try-restart leaves a failed unit failed and still exits 0. The
-            # user has no idle policy at all; saying so beats counting it as
-            # a success.
-            echo "hypr-DE: $user has $unit in a failed state; it was not restarted"
-        fi
+        # One runuser for the whole verdict: each call opens and tears down
+        # a logind session through pam_systemd, and each carries its own
+        # 15s bound, so five calls per uid would mean 75s of worst-case
+        # hostile stall instead of 15s.
+        #
+        # try-restart, so a unit that is not running stays that way. It
+        # returns 0 for inactive, masked AND failed units without doing
+        # anything, and a restart that dies immediately still moves the
+        # start timestamp -- so a restart counts only if the unit is
+        # actually up afterwards.
+        case "$(run_as "$user" "$run" "" sh -c '
+            unit=$1
+            before=$(systemctl --user show "$unit" \
+                -p ExecMainStartTimestampMonotonic --value 2>/dev/null)
+            systemctl --user try-restart "$unit" >/dev/null 2>&1
+            after=$(systemctl --user show "$unit" \
+                -p ExecMainStartTimestampMonotonic --value 2>/dev/null)
+            if [ -n "$after" ] && [ "$after" != "$before" ] && [ "$after" != 0 ] \
+                && systemctl --user is-active "$unit" >/dev/null 2>&1; then
+                echo restarted
+            elif systemctl --user is-failed "$unit" >/dev/null 2>&1; then
+                echo failed
+            else
+                echo untouched
+            fi
+        ' _ "$unit" 2>/dev/null)" in
+            restarted) restarted=$((restarted + 1)) ;;
+            failed)
+                # Either it was already failed, or it died on the new
+                # config. Both mean the user has no idle policy at all, and
+                # saying so beats counting it as a success.
+                echo "hypr-DE: $user has $unit in a failed state; it is not running"
+                ;;
+        esac
     done
 done
 [ "$restarted" -gt 0 ] && echo "hypr-DE: restarted $restarted session unit(s) onto the new config"
