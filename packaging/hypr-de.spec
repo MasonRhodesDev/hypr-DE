@@ -49,7 +49,7 @@ Requires:       neovim
 Requires:       libadwaita
 Requires:       /usr/bin/notify-send
 Requires:       lmtt
-Requires:       logind-idle-control
+Requires:       logind-idle-control >= 0.2.4
 Requires:       man-db
 Requires:       matugen
 Requires:       nautilus
