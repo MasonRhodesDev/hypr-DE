@@ -67,7 +67,6 @@ mk_lock
 : > "$LOCK_POLICY_LOG"
 run_lock
 assert_log 'vigil-lock:--wait --no-warn
-logind-idle-control:disable
 hyprctl:dispatch hl.dsp.dpms({ action = '\''on'\'' })'
 
 : > "$LOCK_POLICY_LOG"
@@ -89,7 +88,6 @@ LOCK_POLICY_SCOPE_STATUS=1 run_lock
 assert_status 0
 assert_log 'systemd-run:scope-failed
 vigil-lock:--wait --no-warn
-logind-idle-control:disable
 hyprctl:dispatch hl.dsp.dpms({ action = '\''on'\'' })'
 assert_marker no
 
@@ -102,7 +100,6 @@ assert_status 0
 assert_log 'vigil-lock:--wait --no-warn
 vigil-lock:--wait --no-warn
 swaylock:-f
-logind-idle-control:disable
 hyprctl:dispatch hl.dsp.dpms({ action = '\''on'\'' })'
 assert_marker no
 
@@ -191,30 +188,31 @@ vigil-lock:--wait --no-warn'
 fi
 rm -f "$lock_conf" 2>/dev/null || sudo -n rm -f "$lock_conf"
 
-# --- an intentional lock releases the idle inhibitor ----------------------
-# Locking on purpose says "I am done with this session", so a held idle
-# inhibitor must not then keep the screen lit all night. The idle path is
-# NOT intentional: it fires because the user walked away, and an inhibitor
-# is precisely the signal that they meant the session to stay awake.
+# --- an idle inhibitor inhibits the idle, and nothing else ----------------
+# Locking never touches it. A held inhibitor is a preference the user will
+# still want when they unlock, and a lock that silently cleared it would be
+# a side effect well outside "inhibit the idle". Nor does a held inhibitor
+# block a manual lock: SUPER+L goes through logind's Lock signal, which
+# hypridle acts on regardless of its inhibit count.
 : > "$LOCK_POLICY_LOG"
 run_lock
+assert_status 0
 assert_log 'vigil-lock:--wait --no-warn
-logind-idle-control:disable
 hyprctl:dispatch hl.dsp.dpms({ action = '\''on'\'' })'
 
 : > "$LOCK_POLICY_LOG"
 run_lock --sleep
-assert_log 'vigil-lock:--wait --no-warn
-logind-idle-control:disable'
+assert_status 0
+assert_log 'vigil-lock:--wait --no-warn'
 
 : > "$LOCK_POLICY_LOG"
 run_lock --idle
 assert_log 'vigil-lock:--wait --warn 10'
 
-# A failing or absent inhibitor CLI must never fail the lock.
-: > "$LOCK_POLICY_LOG"
-LOCK_POLICY_INHIBIT_STATUS=1 run_lock
-assert_status 0
+# No lock path may reach for the toggle daemon at all.
+grep -q 'logind-idle-control' "$root/dist/libexec/lock-cmd.sh" && {
+    echo "lock-cmd.sh must not touch the idle inhibitor: locking is not idling" >&2
+    exit 1; }
 
 # A wedged toggle daemon must not delay a lock either. hypridle holds its
 # logind sleep inhibitor until before_sleep_cmd returns, so an unbounded
@@ -241,13 +239,17 @@ if LOCK_POLICY_COMPOSITOR_LOCKED=false LOCK_POLICY_LOCKED_HINT=yes "$work/sessio
     echo "session-locked.sh: a stale LockedHint must not authorise a blank" >&2; exit 1
 fi
 
-# The user's own idle inhibitor defers the blank; nothing else can, because
-# the listener ignores hypridle's inhibitor accounting entirely.
-if LOCK_POLICY_COMPOSITOR_LOCKED=true LOCK_POLICY_INHIBIT_ENABLED=1 "$work/session-locked.sh"; then
-    echo "session-locked.sh: the user's idle inhibitor must defer the blank" >&2; exit 1
-fi
-LOCK_POLICY_COMPOSITOR_LOCKED=true LOCK_POLICY_INHIBIT_ENABLED=0 "$work/session-locked.sh" || {
-    echo "session-locked.sh must blank a locked screen with the inhibitor off" >&2; exit 1; }
+# The condition is the compositor lock and nothing else. It deliberately
+# does NOT consult the idle-inhibitor toggle: "locked while the toggle is
+# held" is unreachable (the idle-lock listener obeys inhibitors, every
+# deliberate lock path releases the toggle first, and once locked the tray
+# cannot be reached), and consulting it put a subprocess on hypridle's
+# synchronous condition path for a branch that can never be taken.
+LOCK_POLICY_COMPOSITOR_LOCKED=true LOCK_POLICY_INHIBIT_ENABLED=1 "$work/session-locked.sh" || {
+    echo "session-locked.sh must blank a locked screen regardless of the toggle" >&2; exit 1; }
+grep -q 'logind-idle-control' "$root/dist/libexec/session-locked.sh" && {
+    echo "session-locked.sh must not fork the toggle daemon on hypridle's condition path" >&2
+    exit 1; }
 
 # A wedged toggle daemon must not stall the condition. hypridle runs
 # condition_cmd through CProcess::runSync, which waits for the child to

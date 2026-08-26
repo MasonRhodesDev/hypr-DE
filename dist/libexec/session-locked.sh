@@ -12,27 +12,31 @@
 # live desktop; a failed lock never holds the compositor lock, so no marker
 # check is needed here.
 #
-# The idle inhibitor is checked here rather than left to hypridle because
-# the listener sets ignore_inhibit: hypridle's accounting covers three
-# sources -- the user's deliberate toggle, the freedesktop ScreenSaver
-# D-Bus API, and Wayland surface inhibitors that video players, browsers
-# and call apps set on their own with no user-visible control. A locked
-# screen should not be held lit all night by a paused video nobody
-# remembers, so the listener ignores that accounting wholesale and this
-# re-admits the single source the user actually chose. No toggle installed
-# means nothing was chosen.
-# Every call here is bounded. hypridle runs condition_cmd synchronously
+# The listener sets ignore_inhibit, which drops hypridle's whole inhibitor
+# accounting: the user's deliberate toggle, the freedesktop ScreenSaver
+# D-Bus API, and the Wayland surface inhibitors that video players,
+# browsers and call apps set on their own with no user-visible control. A
+# locked screen must not be held lit all night by a paused video nobody
+# remembers.
+#
+# This script used to re-admit the deliberate toggle. It no longer does,
+# because "locked while the toggle is held" turns out to be unreachable:
+# the 180 s idle-lock listener obeys inhibitors, so a held toggle prevents
+# the lock rather than surviving it; every deliberate path into a lock
+# (lock-cmd.sh manual and --sleep) releases the toggle first; and once
+# locked the toggle cannot be reached at all -- the lock surface covers
+# waybar's tray and vigil's theme contract exposes only clock,
+# user_selector, password, status and power. The one case where the check
+# could still have fired -- the release call failing -- is exactly the case
+# where it did the wrong thing, keeping the screen lit after a deliberate
+# lock. Checking it also put a subprocess on hypridle's synchronous
+# condition path, which its own event loop blocks on.
+# The call is bounded. hypridle runs condition_cmd synchronously
 # (CProcess::runSync waits for the child to exit, with no deadline of its
 # own) on the single loop that also drives DPMS, the idle lock, unlock and
 # sleep inhibits -- so anything that hangs here freezes the session's whole
-# idle machinery, not just this check. Both failure directions are safe:
-# an unanswered compositor means "not locked", so no blank; an unanswered
-# toggle daemon means "not inhibited", so the screen blanks as if no toggle
-# were installed. The compositor lock is the invariant; the toggle is a
-# convenience.
+# idle machinery, not just this check. The failure direction is safe: an
+# unanswered compositor reads as "not locked", so nothing blanks.
 PATH=/usr/local/bin:/usr/bin:/bin; export PATH
 [ "$(timeout 2 hyprctl locked 2>/dev/null)" = true ] || exit 1
-if command -v logind-idle-control >/dev/null 2>&1; then
-    [ "$(timeout 2 logind-idle-control status 2>/dev/null)" = 1 ] && exit 1
-fi
 exit 0
