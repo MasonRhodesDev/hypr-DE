@@ -174,10 +174,17 @@ security failsafe is an operator decision, not a session one.
 The session has exactly one DPMS-off, and it fires only while the compositor
 holds the lock: a hypridle listener that blanks 30 s after input stops,
 gated on `hyprctl locked` (`condition_cmd=session-locked.sh`) by both its
-condition and its on-timeout. **A held idle inhibitor keeps the screen lit,
-locked or not** — an inhibitor means "do not idle", and a locked screen is
-no exception. A stuck inhibitor therefore keeps the panels lit indefinitely;
-that is the accepted trade.
+condition and its on-timeout.
+
+**Your own idle inhibitor keeps a locked screen lit; an app's does not.**
+hypridle counts three kinds — the deliberate `logind-idle-control` toggle,
+the freedesktop `org.freedesktop.ScreenSaver` D-Bus API, and Wayland surface
+inhibitors that video players, browsers and call apps set silently. Honouring
+all three would let a paused video nobody remembers keep a locked screen lit
+all night with no visible cause, so the listener ignores the accounting
+wholesale and `session-locked.sh` re-admits only the toggle you set yourself.
+Locking on purpose releases that toggle, so a deliberate lock still goes
+dark.
 Because it is input-driven, waking a locked screen never re-blanks it under
 your hands — with hyprstate ≥ 2.5.0, which no longer blanks at all (older
 hyprstate still runs its own 30 s timer; the package floors it). A session

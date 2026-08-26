@@ -228,6 +228,14 @@ LOCK_POLICY_COMPOSITOR_LOCKED=true "$work/session-locked.sh" || {
 if LOCK_POLICY_COMPOSITOR_LOCKED=false LOCK_POLICY_LOCKED_HINT=yes "$work/session-locked.sh"; then
     echo "session-locked.sh: a stale LockedHint must not authorise a blank" >&2; exit 1
 fi
+
+# The user's own idle inhibitor defers the blank; nothing else can, because
+# the listener ignores hypridle's inhibitor accounting entirely.
+if LOCK_POLICY_COMPOSITOR_LOCKED=true LOCK_POLICY_INHIBIT_ENABLED=1 "$work/session-locked.sh"; then
+    echo "session-locked.sh: the user's idle inhibitor must defer the blank" >&2; exit 1
+fi
+LOCK_POLICY_COMPOSITOR_LOCKED=true LOCK_POLICY_INHIBIT_ENABLED=0 "$work/session-locked.sh" || {
+    echo "session-locked.sh must blank a locked screen with the inhibitor off" >&2; exit 1; }
 # The on-timeout re-checks the lock itself: safe even without condition_cmd.
 : > "$LOCK_POLICY_LOG"
 LOCK_POLICY_COMPOSITOR_LOCKED=true "$work/dpms-off-if-locked.sh"
@@ -249,12 +257,15 @@ fi
 
 # --- the listener wiring is structural, not a single grep ------------------
 conf="$root/dist/hypr/hypridle.conf"
-# No listener may ignore idle inhibitors: a held inhibitor means "do not
-# idle", and that now holds while locked too (the locked screen stays lit).
-if grep -qE '^[[:space:]]*ignore_inhibit=' "$conf"; then
-    echo "hypridle.conf: a listener ignores idle inhibitors; a held inhibitor must keep the screen lit" >&2
-    exit 1
-fi
+# Exactly one listener ignores hypridle's inhibitor accounting -- the
+# locked-screen blanker. That accounting covers three sources: the user's
+# deliberate logind toggle, the freedesktop ScreenSaver D-Bus API, and
+# Wayland surface inhibitors that video players and browsers set on their
+# own. A locked screen must not be held lit by the latter two, so the
+# listener ignores them all and session-locked.sh re-admits the one the
+# user actually chose.
+[ "$(grep -cE '^[[:space:]]*ignore_inhibit=true$' "$conf")" = 1 ] || {
+    echo "hypridle.conf: exactly one listener may ignore inhibitors" >&2; exit 1; }
 block=$(awk '/^listener \{/{inb=1;b="";next} inb&&/^\}/{inb=0; if (b ~ /session-locked\.sh/) print b; next} inb{b=b $0 "\n"}' "$conf")
 for want in 'timeout=30' 'condition_cmd=@LIBEXECDIR@/session-locked.sh' 'condition_retry=' \
             'on-timeout=@LIBEXECDIR@/dpms-off-if-locked.sh'; do

@@ -215,11 +215,12 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 
 %changelog
 * Tue Aug 25 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.26-1
-- The locked-screen listener obeys idle inhibitors again: a held inhibitor
-  keeps the screen lit whether or not the session is locked. 0.2.25 set
-  ignore_inhibit and blanked a locked screen anyway, which defeats the point
-  of holding an inhibitor. The listener stays input-driven, so a woken
-  locked screen is still never re-blanked under the user's hands.
+- A locked screen now stays lit while the user's own idle inhibitor is on.
+  0.2.25 blanked it regardless, which defeated the point of holding one.
+  Only the deliberate logind-idle-control toggle counts: the listener keeps
+  ignore_inhibit, so Wayland surface inhibitors and ScreenSaver D-Bus
+  cookies -- which video players and browsers set silently -- cannot hold a
+  locked screen lit, and session-locked.sh re-admits the toggle alone.
 - Locking on purpose (manual or before-sleep) releases a held idle
   inhibitor: deliberately locking ends the session's claim to stay awake,
   so the screen is free to blank. The idle lock deliberately does not --
