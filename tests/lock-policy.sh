@@ -380,4 +380,146 @@ for case in "true yes locked" "true no locked" "false no none" "false yes none";
         exit 1; }
 done
 
+# --- an upgrade must not leave a stale idle policy running ----------------
+# hypridle reads hypridle.conf once at startup and never watches it, so a
+# package that rewrites the idle policy is inert until something restarts
+# it. On 2026-08-26 that left a four-day-old hypridle with no locked-screen
+# listener at all, on a machine whose packages were fully up to date.
+#
+# Run against a fixture with runuser/id/stat stubbed, the way
+# privacy-privilege.sh already exercises the sibling. Grepping the source
+# for the strings it ought to contain proves nothing: a comment mentioning
+# try-restart satisfies a grep for try-restart.
+restarter="$root/dist/libexec/hypr-de-restart-session-units"
+[ -x "$restarter" ] || {
+    echo "the post-transaction unit restarter is missing or not executable" >&2; exit 1; }
+
+rfix="$work/runfix"; mkdir -p "$rfix/1000/systemd"
+rhelper="$work/restarter"
+sed -e "s|/run/user/\*|$rfix/*|" -e "s|\${run#/run/user/}|\${run#$rfix/}|" \
+    "$restarter" > "$rhelper"
+chmod +x "$rhelper"
+grep -q "$rfix" "$rhelper" || {
+    echo "the restarter fixture rewrite did not take; the cases below would pass vacuously" >&2
+    exit 1; }
+
+rbin="$work/rbin2"; mkdir -p "$rbin"
+# The stubs EXECUTE rather than fake: runuser drops its own arguments and
+# runs the command, so the script's real logic -- including the verdict it
+# folds into `sh -c` -- runs against stubbed systemctl and hyprctl. A stub
+# that answered on the script's behalf would test the mock, not the script,
+# and that is exactly how a lock guard that can never fire got through.
+cat > "$rbin/runuser" <<'STUB'
+#!/bin/sh
+printf '%s\n' "$*" >> "$RESTART_OUT"
+while [ $# -gt 0 ]; do
+    case "$1" in --) shift; break ;; *) shift ;; esac
+done
+exec "$@"
+STUB
+cat > "$rbin/hyprctl" <<'STUB'
+#!/bin/sh
+# The real hyprctl refuses without a signature: prints to stdout, exits 1.
+[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ] || {
+    echo "HYPRLAND_INSTANCE_SIGNATURE not set! (is hyprland running?)"; exit 1; }
+[ "${FIXTURE_HYPRCTL_BROKEN:-0}" = 1 ] && { echo "error"; exit 1; }
+[ "$1" = locked ] && { printf '%s\n' "${FIXTURE_LOCKED:-false}"; exit 0; }
+exit 0
+STUB
+cat > "$rbin/systemctl" <<'STUB'
+#!/bin/sh
+for a in "$@"; do case "$a" in
+    show) printf '%s\n' "$([ -f "$RESTART_OUT.did" ] && echo 222 || echo 111)"; exit 0 ;;
+    try-restart) : > "$RESTART_OUT.did"
+        printf 'systemctl try-restart\n' >> "$RESTART_OUT"; exit 0 ;;
+    is-active) [ -f "$RESTART_OUT.did" ] && [ "${FIXTURE_ACTIVE:-0}" = 0 ]; exit $? ;;
+    is-failed) exit "${FIXTURE_FAILED:-1}" ;;
+esac; done
+exit 0
+STUB
+printf '#!/bin/sh\necho fixtureuser\n' > "$rbin/id"
+printf '#!/bin/sh\necho 1000\n' > "$rbin/stat"
+chmod +x "$rbin"/*
+export RESTART_OUT="$work/restart.out"
+mkdir -p "$rfix/1000/hypr/testsig"
+python3 -c "
+import socket
+s = socket.socket(socket.AF_UNIX); s.bind('$rfix/1000/hypr/testsig/.socket.sock')
+" 2>/dev/null || true
+
+run_restarter() { # run_restarter <env assignments...>
+    : > "$RESTART_OUT"; rm -f "$RESTART_OUT.did"
+    env "$@" PATH="$rbin:$PATH" RESTART_OUT="$RESTART_OUT" bash "$rhelper" 2>&1
+}
+
+# It must bound every call it makes as another user: an unbounded
+# systemctl against a socket the user controls holds pacman's lock for ever.
+grep -qE 'timeout( -k [0-9]+)? [0-9]+ runuser' "$restarter" || {
+    echo "the restarter must bound runuser: a user-owned socket can hang systemctl for ever" >&2
+    exit 1; }
+
+# An unlocked session is restarted, and the lock check carries a signature
+# (without one the real hyprctl refuses, which reads as "not locked").
+out=$(run_restarter FIXTURE_LOCKED=false || true)
+grep -q 'systemctl try-restart' "$RESTART_OUT" || {
+    echo "an unlocked session did not get its unit restarted" >&2; exit 1; }
+grep -q 'HYPRLAND_INSTANCE_SIGNATURE=testsig' "$RESTART_OUT" || {
+    echo "the lock check ran without a signature; the guard could never fire" >&2; exit 1; }
+printf '%s' "$out" | grep -q 'restarted 1' || {
+    echo "a real restart was not reported" >&2; exit 1; }
+
+# A LOCKED session is left alone: hypridle is KillMode=control-group and a
+# locker in its cgroup dies with it, which is a lockout, not an annoyance.
+run_restarter FIXTURE_LOCKED=true >/dev/null || true
+grep -q 'systemctl try-restart' "$RESTART_OUT" && {
+    echo "a locked session was restarted; that can kill the locker" >&2; exit 1; }
+
+# Unreadable lock state with a compositor present must FAIL CLOSED.
+run_restarter FIXTURE_LOCKED=false FIXTURE_HYPRCTL_BROKEN=1 >/dev/null || true
+grep -q 'systemctl try-restart' "$RESTART_OUT" && {
+    echo "lock state was unreadable and it restarted anyway; that must fail closed" >&2
+    exit 1; }
+
+# A restart that dies immediately is NOT a success: the user is left with no
+# idle policy at all, which is worse than the stale one they had.
+out=$(run_restarter FIXTURE_LOCKED=false FIXTURE_ACTIVE=1 FIXTURE_FAILED=0 || true)
+printf '%s' "$out" | grep -q 'failed state' || {
+    echo "a unit that died on restart was not reported as failed" >&2; exit 1; }
+printf '%s' "$out" | grep -q 'restarted 1' && {
+    echo "a unit that died on restart was counted as a success" >&2; exit 1; }
+
+# Ownership is enforced by behaviour, not by the string being present.
+printf '#!/bin/sh\necho 4242\n' > "$rbin/stat"
+run_restarter FIXTURE_LOCKED=false >/dev/null || true
+[ -s "$RESTART_OUT" ] && {
+    echo "ran as a user for a runtime dir that uid does not own" >&2; exit 1; }
+printf '#!/bin/sh\necho 1000\n' > "$rbin/stat"
+
+# Never fails the transaction, whatever happened. Tested with `if !`, since
+# under set -e a bare invocation aborts before $? can be read.
+if ! run_restarter FIXTURE_LOCKED=true >/dev/null 2>&1; then
+    echo "the restarter must never fail the transaction" >&2; exit 1
+fi
+
+# Wired into both package managers, in its OWN pacman hook: alpm's Exec is
+# not repeatable, so a second Exec in hook 95 silently replaces the reload
+# that hook exists for.
+grep -q 'hypr-de-restart-session-units' "$root/dist/pacman/96-hypr-de-restart-units.hook" || {
+    echo "the restarter has no pacman hook of its own" >&2; exit 1; }
+grep -q 'hypr-de-restart-session-units' "$root/packaging/hypr-de.spec" || {
+    echo "the rpm scriptlet does not run the restarter" >&2; exit 1; }
+for hook in "$root"/dist/pacman/*.hook; do
+    # `|| true`: grep -c exits 1 on a zero count, which under set -e would
+    # abort the suite at the assignment and never print why.
+    n=$(grep -c '^Exec' "$hook" || true)
+    [ "$n" = 1 ] || {
+        echo "$(basename "$hook") has $n Exec lines; alpm keeps only the last" >&2; exit 1; }
+done
+grep -q 'hypr-de-reload-sessions' "$root/dist/pacman/95-hypr-de-reload.hook" || {
+    echo "hook 95 no longer runs the config reload it exists for" >&2; exit 1; }
+for hook in 95-hypr-de-reload 96-hypr-de-restart-units; do
+    grep -q "$hook" "$root/packaging/PKGBUILD" || {
+        echo "$hook is not installed by the PKGBUILD" >&2; exit 1; }
+done
+
 echo "lock policy routing is correct"
