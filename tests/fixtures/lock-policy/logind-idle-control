@@ -4,7 +4,12 @@
 # logged: it is a query, and the effect log asserts effects. Everything
 # else is logged so the lock paths that release the inhibitor stay visible.
 case "${1:-}" in
-    status) printf '%s\n' "${LOCK_POLICY_INHIBIT_ENABLED:-0}"; exit 0 ;;
+    status)
+        # A wedged daemon: hypridle runs condition_cmd synchronously with no
+        # deadline of its own, so the script must impose one.
+        [ "${LOCK_POLICY_INHIBIT_HANG:-0}" = 1 ] && sleep 30
+        printf '%s\n' "${LOCK_POLICY_INHIBIT_ENABLED:-0}"
+        exit 0 ;;
 esac
 printf 'logind-idle-control:%s\n' "$*" >> "$LOCK_POLICY_LOG"
 exit "${LOCK_POLICY_INHIBIT_STATUS:-0}"

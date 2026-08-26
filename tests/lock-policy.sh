@@ -236,6 +236,36 @@ if LOCK_POLICY_COMPOSITOR_LOCKED=true LOCK_POLICY_INHIBIT_ENABLED=1 "$work/sessi
 fi
 LOCK_POLICY_COMPOSITOR_LOCKED=true LOCK_POLICY_INHIBIT_ENABLED=0 "$work/session-locked.sh" || {
     echo "session-locked.sh must blank a locked screen with the inhibitor off" >&2; exit 1; }
+
+# A wedged toggle daemon must not stall the condition. hypridle runs
+# condition_cmd through CProcess::runSync, which waits for the child to
+# exit with no deadline of its own, on the same single loop that drives
+# DPMS, the idle lock, unlock and sleep inhibits -- so a hang here freezes
+# the session's whole idle machinery, not just this check. The script
+# imposes its own bound and degrades to "blank as if no toggle": the
+# compositor lock is the security invariant, the toggle is a convenience.
+started=$(date +%s)
+if LOCK_POLICY_COMPOSITOR_LOCKED=true LOCK_POLICY_INHIBIT_HANG=1 "$work/session-locked.sh"; then
+    :
+else
+    echo "session-locked.sh: a wedged toggle daemon must degrade to blanking" >&2; exit 1
+fi
+elapsed=$(( $(date +%s) - started ))
+[ "$elapsed" -lt 10 ] || {
+    echo "session-locked.sh waited ${elapsed}s on a wedged daemon; it must bound the call" >&2
+    exit 1; }
+
+# With no toggle installed at all, nothing was chosen, so a locked screen
+# blanks. Built with a PATH that has the compositor stub but no
+# logind-idle-control, which is the only way to exercise the command -v
+# guard: with the fixture present both branches behave identically.
+mkdir -p "$work/no-toggle"
+cp "$fixtures/hyprctl" "$work/no-toggle/hyprctl"
+sed -e "s|^PATH=.*|PATH=$work/no-toggle:/usr/bin:/bin; export PATH|" \
+    "$root/dist/libexec/session-locked.sh" > "$work/session-locked-no-toggle.sh"
+chmod +x "$work/session-locked-no-toggle.sh"
+LOCK_POLICY_COMPOSITOR_LOCKED=true "$work/session-locked-no-toggle.sh" || {
+    echo "session-locked.sh must blank when no toggle is installed" >&2; exit 1; }
 # The on-timeout re-checks the lock itself: safe even without condition_cmd.
 : > "$LOCK_POLICY_LOG"
 LOCK_POLICY_COMPOSITOR_LOCKED=true "$work/dpms-off-if-locked.sh"

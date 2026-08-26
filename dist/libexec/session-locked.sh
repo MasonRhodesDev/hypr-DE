@@ -21,9 +21,18 @@
 # remembers, so the listener ignores that accounting wholesale and this
 # re-admits the single source the user actually chose. No toggle installed
 # means nothing was chosen.
+# Every call here is bounded. hypridle runs condition_cmd synchronously
+# (CProcess::runSync waits for the child to exit, with no deadline of its
+# own) on the single loop that also drives DPMS, the idle lock, unlock and
+# sleep inhibits -- so anything that hangs here freezes the session's whole
+# idle machinery, not just this check. Both failure directions are safe:
+# an unanswered compositor means "not locked", so no blank; an unanswered
+# toggle daemon means "not inhibited", so the screen blanks as if no toggle
+# were installed. The compositor lock is the invariant; the toggle is a
+# convenience.
 PATH=/usr/local/bin:/usr/bin:/bin; export PATH
-[ "$(hyprctl locked 2>/dev/null)" = true ] || exit 1
+[ "$(timeout 2 hyprctl locked 2>/dev/null)" = true ] || exit 1
 if command -v logind-idle-control >/dev/null 2>&1; then
-    [ "$(logind-idle-control status 2>/dev/null)" = 1 ] && exit 1
+    [ "$(timeout 2 logind-idle-control status 2>/dev/null)" = 1 ] && exit 1
 fi
 exit 0

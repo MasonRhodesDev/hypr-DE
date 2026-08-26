@@ -6,5 +6,8 @@
 # on an unlocked desktop. A failed lock never holds the compositor lock, so
 # the lock-failed marker lock-cmd.sh maintains is implied by this check.
 PATH=/usr/local/bin:/usr/bin:/bin; export PATH
-[ "$(hyprctl locked 2>/dev/null)" = true ] || exit 0
+# Bounded for the same reason as session-locked.sh: on-timeout runs on
+# hypridle's single loop, and an unanswered compositor must mean "do not
+# blank" rather than "wait forever".
+[ "$(timeout 2 hyprctl locked 2>/dev/null)" = true ] || exit 0
 exec hyprctl dispatch "hl.dsp.dpms({ action = 'off' })"
