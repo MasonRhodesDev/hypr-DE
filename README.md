@@ -176,16 +176,17 @@ holds the lock: a hypridle listener that blanks 30 s after input stops,
 gated on `hyprctl locked` (`condition_cmd=session-locked.sh`) by both its
 condition and its on-timeout.
 
-**A held idle inhibitor stops you locking; it does not keep a locked screen
-lit.** While the toggle is on, the 3-minute idle lock never fires, so the
-session stays unlocked and nothing blanks — that is what holding it means.
-Lock on purpose and the toggle is released for you, so the screen goes dark
-30 s later as you would expect.
+**An idle inhibitor inhibits the idle, and nothing else.** While one is
+held the 3-minute idle lock does not fire and nothing blanks — the session
+simply stays as you left it. It does not stop you locking: `SUPER+L` and
+the power menu work exactly as always, and locking does not clear your
+inhibitor either, so it is still held when you come back.
 
-Once a screen *is* locked, no inhibitor holds it lit — not the toggle, not
-the `org.freedesktop.ScreenSaver` D-Bus API, and not the Wayland surface
-inhibitors that video players and browsers set silently. A paused video
-nobody remembers cannot keep your locked screen burning all night.
+Once a screen *is* locked it blanks after 30 s regardless — no inhibitor
+holds it lit, not the toggle, not the `org.freedesktop.ScreenSaver` D-Bus
+API, and not the Wayland surface inhibitors that video players and browsers
+set silently. A paused video nobody remembers cannot keep your locked
+screen burning all night.
 Because it is input-driven, waking a locked screen never re-blanks it under
 your hands — with hyprstate ≥ 2.5.0, which no longer blanks at all (older
 hyprstate still runs its own 30 s timer; the package floors it). A session

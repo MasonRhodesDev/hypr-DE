@@ -220,6 +220,11 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 
 %changelog
 * Wed Aug 26 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.28-1
+- An idle inhibitor now only inhibits idling: locking neither is blocked by
+  one nor clears one. The release-on-lock added in 0.2.26 existed so a held
+  inhibitor could not keep a locked screen lit; the locked blanker ignores
+  inhibitors outright, so that reason is gone and all it did was discard a
+  preference the user still wants after unlocking.
 - Drop the idle-inhibitor check from the locked-screen condition. Being
   locked while the toggle is held is unreachable -- the idle lock obeys the
   toggle rather than surviving it, every deliberate lock releases it, and
