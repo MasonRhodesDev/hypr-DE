@@ -52,12 +52,21 @@ set -uo pipefail
 
 UNITS=(hypridle.service)
 
-# Bounded, because $XDG_RUNTIME_DIR/systemd/private belongs to the user:
-# a socket that accepts and never answers makes `systemctl --user` block
-# with no deadline of its own, which would hold pacman's db.lck for ever
-# and leave the machine unable to install anything, security updates
-# included. Any local user can arrange that, so this is a hard bound and
-# not a nicety. (The sibling is immune only because hyprctl self-times-out.)
+# Bounded PER CALL, because $XDG_RUNTIME_DIR/systemd/private belongs to the
+# user: a socket that accepts and never answers makes `systemctl --user`
+# block with no deadline of its own, which would hold pacman's db.lck for
+# ever and leave the machine unable to install anything, security updates
+# included. Any local user can arrange that.
+#
+# What this does NOT bound is how many calls get made. session_locked walks
+# $XDG_RUNTIME_DIR/hypr/*/, a directory the same user populates, so a
+# session answering just inside the per-call bound can still stretch the
+# total: ~2s for 500 socket dirs answering instantly, and hours for
+# thousands answering slowly. The loop needs a cap as well, which the
+# sibling needs too and which is tracked separately -- do not read this
+# bound as a total. (The sibling is unbounded per call and bounded only
+# because hyprctl currently self-times-out; measured at 5s, not a
+# documented guarantee.)
 run_as() { # run_as <user> <runtime-dir> <sig-or-empty> <cmd...>
     local envs=(XDG_RUNTIME_DIR="$2" DBUS_SESSION_BUS_ADDRESS="unix:path=$2/bus")
     # Unset before setting: an admin running the upgrade from inside their

@@ -460,7 +460,7 @@ grep -qE 'timeout( -k [0-9]+)? [0-9]+ runuser' "$restarter" || {
 
 # An unlocked session is restarted, and the lock check carries a signature
 # (without one the real hyprctl refuses, which reads as "not locked").
-out=$(run_restarter FIXTURE_LOCKED=false)
+out=$(run_restarter FIXTURE_LOCKED=false || true)
 grep -q 'systemctl try-restart' "$RESTART_OUT" || {
     echo "an unlocked session did not get its unit restarted" >&2; exit 1; }
 grep -q 'HYPRLAND_INSTANCE_SIGNATURE=testsig' "$RESTART_OUT" || {
@@ -470,19 +470,19 @@ printf '%s' "$out" | grep -q 'restarted 1' || {
 
 # A LOCKED session is left alone: hypridle is KillMode=control-group and a
 # locker in its cgroup dies with it, which is a lockout, not an annoyance.
-run_restarter FIXTURE_LOCKED=true >/dev/null
+run_restarter FIXTURE_LOCKED=true >/dev/null || true
 grep -q 'systemctl try-restart' "$RESTART_OUT" && {
     echo "a locked session was restarted; that can kill the locker" >&2; exit 1; }
 
 # Unreadable lock state with a compositor present must FAIL CLOSED.
-run_restarter FIXTURE_LOCKED=false FIXTURE_HYPRCTL_BROKEN=1 >/dev/null
+run_restarter FIXTURE_LOCKED=false FIXTURE_HYPRCTL_BROKEN=1 >/dev/null || true
 grep -q 'systemctl try-restart' "$RESTART_OUT" && {
     echo "lock state was unreadable and it restarted anyway; that must fail closed" >&2
     exit 1; }
 
 # A restart that dies immediately is NOT a success: the user is left with no
 # idle policy at all, which is worse than the stale one they had.
-out=$(run_restarter FIXTURE_LOCKED=false FIXTURE_ACTIVE=1 FIXTURE_FAILED=0)
+out=$(run_restarter FIXTURE_LOCKED=false FIXTURE_ACTIVE=1 FIXTURE_FAILED=0 || true)
 printf '%s' "$out" | grep -q 'failed state' || {
     echo "a unit that died on restart was not reported as failed" >&2; exit 1; }
 printf '%s' "$out" | grep -q 'restarted 1' && {
@@ -490,7 +490,7 @@ printf '%s' "$out" | grep -q 'restarted 1' && {
 
 # Ownership is enforced by behaviour, not by the string being present.
 printf '#!/bin/sh\necho 4242\n' > "$rbin/stat"
-run_restarter FIXTURE_LOCKED=false >/dev/null
+run_restarter FIXTURE_LOCKED=false >/dev/null || true
 [ -s "$RESTART_OUT" ] && {
     echo "ran as a user for a runtime dir that uid does not own" >&2; exit 1; }
 printf '#!/bin/sh\necho 1000\n' > "$rbin/stat"
