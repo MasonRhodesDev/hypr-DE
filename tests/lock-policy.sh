@@ -380,4 +380,27 @@ for case in "true yes locked" "true no locked" "false no none" "false yes none";
         exit 1; }
 done
 
+# --- an upgrade must not leave a stale idle policy running ----------------
+# hypridle reads hypridle.conf once at startup and never watches it, so a
+# package that rewrites the idle policy is inert until something restarts
+# it. On 2026-08-26 that left a four-day-old hypridle with no locked-screen
+# listener at all, on a machine whose packages were fully up to date.
+restarter="$root/dist/libexec/hypr-de-restart-session-units"
+[ -x "$restarter" ] || {
+    echo "the post-transaction unit restarter is missing or not executable" >&2; exit 1; }
+grep -q 'try-restart' "$restarter" || {
+    echo "the restarter must use try-restart: a stopped unit stays stopped" >&2; exit 1; }
+grep -q 'hypridle.service' "$restarter" || {
+    echo "the restarter must cover hypridle, whose config hypr-DE owns" >&2; exit 1; }
+# Wired into both package managers, or it only works on one distro.
+grep -q 'hypr-de-restart-session-units' "$root/dist/pacman/95-hypr-de-reload.hook" || {
+    echo "the pacman hook does not run the restarter" >&2; exit 1; }
+grep -q 'hypr-de-restart-session-units' "$root/packaging/hypr-de.spec" || {
+    echo "the rpm scriptlet does not run the restarter" >&2; exit 1; }
+# It runs as root across other users' sessions, so it must verify that a
+# /run/user/<uid> really belongs to the uid its path claims before running
+# anything as them -- the same check its sibling makes.
+grep -q 'stat -c %u' "$restarter" || {
+    echo "the restarter must verify runtime-dir ownership before runuser" >&2; exit 1; }
+
 echo "lock policy routing is correct"

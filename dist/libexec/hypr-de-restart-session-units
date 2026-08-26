@@ -1,0 +1,57 @@
+#!/bin/bash
+# Restart the session units whose packaged config this transaction replaced.
+# Run as root from the package manager AFTER a transaction (pacman hook /
+# rpm %posttrans), like its sibling hypr-de-reload-sessions.
+#
+# Why this exists: installing a package does not restart what is already
+# running. hypridle reads @DATADIR@/hypr/hypridle.conf once at startup and
+# never watches it, so an upgrade that rewrites the idle policy leaves the
+# OLD policy live until the user next logs in -- with nothing to indicate
+# anything is pending. Observed on 2026-08-26: hypr-DE 0.2.22 -> 0.2.27
+# installed cleanly while the running hypridle, four days old, still had no
+# locked-screen listener at all. A fix that ships and does not take effect
+# is worse than one that has not shipped: the reporter retests, still sees
+# the bug, and concludes the fix was wrong.
+#
+# Only units whose configuration THIS package owns belong here. A daemon
+# whose own package was upgraded should be restarted by that package --
+# hyprstate and logind-idle-control each own their unit and their binary.
+#
+# try-restart, not restart: a unit that is not running stays not running.
+#
+# One accepted risk, stated plainly: hypridle holds the logind sleep
+# inhibitor that makes before_sleep_cmd lock before a suspend. Restarting
+# it drops that inhibitor for a fraction of a second, so a suspend landing
+# in exactly that window could proceed without hypridle locking. hyprstate
+# locks before the suspends it initiates, which covers the common lid path,
+# and the window is far smaller than the alternative -- an idle policy that
+# stays stale until the next login.
+#
+# Never fails the transaction: every step is best-effort and it always
+# exits 0.
+set -uo pipefail
+
+UNITS=(hypridle.service)
+
+restarted=0
+for run in /run/user/*; do
+    uid=${run#/run/user/}
+    case "$uid" in ''|*[!0-9]*) continue ;; esac
+    [ -d "$run/systemd" ] || continue
+    user=$(id -nu "$uid" 2>/dev/null) || continue
+    # The glob walked /run/user/<uid>/, which that user owns; confirm the
+    # directory really belongs to the uid the path claims before running
+    # anything as them.
+    [ "$(stat -c %u "$run" 2>/dev/null)" = "$uid" ] || continue
+    for unit in "${UNITS[@]}"; do
+        if runuser -u "$user" -- env \
+            XDG_RUNTIME_DIR="$run" \
+            DBUS_SESSION_BUS_ADDRESS="unix:path=$run/bus" \
+            systemctl --user try-restart "$unit" >/dev/null 2>&1
+        then
+            restarted=$((restarted + 1))
+        fi
+    done
+done
+[ "$restarted" -gt 0 ] && echo "hypr-DE: restarted $restarted session unit(s) onto the new config"
+exit 0

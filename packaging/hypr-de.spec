@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.27
+Version:        0.2.28
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -165,6 +165,7 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 # unlinking and rewriting them, which can latch a bogus Hyprland config
 # error banner on a live session. Reload once, best-effort.
 %{_libexecdir}/hypr-de/hypr-de-reload-sessions >/dev/null 2>&1 || :
+%{_libexecdir}/hypr-de/hypr-de-restart-session-units >/dev/null 2>&1 || :
 
 %preun
 %systemd_user_preun swaybg.service waybar-reload.path waybar-reload.service waybar-watchdog.service waybar-watchdog.timer wayland-env-guard.path wayland-env-guard.service wayland-env-guard.timer hyprland-configreload-listener.service hypr-de-prime-theme.service logind-idle-control-tray.service
@@ -219,6 +220,12 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Wed Aug 26 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.28-1
+- Restart hypridle after an upgrade that rewrote its config. It reads the
+  file once at startup and never watches it, so until now a new idle policy
+  sat inert until the next login -- observed with a four-day-old hypridle
+  running no locked-screen listener on a fully up-to-date machine.
+
 * Tue Aug 26 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.27-1
 - Require logind-idle-control >= 0.2.4. Below that it holds only a logind
   idle inhibitor, which hypridle cannot see, so the toggle never suppressed
