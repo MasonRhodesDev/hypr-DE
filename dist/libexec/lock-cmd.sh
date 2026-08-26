@@ -58,7 +58,7 @@ log() { printf 'hypr-de lock: %s\n' "$*" >&2; }
 # runs.
 release_idle_inhibitor() {
     command -v logind-idle-control >/dev/null 2>&1 || return 0
-    logind-idle-control disable >/dev/null 2>&1 || \
+    timeout 2 logind-idle-control disable >/dev/null 2>&1 || \
         log "could not release the idle inhibitor; the locked screen may stay lit"
     return 0
 }

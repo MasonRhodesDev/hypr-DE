@@ -11,5 +11,8 @@ case "${1:-}" in
         printf '%s\n' "${LOCK_POLICY_INHIBIT_ENABLED:-0}"
         exit 0 ;;
 esac
+# A wedged daemon on the release path: hypridle holds its sleep inhibitor
+# until before_sleep_cmd returns, so an unbounded call here delays suspend.
+[ "${LOCK_POLICY_INHIBIT_HANG:-0}" = 1 ] && sleep 30
 printf 'logind-idle-control:%s\n' "$*" >> "$LOCK_POLICY_LOG"
 exit "${LOCK_POLICY_INHIBIT_STATUS:-0}"

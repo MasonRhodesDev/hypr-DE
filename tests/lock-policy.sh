@@ -216,6 +216,18 @@ assert_log 'vigil-lock:--wait --warn 10'
 LOCK_POLICY_INHIBIT_STATUS=1 run_lock
 assert_status 0
 
+# A wedged toggle daemon must not delay a lock either. hypridle holds its
+# logind sleep inhibitor until before_sleep_cmd returns, so an unbounded
+# release call here postpones the suspend itself.
+started=$(date +%s)
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_INHIBIT_HANG=1 run_lock --sleep
+assert_status 0
+elapsed=$(( $(date +%s) - started ))
+[ "$elapsed" -lt 15 ] || {
+    echo "a wedged toggle daemon delayed the lock by ${elapsed}s; the release must be bounded" >&2
+    exit 1; }
+
 # --- the locked-screen listener: compositor truth, never a hint ----------
 # hypridle.conf's input-idle listener ignores inhibitors, so its condition is
 # the only thing keeping it from blanking an unlocked, inhibited session 30 s
@@ -256,16 +268,38 @@ elapsed=$(( $(date +%s) - started ))
     exit 1; }
 
 # With no toggle installed at all, nothing was chosen, so a locked screen
-# blanks. Built with a PATH that has the compositor stub but no
-# logind-idle-control, which is the only way to exercise the command -v
-# guard: with the fixture present both branches behave identically.
+# blanks. The PATH here carries ONLY what the script needs and no system
+# directory: on a machine where logind-idle-control is genuinely installed
+# -- every real deployment, and this one -- a /usr/bin fallback would still
+# resolve it and the `command -v` guard would never be exercised.
 mkdir -p "$work/no-toggle"
 cp "$fixtures/hyprctl" "$work/no-toggle/hyprctl"
-sed -e "s|^PATH=.*|PATH=$work/no-toggle:/usr/bin:/bin; export PATH|" \
+cp "$(command -v timeout)" "$work/no-toggle/timeout"
+sed -e "s|^PATH=.*|PATH=$work/no-toggle; export PATH|" \
     "$root/dist/libexec/session-locked.sh" > "$work/session-locked-no-toggle.sh"
 chmod +x "$work/session-locked-no-toggle.sh"
 LOCK_POLICY_COMPOSITOR_LOCKED=true "$work/session-locked-no-toggle.sh" || {
     echo "session-locked.sh must blank when no toggle is installed" >&2; exit 1; }
+# NOTE: this pins the behaviour, not the `command -v` guard that implements
+# it. Removing the guard is an equivalent mutant: `timeout 2
+# logind-idle-control status 2>/dev/null` on an absent binary yields the
+# same empty stdout as never calling it, because the exec failure goes to
+# the stderr this script discards. The guard earns its place by avoiding a
+# fork+exec on every retry, which is a cost argument, not one a black-box
+# test can make. Do not claim this case kills that mutation.
+
+# A wedged compositor must not stall either script, for the same reason a
+# wedged toggle daemon must not: both run on hypridle's single loop.
+started=$(date +%s)
+LOCK_POLICY_COMPOSITOR_HANG=1 "$work/session-locked.sh" && {
+    echo "session-locked.sh: an unanswered compositor must not authorise a blank" >&2; exit 1; }
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_COMPOSITOR_HANG=1 "$work/dpms-off-if-locked.sh"
+assert_log ''
+elapsed=$(( $(date +%s) - started ))
+[ "$elapsed" -lt 15 ] || {
+    echo "a wedged compositor stalled the scripts for ${elapsed}s; both must bound it" >&2
+    exit 1; }
 # The on-timeout re-checks the lock itself: safe even without condition_cmd.
 : > "$LOCK_POLICY_LOG"
 LOCK_POLICY_COMPOSITOR_LOCKED=true "$work/dpms-off-if-locked.sh"
