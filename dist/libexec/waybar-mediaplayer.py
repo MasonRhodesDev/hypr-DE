@@ -55,6 +55,57 @@ def now_playing():
     }
 
 
+def emit(data, last):
+    """Print `data` unless it is what we printed last. Returns the new last.
+
+    A closed pipe is waybar going away, not an error: exit quietly rather
+    than dumping a BrokenPipeError traceback into its stderr.
+    """
+    line = json.dumps(data)
+    if line == last:
+        return last
+    try:
+        print(line, flush=True)
+    except BrokenPipeError:
+        sys.exit(0)
+    return line
+
+
+def follow():
+    """Emit one line per actual change, and nothing in between.
+
+    Waybar used to run this every 2 seconds behind an `exec-if` that
+    itself forked a shell, `timeout`, `playerctl` and `grep` -- about four
+    processes every two seconds, for ever, whether or not anything was
+    playing. The state only changes when a player says so, and MPRIS says
+    so: `playerctl --follow` subscribes to PropertiesChanged on
+    org.mpris.MediaPlayer2.Player and blocks until something moves.
+
+    It is used purely as a change trigger, not as the data source, so the
+    player-preference order above still decides what is shown. Dedupe is on
+    the rendered output, not the trigger: players emit metadata events far
+    more often than the bar changes (a stopped chromium emitted three in
+    five seconds during testing), and waybar only cares when the line it
+    would draw is different.
+    """
+    last = None
+    last = emit(now_playing(), last)
+    # -F blocks until a property changes; the format keeps the trigger
+    # cheap and stable (position is deliberately not in it).
+    proc = subprocess.Popen(
+        ["playerctl", "--follow", "-f", "{{status}}|{{playerName}}|{{artist}}|{{title}}"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+    )
+    if proc.stdout is None:
+        return
+    for _trigger in proc.stdout:
+        last = emit(now_playing(), last)
+
+
 if __name__ == "__main__":
-    data = now_playing()
-    print(json.dumps(data))
+    if "--follow" in sys.argv[1:]:
+        follow()
+    else:
+        print(json.dumps(now_playing()))

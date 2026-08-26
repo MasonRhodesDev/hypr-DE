@@ -4,7 +4,11 @@ Requires=waybar-watchdog.service
 
 [Timer]
 OnBootSec=30s
-OnUnitActiveSec=30s
+# 2min, not 30s. This is drift repair for Waybar#4451 (the process survives
+# but loses its layer surface) and Hyprland emits no layer-map event, so it
+# cannot be event-driven -- but it forks about ten processes per run, and a
+# bar that has silently vanished is not more tolerable at 30s than at 2min.
+OnUnitActiveSec=2min
 AccuracySec=1s
 
 [Install]

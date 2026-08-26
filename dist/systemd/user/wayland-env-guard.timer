@@ -3,7 +3,13 @@ Description=Periodic Wayland env + portal stack health check
 
 [Timer]
 OnStartupSec=2min
-OnUnitActiveSec=5min
+# 15min. The .path unit covers socket churn, which is the common case; this
+# timer exists for the portal stack, where xdph that raced a compositor
+# restart dies into start-limit-hit and stays dead (the script's header
+# records six days without screen sharing). That has no runtime-dir change
+# to trigger on -- but it does have a systemd failure, so the event-driven
+# replacement is an OnFailure= drop-in on the portal units (#39).
+OnUnitActiveSec=15min
 
 [Install]
 WantedBy=timers.target
