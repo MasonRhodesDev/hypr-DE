@@ -159,9 +159,15 @@
             "return-type": "json",
             "max-length": 60,
             "escape": true,
-            "exec": "timeout 3 @LIBEXECDIR@/waybar-mediaplayer.py 2> /dev/null",
-            "exec-if": "timeout 2 playerctl status 2>/dev/null | grep -iq playing",
-            "interval": 2
+            // Continuous, not polled: the script blocks on
+            // `playerctl --follow` (MPRIS PropertiesChanged) and prints a
+            // line only when playback actually changes. The 2s interval it
+            // replaces forked a shell, timeout, playerctl and grep every
+            // two seconds for ever, even with nothing playing.
+            // restart-interval covers playerctl exiting when the last
+            // player goes away.
+            "exec": "@LIBEXECDIR@/waybar-mediaplayer.py --follow 2> /dev/null",
+            "restart-interval": 5
         },
         "pulseaudio": {
             "format": "{volume}%  {icon}",
