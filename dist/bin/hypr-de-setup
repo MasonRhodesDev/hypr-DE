@@ -46,6 +46,12 @@ GAMING_UNITS=(
     steam-clean-shutdown.service
 )
 
+# Required where the package exists, skipped where it does not (Arch-only
+# deps with no RPM yet). Preset like REQUIRED_UNITS when present.
+OPTIONAL_UNITS=(
+    bt-stale-bond-guard.service
+)
+
 user_systemd_ok() {
     systemctl --user show-environment >/dev/null 2>&1
 }
@@ -138,7 +144,7 @@ if ! user_systemd_ok; then
 fi
 
 units=("${REQUIRED_UNITS[@]}")
-for u in "${GAMING_UNITS[@]}"; do
+for u in "${GAMING_UNITS[@]}" "${OPTIONAL_UNITS[@]}"; do
     unit_exists "$u" && units+=("$u")
 done
 
