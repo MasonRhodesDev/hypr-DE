@@ -17,7 +17,7 @@ source=("$pkgbase-$pkgver.tar.gz::https://github.com/MasonRhodesDev/hypr-DE/arch
 sha256sums=('402afa6bd546b287d1491ad6cd665ea17b6a19d9f0468602b60528d2323be65c')
 
 _depends_main=(
-  bluez bluez-obex bluez-utils brightnessctl fuzzel gnome-keyring
+  bluez bluez-obex bluez-utils brightnessctl bt-stale-bond-guard fuzzel gnome-keyring
   gpu-screen-recorder grim gtk4 'hypridle>=0.1.8' 'hyprland>=0.56' hyprland-guiutils
   hyprland-qt-support hyprpicker hyprpolkitagent
   hyprpwcenter hyprshutdown 'hyprstate>=2.5.0' dials jq kitty libadwaita
