@@ -52,6 +52,8 @@ jobs:
         run: ./tests/privacy-privilege.sh
       - name: Runtime state paths
         run: ./tests/runtime-paths.sh
+      - name: swaybg and the lock screen read the same wallpaper
+        run: ./tests/wallpaper-source.sh
       - name: PAM rewrite safety
         run: ./tests/pam-rewrite.sh
       - name: Lock policy routing

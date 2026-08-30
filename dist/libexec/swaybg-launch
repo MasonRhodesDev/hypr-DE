@@ -1,0 +1,39 @@
+#!/bin/bash
+# Start swaybg on the wallpaper the rest of the desktop uses.
+#
+# swaybg.service used to expand ${WALLPAPER_PATH} from the user manager's
+# environment. That value is read from environment.d only when the
+# manager's generators run, and a `set-environment` override outranks it
+# forever - so under Linger=yes it can lag every login. On 2026-08-30 it
+# lagged eight days: swaybg showed the package default while vigil, which
+# reads the appearance-profiles registry, showed the real wallpaper. Same
+# fact, two layers, one stale.
+#
+# Read the registry here instead - the file vigil reads - so the two agree
+# by construction, and resolve it on every start rather than at manager
+# start. Fall back to the packaged default when no wallpaper has been set;
+# that also retires ConditionEnvironment, which only existed to stop the
+# empty-argument retry loop.
+set -uo pipefail
+
+registry="${XDG_CONFIG_HOME:-$HOME/.config}/appearance-profiles/default.toml"
+default="@DATADIR@/wallpapers/default.png"
+
+wallpaper=""
+if [ -r "$registry" ]; then
+    # `path = "..."` under [background]. One key, one section; a TOML parser
+    # is not worth a dependency for that, and the setter already writes it
+    # in this exact shape.
+    wallpaper=$(awk '
+        /^\[/ { inbg = ($0 ~ /^\[background\]/); next }
+        inbg && $1 == "path" {
+            sub(/^[^=]*=[[:space:]]*"/, ""); sub(/"[[:space:]]*$/, ""); print; exit
+        }' "$registry")
+fi
+
+if [ -z "$wallpaper" ] || [ ! -r "$wallpaper" ]; then
+    [ -n "$wallpaper" ] && echo "swaybg-launch: $wallpaper unreadable; using default" >&2
+    wallpaper=$default
+fi
+
+exec /usr/bin/swaybg -i "$wallpaper" -m fill
