@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.28
+Version:        0.2.29
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -220,6 +220,14 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Sun Aug 30 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.29-1
+- swaybg reads the appearance-profiles registry, the file vigil reads, so
+  the desktop and the lock screen cannot show different wallpapers. It used
+  to expand WALLPAPER_PATH from the user manager's environment, which is
+  read from environment.d only at manager start and outranked forever by a
+  set-environment override -- under Linger=yes, that lagged every login for
+  eight days. hypr-de-set-wallpaper no longer plants that override.
+
 * Wed Aug 26 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.28-1
 - Restart hypridle after an upgrade that rewrote its config. It reads the
   file once at startup and never watches it, so until now a new idle policy
