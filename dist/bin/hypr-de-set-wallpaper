@@ -42,7 +42,11 @@ else
 fi
 
 if [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ] || [ -n "${XDG_RUNTIME_DIR:-}" ]; then
-    systemctl --user set-environment "WALLPAPER_PATH=$WP" 2>/dev/null || true
+    # No set-environment. swaybg-launch reads the registry written above, so
+    # the environment is not consulted - and an override here would outrank
+    # environment.d forever, which is how the desktop and the lock screen
+    # came to show different wallpapers for eight days. The environment.d
+    # file stays for anything of the user's own that still reads it.
     systemctl --user try-restart swaybg.service 2>/dev/null || true
     # Re-render the theme from the new wallpaper in the CURRENT mode.
     # NEVER bare `lmtt switch` — that toggles light/dark.

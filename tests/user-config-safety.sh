@@ -9,21 +9,22 @@ fail=0
 ok()  { printf 'ok   %s\n' "$*"; }
 bad() { printf 'FAIL %s\n' "$*"; fail=1; }
 
-echo "== the wallpaper unit survives a path with a space"
+echo "== the wallpaper unit does not read the environment"
 unit="$root/dist/systemd/user/swaybg.service"
-# systemd expands ${VAR} as ONE argument and $VAR split on whitespace, so the
-# braces are load-bearing. Verified with systemd-run: '${WP}' over
-# "/tmp/a b.png" yields arg2=[/tmp/a b.png], while '$WP' yields
-# arg2=[/tmp/a] arg3=[b.png].
-if grep -q 'ExecStart=.*-i \${WALLPAPER_PATH}' "$unit"; then
-    ok "ExecStart uses the braced, non-splitting form"
+# It used to expand ${WALLPAPER_PATH}, which is frozen at manager start and
+# outranked by any set-environment override for the manager's lifetime -
+# under Linger=yes, indefinitely. The launcher reads the appearance-profiles
+# registry instead, the file vigil reads. Space-safety and the no-wallpaper
+# fallback now live in tests/wallpaper-source.sh, against the launcher.
+if grep -q '^ExecStart=@LIBEXECDIR@/swaybg-launch$' "$unit"; then
+    ok "ExecStart is the launcher"
 else
     grep -n ExecStart "$unit"
-    bad "ExecStart must reference \${WALLPAPER_PATH} braced, or a path with a space is torn in half"
+    bad "ExecStart must be the launcher, not a \${WALLPAPER_PATH} expansion"
 fi
-grep -q '^ConditionEnvironment=WALLPAPER_PATH' "$unit" \
-    && ok "the unit is skipped until a wallpaper is set" \
-    || bad "with WALLPAPER_PATH unset, swaybg gets an empty -i and restart-loops every 3s"
+grep -v '^[[:space:]]*#' "$unit" | grep -q 'ConditionEnvironment\|WALLPAPER_PATH' \
+    && bad "swaybg.service still consults the environment" \
+    || ok "no ConditionEnvironment, no WALLPAPER_PATH"
 
 echo
 echo "== a screenshot does not overwrite the user's swappy config"
