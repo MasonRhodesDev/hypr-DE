@@ -61,7 +61,23 @@ socat -U - "UNIX-CONNECT:$socket_path" | while IFS= read -r line; do
             echo "$(date '+%Y-%m-%d %H:%M:%S') - Config reloaded, restarting waybar..."
             (sleep 1 && systemctl --user restart waybar) &
             ;;
-        monitoradded\>\>*|monitorremoved\>\>*|monitoraddedv2\>\>*)
+        monitoradded\>\>*|monitoraddedv2\>\>*)
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - Monitor change: $line"
+            if [[ -x "$XWAYLAND_PRIMARY_SCRIPT" ]]; then
+                (sleep 1 && "$XWAYLAND_PRIMARY_SCRIPT") &
+            fi
+            # A monitor that re-appears during locked blanking relit itself
+            # for ~6 min/cycle (issue #51): deep-sleeping panels drop their
+            # hotplug line after DPMS-off and re-add as if freshly plugged.
+            # blank-guard re-blanks only when the lock holds AND another
+            # output is already dark - a plug at the lit lock screen stays
+            # lit. sleep 2: let the re-add settle (mode set, profile apply)
+            # before deciding; the v2 event carries "id,name,desc".
+            name="${line#*>>}"; name="${name%%,*}"
+            case "$line" in monitoraddedv2*) name=$(printf '%s' "${line#*>>}" | cut -d, -f2);; esac
+            (sleep 2 && "@LIBEXECDIR@/blank-guard.sh" "$name") &
+            ;;
+        monitorremoved\>\>*)
             echo "$(date '+%Y-%m-%d %H:%M:%S') - Monitor change: $line"
             if [[ -x "$XWAYLAND_PRIMARY_SCRIPT" ]]; then
                 (sleep 1 && "$XWAYLAND_PRIMARY_SCRIPT") &
