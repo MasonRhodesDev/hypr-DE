@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.29
+Version:        0.2.30
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -220,6 +220,14 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Wed Sep 03 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.30-1
+- Blank-guard: an output re-added during locked blanking joins the blank.
+  Deep-sleeping monitors drop their hotplug line ~20 s after DPMS-off and
+  re-announce as if freshly plugged, relighting for ~6 minutes per cycle.
+  The configreload listener now re-runs the lock-gated blank when the
+  compositor holds the lock AND another enabled output is already dark -
+  a monitor plugged in at the lit lock screen stays lit.
+
 * Sun Aug 30 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.29-1
 - swaybg reads the appearance-profiles registry, the file vigil reads, so
   the desktop and the lock screen cannot show different wallpapers. It used
