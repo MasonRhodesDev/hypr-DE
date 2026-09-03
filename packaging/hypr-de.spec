@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.29
+Version:        0.2.30
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -220,6 +220,15 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Sun Aug 30 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.30-1
+- Pull in bt-stale-bond-guard (Arch only for now). A bonded LE device that
+  lost its side of the bond -- an Xbox controller whose pair button was
+  held, a mouse paired to another host -- reconnects every ~2 s and BlueZ
+  rejects it with the stale key forever; JustWorksRepairing never fires
+  because the peer does not ask to pair. The guard drops the bond after
+  five rejected connects and re-pairs on the peer's sync button.
+  hypr-de-setup presets the unit only where the package exists.
+
 * Sun Aug 30 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.29-1
 - swaybg reads the appearance-profiles registry, the file vigil reads, so
   the desktop and the lock screen cannot show different wallpapers. It used

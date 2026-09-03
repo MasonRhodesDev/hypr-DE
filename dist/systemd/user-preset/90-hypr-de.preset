@@ -15,3 +15,4 @@ enable hyprstate.service
 enable logind-idle-control.service
 enable logind-idle-control-tray.service
 enable obex.service
+enable bt-stale-bond-guard.service
