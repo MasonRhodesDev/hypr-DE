@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.33
+Version:        0.2.34
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -220,6 +220,17 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Wed Sep 03 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.34-1
+- The warn/blur never starts under a live keep-awake claim. The 180 s
+  idle-lock listener gains a STATELESS claim gate (no-keep-awake.sh,
+  condition_retry=10) that re-derives Wayland client inhibitors, the
+  user's toggle, logind idle-blocks, and a running game (Steam overlay /
+  gamescope) at fire time. hypridle's own ScreenSaver ledger stays as the
+  second belt - it is kept, not trusted: a hypridle restart wipes it and
+  clients never re-register, which is how a package upgrade mid-game
+  dropped Steam's "Playing a game" claim and blurred over a live game.
+- The 10 s condition retry implements decision 2's clock: a claim
+  releasing after a long absence warns and locks within ~10 s.
 * Thu Sep 04 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.33-1
 - The decided idle/power ladder (POWER_SPEC.md, 2026-09-04): keep-awake
   claims -- the user's toggle and app inhibitors alike, indistinguishable --
