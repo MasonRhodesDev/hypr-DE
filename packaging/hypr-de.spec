@@ -220,7 +220,7 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
-* Wed Sep 03 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.34-1
+* Thu Sep 04 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.34-1
 - The warn/blur never starts under a live keep-awake claim. The 180 s
   idle-lock listener gains a STATELESS claim gate (no-keep-awake.sh,
   condition_retry=10) that re-derives Wayland client inhibitors, the
