@@ -350,15 +350,51 @@ fi
 want_cmds='after_sleep_cmd=hyprctl dispatch "hl.dsp.dpms({ action = '"'"'on'"'"' })"
 before_sleep_cmd=@LIBEXECDIR@/lock-cmd.sh --sleep
 lock_cmd=@LIBEXECDIR@/lock-cmd.sh
+on-resume=@LIBEXECDIR@/idle-suspend.sh --cancel
 on-resume=hyprctl dispatch "hl.dsp.dpms({ action = '"'"'on'"'"' })"
 on-timeout=@LIBEXECDIR@/dpms-off-if-locked.sh
+on-timeout=@LIBEXECDIR@/idle-suspend.sh
 on-timeout=@LIBEXECDIR@/lock-cmd.sh --idle'
 got_cmds=$(sed -n 's/^[[:space:]]*\(on-timeout\|on-resume\|after_sleep_cmd\|before_sleep_cmd\|lock_cmd\)=/\1=/p' \
-    "$conf" | sort)
+    "$conf" | LC_ALL=C sort)
 [ "$got_cmds" = "$want_cmds" ] || {
     echo "hypridle.conf: the set of commands hypridle runs changed" >&2
     printf 'expected:\n%s\nactual:\n%s\n' "$want_cmds" "$got_cmds" >&2
     exit 1; }
+
+# --- Idle suspend: a REQUEST to hyprstate, never a direct suspend -----------
+# The 900 s listener asks hyprstate and nothing else; idle-suspend.sh is the
+# bridge, and hyprstate owns grace, lock proof, cancellation and Suspend().
+mk_libexec idle-suspend.sh
+: > "$LOCK_POLICY_LOG"
+"$work/idle-suspend.sh"
+assert_log 'hyprstate:suspend request'
+: > "$LOCK_POLICY_LOG"
+"$work/idle-suspend.sh" --cancel
+assert_log 'hyprstate:suspend cancel'
+# Absent hyprstate is a silent no-op, not an error every idle period. Reuse
+# the no-toggle dir (hyprctl + timeout only, no hyprstate) built above.
+: > "$LOCK_POLICY_LOG"
+sed -e "s|^PATH=.*|PATH=$work/no-toggle; export PATH|" \
+    "$root/dist/libexec/idle-suspend.sh" > "$work/idle-suspend-no-hyprstate.sh"
+chmod +x "$work/idle-suspend-no-hyprstate.sh"
+"$work/idle-suspend-no-hyprstate.sh" || {
+    echo "idle-suspend.sh must exit 0 when hyprstate is absent" >&2; exit 1; }
+if [ -s "$LOCK_POLICY_LOG" ]; then
+    echo "idle-suspend.sh ran something with hyprstate absent" >&2; exit 1
+fi
+# The suspend listener keeps its 900 s timeout and --cancel on resume, and
+# MUST NOT ignore inhibitors -- a suspend that ignored them is the regression
+# this listener exists to avoid (unlike the locked-screen blanker above).
+sblock=$(awk '/^listener \{/{inb=1;b="";next} inb&&/^\}/{inb=0; if (b ~ /idle-suspend\.sh/) print b; next} inb{b=b $0 "\n"}' "$conf")
+for want in 'timeout=900' 'on-timeout=@LIBEXECDIR@/idle-suspend.sh' \
+            'on-resume=@LIBEXECDIR@/idle-suspend.sh --cancel'; do
+    printf '%s' "$sblock" | grep -q "^  $want" || {
+        echo "hypridle.conf: the idle-suspend listener lost '$want'" >&2; exit 1; }
+done
+if printf '%s' "$sblock" | grep -qE '^[[:space:]]*ignore_inhibit'; then
+    echo "hypridle.conf: the idle-suspend listener must honor inhibitors" >&2; exit 1
+fi
 
 # --- one blanker, and it blanks only a locked compositor -------------------
 # The locked listener is the session's only DPMS-off. A blank must follow

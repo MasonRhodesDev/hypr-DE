@@ -42,7 +42,9 @@
 #     window is not, and would suspend unlocked.
 #   - the 180s idle-to-lock countdown restarts, so a session idle for 170s
 #     gets a fresh 180s of unlocked desktop.
-# Both are bounded by how long a restart takes; neither has been measured
+#   - the 900s idle-to-suspend countdown restarts with the other listeners,
+#     so a session near suspend gets a fresh 900s before it asks hyprstate.
+# These are bounded by how long a restart takes; none has been measured
 # under a package transaction's I/O, so they are stated as real rather than
 # dismissed as negligible.
 #
