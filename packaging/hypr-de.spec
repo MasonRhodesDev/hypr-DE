@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.34
+Version:        0.2.35
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -220,6 +220,12 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Thu Sep 04 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.35-1
+- Warn visuals: the lock wallpaper fades in across the WHOLE warn window
+  (vigil.toml lock.warning wallpaper_in_ms=10000) instead of flashing in
+  during the final 1.5 s - the blur ramps up fast while the bg image
+  gradually materializes, two parallel tracks toward the lock.
+  Seat-confirmed against the decided model.
 * Thu Sep 04 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.34-1
 - The warn/blur never starts under a live keep-awake claim. The 180 s
   idle-lock listener gains a STATELESS claim gate (no-keep-awake.sh,
