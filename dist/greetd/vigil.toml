@@ -11,3 +11,10 @@
 
 [sessions]
 default = "Hyprland (uwsm-managed)"
+
+# Warn visuals (2026-09-04): the bg image fades in across the WHOLE warn
+# window (wallpaper_in >= duration => starts at t=0, gated on readiness),
+# while the blur ramps up in the first 1.5s - two parallel tracks toward
+# the lock, per the decided model. Default was 1500 (a tail flash).
+[lock.warning]
+wallpaper_in_ms = 10000
