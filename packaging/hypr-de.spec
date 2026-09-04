@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.32
+Version:        0.2.33
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -220,6 +220,17 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Thu Sep 04 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.33-1
+- The decided idle/power ladder (POWER_SPEC.md, 2026-09-04): keep-awake
+  claims -- the user's toggle and app inhibitors alike, indistinguishable --
+  govern only the unlocked machine, where they prevent the 180 s idle lock.
+  Once locked, nothing is consulted again.
+- A locked screen always blanks: session-locked.sh is now a pure compositor
+  lock check; the toggle re-admission that kept a locked screen lit is gone.
+- The 900 s idle-suspend listener ignores inhibitors and gates on the
+  compositor lock (condition_cmd=session-locked.sh, condition_retry), the
+  same shape as the blanker: lock ends every claim's authority, and a
+  machine a claim kept unlocked never fires it.
 * Wed Sep 03 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.32-1
 - Idle suspend now ships as a sane default. A third hypridle listener
   (timeout=900) asks hyprstate via `hyprstate suspend request`; hyprstate

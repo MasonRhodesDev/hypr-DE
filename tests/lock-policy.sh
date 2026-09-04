@@ -241,52 +241,18 @@ if LOCK_POLICY_COMPOSITOR_LOCKED=false LOCK_POLICY_LOCKED_HINT=yes "$work/sessio
     echo "session-locked.sh: a stale LockedHint must not authorise a blank" >&2; exit 1
 fi
 
-# The user's own idle inhibitor defers the blank; nothing else can, because
-# the listener ignores hypridle's inhibitor accounting entirely.
-if LOCK_POLICY_COMPOSITOR_LOCKED=true LOCK_POLICY_INHIBIT_ENABLED=1 "$work/session-locked.sh"; then
-    echo "session-locked.sh: the user's idle inhibitor must defer the blank" >&2; exit 1
-fi
-LOCK_POLICY_COMPOSITOR_LOCKED=true LOCK_POLICY_INHIBIT_ENABLED=0 "$work/session-locked.sh" || {
-    echo "session-locked.sh must blank a locked screen with the inhibitor off" >&2; exit 1; }
+# Decided model (2026-09-04): a locked screen ALWAYS blanks. Keep-awake --
+# the user's toggle and app inhibitors alike -- governs only the unlocked
+# machine, so neither the toggle nor anything else defers a blank once the
+# compositor holds the lock.
+LOCK_POLICY_COMPOSITOR_LOCKED=true LOCK_POLICY_INHIBIT_ENABLED=1 "$work/session-locked.sh" || {
+    echo "session-locked.sh: a locked screen must blank even with the toggle held" >&2; exit 1; }
 
-# A wedged toggle daemon must not stall the condition. hypridle runs
-# condition_cmd through CProcess::runSync, which waits for the child to
-# exit with no deadline of its own, on the same single loop that drives
-# DPMS, the idle lock, unlock and sleep inhibits -- so a hang here freezes
-# the session's whole idle machinery, not just this check. The script
-# imposes its own bound and degrades to "blank as if no toggle": the
-# compositor lock is the security invariant, the toggle is a convenience.
-started=$(date +%s)
-if LOCK_POLICY_COMPOSITOR_LOCKED=true LOCK_POLICY_INHIBIT_HANG=1 "$work/session-locked.sh"; then
-    :
-else
-    echo "session-locked.sh: a wedged toggle daemon must degrade to blanking" >&2; exit 1
-fi
-elapsed=$(( $(date +%s) - started ))
-[ "$elapsed" -lt 10 ] || {
-    echo "session-locked.sh waited ${elapsed}s on a wedged daemon; it must bound the call" >&2
-    exit 1; }
-
-# With no toggle installed at all, nothing was chosen, so a locked screen
-# blanks. The PATH here carries ONLY what the script needs and no system
-# directory: on a machine where logind-idle-control is genuinely installed
-# -- every real deployment, and this one -- a /usr/bin fallback would still
-# resolve it and the `command -v` guard would never be exercised.
+# The no-toggle PATH dir is still built: the idle-suspend section below
+# reuses it as an environment with no hyprstate.
 mkdir -p "$work/no-toggle"
 cp "$fixtures/hyprctl" "$work/no-toggle/hyprctl"
 cp "$(command -v timeout)" "$work/no-toggle/timeout"
-sed -e "s|^PATH=.*|PATH=$work/no-toggle; export PATH|" \
-    "$root/dist/libexec/session-locked.sh" > "$work/session-locked-no-toggle.sh"
-chmod +x "$work/session-locked-no-toggle.sh"
-LOCK_POLICY_COMPOSITOR_LOCKED=true "$work/session-locked-no-toggle.sh" || {
-    echo "session-locked.sh must blank when no toggle is installed" >&2; exit 1; }
-# NOTE: this pins the behaviour, not the `command -v` guard that implements
-# it. Removing the guard is an equivalent mutant: `timeout 2
-# logind-idle-control status 2>/dev/null` on an absent binary yields the
-# same empty stdout as never calling it, because the exec failure goes to
-# the stderr this script discards. The guard earns its place by avoiding a
-# fork+exec on every retry, which is a cost argument, not one a black-box
-# test can make. Do not claim this case kills that mutation.
 
 # A wedged compositor must not stall either script, for the same reason a
 # wedged toggle daemon must not: both run on hypridle's single loop.
@@ -321,15 +287,14 @@ fi
 
 # --- the listener wiring is structural, not a single grep ------------------
 conf="$root/dist/hypr/hypridle.conf"
-# Exactly one listener ignores hypridle's inhibitor accounting -- the
-# locked-screen blanker. That accounting covers three sources: the user's
-# deliberate logind toggle, the freedesktop ScreenSaver D-Bus API, and
-# Wayland surface inhibitors that video players and browsers set on their
-# own. A locked screen must not be held lit by the latter two, so the
-# listener ignores them all and session-locked.sh re-admits the one the
-# user actually chose.
-[ "$(grep -cE '^[[:space:]]*ignore_inhibit=true$' "$conf")" = 1 ] || {
-    echo "hypridle.conf: exactly one listener may ignore inhibitors" >&2; exit 1; }
+# Exactly two listeners ignore hypridle's inhibitor accounting: the
+# locked-screen blanker and the idle-suspend request, both gated on the
+# compositor lock. Decided model: keep-awake claims govern only the
+# unlocked machine (they prevent the 180 s idle lock); once locked, the
+# blank and the suspend march unconditionally. The 180 s lock listener is
+# the one place the accounting still applies.
+[ "$(grep -cE '^[[:space:]]*ignore_inhibit=true$' "$conf")" = 2 ] || {
+    echo "hypridle.conf: exactly the two lock-gated listeners ignore inhibitors" >&2; exit 1; }
 block=$(awk '/^listener \{/{inb=1;b="";next} inb&&/^\}/{inb=0; if (b ~ /session-locked\.sh/) print b; next} inb{b=b $0 "\n"}' "$conf")
 for want in 'timeout=30' 'condition_cmd=@LIBEXECDIR@/session-locked.sh' 'condition_retry=' \
             'on-timeout=@LIBEXECDIR@/dpms-off-if-locked.sh'; do
@@ -384,17 +349,17 @@ if [ -s "$LOCK_POLICY_LOG" ]; then
     echo "idle-suspend.sh ran something with hyprstate absent" >&2; exit 1
 fi
 # The suspend listener keeps its 900 s timeout and --cancel on resume, and
-# MUST NOT ignore inhibitors -- a suspend that ignored them is the regression
-# this listener exists to avoid (unlike the locked-screen blanker above).
+# per the decided model it ignores inhibitors and gates on the compositor
+# lock instead: lock ends every keep-awake claim's authority, and a machine
+# a claim kept unlocked never fires this because the condition fails.
 sblock=$(awk '/^listener \{/{inb=1;b="";next} inb&&/^\}/{inb=0; if (b ~ /idle-suspend\.sh/) print b; next} inb{b=b $0 "\n"}' "$conf")
-for want in 'timeout=900' 'on-timeout=@LIBEXECDIR@/idle-suspend.sh' \
+for want in 'timeout=900' 'ignore_inhibit=true' \
+            'condition_cmd=@LIBEXECDIR@/session-locked.sh' 'condition_retry=' \
+            'on-timeout=@LIBEXECDIR@/idle-suspend.sh' \
             'on-resume=@LIBEXECDIR@/idle-suspend.sh --cancel'; do
     printf '%s' "$sblock" | grep -q "^  $want" || {
         echo "hypridle.conf: the idle-suspend listener lost '$want'" >&2; exit 1; }
 done
-if printf '%s' "$sblock" | grep -qE '^[[:space:]]*ignore_inhibit'; then
-    echo "hypridle.conf: the idle-suspend listener must honor inhibitors" >&2; exit 1
-fi
 
 # --- one blanker, and it blanks only a locked compositor -------------------
 # The locked listener is the session's only DPMS-off. A blank must follow

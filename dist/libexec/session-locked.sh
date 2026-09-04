@@ -1,8 +1,7 @@
 #!/bin/sh
-# hypridle condition_cmd for the locked-screen blanking listener in
-# hypr/hypridle.conf. Exit 0 only when the screen may go dark: the
-# compositor holds the session lock, and the user has not asked the session
-# to stay awake.
+# hypridle condition_cmd for the two lock-gated listeners in
+# hypr/hypridle.conf (the 30 s blanker and the 900 s idle-suspend request).
+# Exit 0 exactly when the compositor holds the session lock.
 #
 # The compositor lock, not logind's LockedHint: it is the property the
 # invariant is about -- a lock surface is covering the outputs -- and it is
@@ -12,27 +11,17 @@
 # live desktop; a failed lock never holds the compositor lock, so no marker
 # check is needed here.
 #
-# The idle inhibitor is checked here rather than left to hypridle because
-# the listener sets ignore_inhibit: hypridle's accounting covers three
-# sources -- the user's deliberate toggle, the freedesktop ScreenSaver
-# D-Bus API, and Wayland surface inhibitors that video players, browsers
-# and call apps set on their own with no user-visible control. A locked
-# screen should not be held lit all night by a paused video nobody
-# remembers, so the listener ignores that accounting wholesale and this
-# re-admits the single source the user actually chose. No toggle installed
-# means nothing was chosen.
-# Every call here is bounded. hypridle runs condition_cmd synchronously
-# (CProcess::runSync waits for the child to exit, with no deadline of its
-# own) on the single loop that also drives DPMS, the idle lock, unlock and
-# sleep inhibits -- so anything that hangs here freezes the session's whole
-# idle machinery, not just this check. Both failure directions are safe:
-# an unanswered compositor means "not locked", so no blank; an unanswered
-# toggle daemon means "not inhibited", so the screen blanks as if no toggle
-# were installed. The compositor lock is the invariant; the toggle is a
-# convenience.
+# No keep-awake check, deliberately (decided model, 2026-09-04): a claim --
+# app inhibitor or the user's toggle, indistinguishable -- governs only the
+# UNLOCKED machine, where it prevents the idle lock. Once locked, nothing
+# is consulted again: the screen blanks and the suspend marches. The old
+# toggle re-admission that kept a locked screen lit is gone with it.
+#
+# Bounded: hypridle runs condition_cmd synchronously (CProcess::runSync
+# waits with no deadline of its own) on the single loop that also drives
+# DPMS, the idle lock, unlock and sleep inhibits -- so anything that hangs
+# here freezes the session's whole idle machinery. An unanswered compositor
+# means "not locked", so no blank and no suspend request.
 PATH=/usr/local/bin:/usr/bin:/bin; export PATH
 [ "$(timeout 2 hyprctl locked 2>/dev/null)" = true ] || exit 1
-if command -v logind-idle-control >/dev/null 2>&1; then
-    [ "$(timeout 2 logind-idle-control status 2>/dev/null)" = 1 ] && exit 1
-fi
 exit 0
