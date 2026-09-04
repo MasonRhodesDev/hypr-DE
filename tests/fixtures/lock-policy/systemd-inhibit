@@ -1,0 +1,8 @@
+#!/bin/sh
+# Stand-in for systemd-inhibit --list: one idle block when asked for.
+if [ "${LOCK_POLICY_LOGIND_IDLE_BLOCK:-0}" = 1 ]; then
+    printf 'WHO UID USER PID COMM WHAT WHY MODE\nsomething 1000 mason 1 x idle keep-awake block\n'
+else
+    printf 'WHO UID USER PID COMM WHAT WHY MODE\n'
+fi
+exit 0

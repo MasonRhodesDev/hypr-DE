@@ -1,0 +1,7 @@
+#!/bin/sh
+# Stand-in for pgrep -x <name>: a game "runs" when the environment names it.
+case "${2:-}" in
+    gameoverlayui) [ "${LOCK_POLICY_GAME:-}" = steam ] && exit 0 ;;
+    gamescope)     [ "${LOCK_POLICY_GAME:-}" = gamescope ] && exit 0 ;;
+esac
+exit 1

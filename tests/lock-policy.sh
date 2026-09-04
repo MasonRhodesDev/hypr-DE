@@ -285,6 +285,44 @@ if PATH="$work/planted:$PATH" HYPRLAND_INSTANCE_SIGNATURE='' LOCK_POLICY_COMPOSI
     echo "session-locked.sh consulted a PATH-planted hyprctl" >&2; exit 1
 fi
 
+# --- ladder entry: the warn/blur never starts under a live claim -----------
+# no-keep-awake.sh is STATELESS: hypridle's ScreenSaver ledger dies with any
+# hypridle restart (a package upgrade mid-game dropped Steam's claim and the
+# blur fired over a live game), so every claim source is re-derived at fire
+# time. Each source blocks alone; no claims means ladder entry is allowed.
+mk_libexec no-keep-awake.sh
+"$work/no-keep-awake.sh" || {
+    echo "no-keep-awake.sh: with no claims, ladder entry must be allowed" >&2; exit 1; }
+if out=$(LOCK_POLICY_INHIBIT_CLIENT=chromium "$work/no-keep-awake.sh"); then
+    echo "no-keep-awake.sh: a Wayland client claim must block ladder entry" >&2; exit 1
+else
+    [ "$out" = "wayland:chromium" ] || {
+        echo "no-keep-awake.sh must name the Wayland holder, got '$out'" >&2; exit 1; }
+fi
+if LOCK_POLICY_INHIBIT_ENABLED=1 "$work/no-keep-awake.sh" >/dev/null; then
+    echo "no-keep-awake.sh: the toggle must block ladder entry" >&2; exit 1
+fi
+if LOCK_POLICY_LOGIND_IDLE_BLOCK=1 "$work/no-keep-awake.sh" >/dev/null; then
+    echo "no-keep-awake.sh: a logind idle block must block ladder entry" >&2; exit 1
+fi
+# The Overwatch pin: a running game blocks ladder entry even with every
+# ledger wiped - the game's only claim (Steam's overlay ScreenSaver
+# inhibit) is exactly what a hypridle restart destroys.
+if LOCK_POLICY_GAME=steam "$work/no-keep-awake.sh" >/dev/null; then
+    echo "no-keep-awake.sh: a running Steam game must block ladder entry" >&2; exit 1
+fi
+if LOCK_POLICY_GAME=gamescope "$work/no-keep-awake.sh" >/dev/null; then
+    echo "no-keep-awake.sh: a gamescope session must block ladder entry" >&2; exit 1
+fi
+# A wedged compositor must not stall the gate (hypridle's single loop) and
+# reads as "no claim from that source", falling through to the others.
+started=$(date +%s)
+LOCK_POLICY_COMPOSITOR_HANG=1 "$work/no-keep-awake.sh" || {
+    echo "no-keep-awake.sh: a wedged compositor alone must not read as a claim" >&2; exit 1; }
+elapsed=$(( $(date +%s) - started ))
+[ "$elapsed" -lt 10 ] || {
+    echo "no-keep-awake.sh waited ${elapsed}s on a wedged compositor" >&2; exit 1; }
+
 # --- the listener wiring is structural, not a single grep ------------------
 conf="$root/dist/hypr/hypridle.conf"
 # Exactly two listeners ignore hypridle's inhibitor accounting: the
@@ -348,6 +386,17 @@ chmod +x "$work/idle-suspend-no-hyprstate.sh"
 if [ -s "$LOCK_POLICY_LOG" ]; then
     echo "idle-suspend.sh ran something with hyprstate absent" >&2; exit 1
 fi
+# The 180 s lock listener carries the stateless claim gate and keeps
+# hypridle's ledger as the second belt (no ignore_inhibit).
+lblock=$(awk '/^listener \{/{inb=1;b="";next} inb&&/^\}/{inb=0; if (b ~ /lock-cmd\.sh --idle/) print b; next} inb{b=b $0 "\n"}' "$conf")
+for want in 'timeout=180' 'condition_cmd=@LIBEXECDIR@/no-keep-awake.sh' 'condition_retry='; do
+    printf '%s' "$lblock" | grep -q "^  $want" || {
+        echo "hypridle.conf: the idle-lock listener lost '$want'" >&2; exit 1; }
+done
+if printf '%s' "$lblock" | grep -qE '^[[:space:]]*ignore_inhibit'; then
+    echo "hypridle.conf: the idle-lock listener must keep the inhibitor ledger as its second belt" >&2; exit 1
+fi
+
 # The suspend listener keeps its 900 s timeout and --cancel on resume, and
 # per the decided model it ignores inhibitors and gates on the compositor
 # lock instead: lock ends every keep-awake claim's authority, and a machine
