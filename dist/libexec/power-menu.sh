@@ -5,10 +5,11 @@ case "$selection" in
     Logout)   hyprshutdown ;;
     Reboot)   hyprshutdown -p 'systemctl reboot' ;;
     Shutdown) hyprshutdown -p 'systemctl poweroff -i' ;;
-    # This entry locks. It was labelled "Suspend", but locking is all it
-    # does: hyprstate owns suspend (lid FSM + lock-before-suspend) and
-    # exposes no CLI or D-Bus method to request one, and calling systemctl
-    # suspend here would bypass its writer. Naming it for what it does beats
-    # a menu entry that quietly means something else.
+    # This entry locks. hyprstate 2.6.0 does expose `hyprstate suspend
+    # request`, but that verb feeds the idle/lid countdown -- a 30 s grace
+    # window with lock verification -- not an immediate suspend, and a menu
+    # entry named Suspend that acts half a minute later quietly means
+    # something else. Naming it for what it does beats that. (A real Suspend
+    # entry would be one line: `Suspend) hyprstate suspend request ;;`.)
     Lock)     loginctl lock-session ;;
 esac

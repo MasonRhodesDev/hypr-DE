@@ -1,0 +1,2 @@
+#!/bin/sh
+printf 'hyprstate:%s\n' "$*" >> "$LOCK_POLICY_LOG"

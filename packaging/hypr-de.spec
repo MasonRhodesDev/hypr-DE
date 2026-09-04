@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.30
+Version:        0.2.32
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -37,7 +37,7 @@ Requires:       hyprpicker
 Requires:       hyprpolkitagent
 Requires:       hyprpwcenter
 Requires:       hyprshutdown
-Requires:       hyprstate >= 2.5.0
+Requires:       hyprstate >= 2.6.0
 Requires:       dials
 Requires:       jetbrains-mono-fonts
 # Nerd variants come from hypr-de-extras (none exist in Fedora proper); the
@@ -220,6 +220,18 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Wed Sep 03 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.32-1
+- Idle suspend now ships as a sane default. A third hypridle listener
+  (timeout=900) asks hyprstate via `hyprstate suspend request`; hyprstate
+  owns the rest -- the 30 s grace countdown, proof of a live locker,
+  cancellation, and the logind Suspend() call -- the identical path a lid
+  close takes. Before this, hypridle only locked (180 s) and blanked (30 s
+  later) and nothing ever suspended a lidless desktop.
+- idle-suspend.sh is a PATH-pinned libexec bridge (BAR-017); a missing
+  hyprstate is a silent no-op. The listener deliberately does NOT
+  ignore_inhibit, so media, calls, and the user's toggle each defer the
+  suspend; hyprstate re-checks logind inhibitors and parks the request in
+  DEFERRED. Floor raised to hyprstate >= 2.6.0 for the request verb.
 * Wed Sep 03 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.30-1
 - Blank-guard: an output re-added during locked blanking joins the blank.
   Deep-sleeping monitors drop their hotplug line ~20 s after DPMS-off and
