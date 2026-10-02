@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.35
+Version:        0.2.36
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -220,6 +220,12 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Fri Oct 02 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.36-1
+- Screen recorder: SHIFT+Print stops the running recording instead of
+  starting another, and the waybar REC indicator shows while recording.
+  hypr-de-record now loads base.sh from the libexec dir when run from the
+  bin dir, and is_recording matches the 15-char truncated comm
+  (gpu-screen-reco).
 * Thu Sep 04 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.35-1
 - Warn visuals: the lock wallpaper fades in across the WHOLE warn window
   (vigil.toml lock.warning wallpaper_in_ms=10000) instead of flashing in
