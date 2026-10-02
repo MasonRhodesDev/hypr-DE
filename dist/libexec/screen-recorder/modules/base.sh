@@ -32,9 +32,11 @@ is_recording() {
     # Confirm the pid is still the recorder: a recycled pid would otherwise
     # take the SIGINT the stop keybind sends.
     if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then
+        # The kernel truncates comm to 15 chars, so "gpu-screen-recorder"
+        # reads back as "gpu-screen-reco".
         comm=$(cat "/proc/$pid/comm" 2>/dev/null)
         case "$comm" in
-            gpu-screen-record*) return 0 ;;
+            gpu-screen-reco*) return 0 ;;
         esac
     fi
     # Clean up stale PID file
