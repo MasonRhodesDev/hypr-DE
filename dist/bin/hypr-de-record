@@ -1,8 +1,16 @@
 #!/bin/bash
 # Modern screen recording with gpu-screen-recorder (hardware encoding)
 
+# Installed to @BINDIR@, while its helpers live in @LIBEXECDIR@.
+# A copy run from a checkout or symlinked dir may ship them alongside.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/screen-recorder/modules/base.sh"
+BASE="$SCRIPT_DIR/screen-recorder/modules/base.sh"
+[[ -f "$BASE" ]] || BASE=@LIBEXECDIR@/screen-recorder/modules/base.sh
+# shellcheck source=/dev/null
+source "$BASE" || {
+  notify-send "Screen Recording" "Cannot load $BASE"
+  exit 1
+}
 
 if is_recording; then
   # Stop recording
