@@ -27,10 +27,10 @@ arch = ["sni-watcher"]
 units = ["sni-watcher.service"]
 
 [bluetooth]
-reason = "BlueZ daemon (enabled on install) + OBEX; waybar bluetooth module is the indicator (no tray applet); left-click opens Overskride (GTK4/libadwaita pairing/profiles/files); right-click toggles adapter power. PipeWire/WirePlumber own BT audio. Overskride is hosted on [mason] and solaris765/hypr-de-extras (not in extra/Fedora)."
+reason = "BlueZ daemon (enabled on install) + OBEX; waybar bluetooth module is the indicator (no tray applet); left-click opens Overskride (GTK4/libadwaita pairing/profiles/files); right-click toggles adapter power. PipeWire/WirePlumber own BT audio. Overskride is hosted on [mason] and solaris765/hypr-de-extras (not in extra/Fedora). bt-stale-bond-guard (user service) drops an LE bond the peer no longer holds — the Xbox-controller connect/disconnect storm BlueZ never recovers from on its own — and re-pairs on the peer's sync button; Arch-only until it grows an RPM, so hypr-de-setup treats its unit as optional."
 fedora = ["bluez", "bluez-obexd", "overskride"]
-arch = ["bluez", "bluez-obex", "bluez-utils", "overskride"]
-units = ["obex.service"]
+arch = ["bluez", "bluez-obex", "bluez-utils", "overskride", "bt-stale-bond-guard"]
+units = ["obex.service", "bt-stale-bond-guard.service"]
 
 [notifications]
 reason = "swaync daemon (swaync/config.json, recovery framework, waybar module)"
