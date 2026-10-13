@@ -3,7 +3,10 @@
 #   ~/.config/hypr-de/wallpaper.conf          ($WALLPAPER for hyprlock)
 #   ~/.config/environment.d/wallpaper.conf    (WALLPAPER_PATH for swaybg.service)
 #   ~/.config/appearance-profiles/default.toml   (shared wallpaper registry)
-# then applies live (systemd user env + swaybg restart + lmtt re-render).
+# then applies live (swaybg restart + lmtt re-render). Since the
+# hypr-de-wallpaper lmtt module, every `lmtt switch` also syncs swaybg and
+# the hyprlock conf from the registry, so dials (which writes the registry
+# through lmtt) reaches the same consumers without this script.
 set -euo pipefail
 
 usage() { echo "usage: hypr-de-set-wallpaper <image-path>" >&2; exit 2; }

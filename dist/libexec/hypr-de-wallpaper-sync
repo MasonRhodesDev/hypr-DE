@@ -1,0 +1,51 @@
+#!/bin/bash
+# Bring every wallpaper consumer in line with the appearance-profiles
+# registry: the file lmtt writes and vigil reads. Runs after every
+# `lmtt switch` through the hypr-de-wallpaper lmtt module, so a wallpaper
+# set from dials (or `lmtt wallpaper set`) reaches the desktop without a
+# re-login:
+#   swaybg          restarted only when it shows a different image
+#   hyprlock        ~/.config/hypr-de/wallpaper.conf        ($WALLPAPER)
+#   environment.d   ~/.config/environment.d/wallpaper.conf (WALLPAPER_PATH)
+# Idempotent: a theme toggle that changes no wallpaper rewrites and restarts
+# nothing, so SUPER+T never flickers the desktop.
+set -uo pipefail
+
+CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}"
+registry="$CONFIG/appearance-profiles/default.toml"
+default="@DATADIR@/wallpapers/default.png"
+
+# `path = "..."` under [background], exactly as swaybg-launch reads it.
+wallpaper=""
+if [ -r "$registry" ]; then
+    wallpaper=$(awk '
+        /^\[/ { inbg = ($0 ~ /^\[background\]/); next }
+        inbg && $1 == "path" {
+            sub(/^[^=]*=[[:space:]]*"/, ""); sub(/"[[:space:]]*$/, ""); print; exit
+        }' "$registry")
+fi
+if [ -z "$wallpaper" ] || [ ! -r "$wallpaper" ]; then
+    [ -n "$wallpaper" ] && echo "hypr-de-wallpaper-sync: $wallpaper unreadable; using default" >&2
+    wallpaper=$default
+fi
+
+# The two files hyprlock and the user's own environment.d readers consult,
+# rewritten only when they differ (no churn on a plain theme toggle).
+write_if_changed() {
+    local file=$1 want=$2
+    [ "$(cat "$file" 2>/dev/null)" = "$want" ] && return 0
+    mkdir -p "$(dirname "$file")"
+    printf '%s\n' "$want" > "$file"
+}
+write_if_changed "$CONFIG/hypr-de/wallpaper.conf" "\$WALLPAPER = $wallpaper"
+write_if_changed "$CONFIG/environment.d/wallpaper.conf" "WALLPAPER_PATH=$wallpaper"
+
+# swaybg: only a running instance showing another image is restarted. No
+# compositor (first-boot setup) or no swaybg: nothing to repaint.
+[ -n "${WAYLAND_DISPLAY:-}" ] || exit 0
+pid=$(systemctl --user show -p MainPID --value swaybg.service 2>/dev/null)
+[ -n "$pid" ] && [ "$pid" != 0 ] && [ -r "/proc/$pid/cmdline" ] || exit 0
+showing=$(tr '\0' '\n' < "/proc/$pid/cmdline" | awk 'prev == "-i" { print; exit } { prev = $0 }')
+if [ "$showing" != "$wallpaper" ]; then
+    systemctl --user try-restart swaybg.service 2>/dev/null || true
+fi

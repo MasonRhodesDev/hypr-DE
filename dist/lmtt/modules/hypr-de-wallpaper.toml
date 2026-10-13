@@ -1,0 +1,13 @@
+# Shipped by hypr-de (installed under /usr/share/lmtt/modules/). Reload-only:
+# after every `lmtt switch`, bring swaybg and hyprlock in line with the
+# appearance registry lmtt writes, so a wallpaper set from dials (or
+# `lmtt wallpaper set`) reaches the desktop without a re-login. Nothing is
+# rendered. Override by creating ~/.config/lmtt/modules/hypr-de-wallpaper.toml
+# (same filename wins).
+name = "hypr-de-wallpaper"
+description = "hypr-DE wallpaper consumers (swaybg, hyprlock) follow the appearance registry"
+priority = 110
+
+[reload]
+command = "@LIBEXECDIR@/hypr-de-wallpaper-sync || true"
+timeout = 5000

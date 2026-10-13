@@ -57,6 +57,8 @@ jobs:
         run: ./tests/runtime-paths.sh
       - name: swaybg and the lock screen read the same wallpaper
         run: ./tests/wallpaper-source.sh
+      - name: A wallpaper set anywhere reaches the desktop
+        run: ./tests/wallpaper-sync.sh
       - name: Blank-guard on monitor re-add
         run: ./tests/blank-guard.sh
       - name: PAM rewrite safety
