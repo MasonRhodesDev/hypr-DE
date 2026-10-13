@@ -44,8 +44,10 @@
             "escape": true
         },
         "clock": {
-            "format": "{:%I:%M:%S %p} ",
-            "interval": 1,
+            // No seconds: a seconds hand is one wakeup per second for the
+            // whole session. waybar aligns the 60 s tick to the minute.
+            "format": "{:%I:%M %p} ",
+            "interval": 60,
             "tooltip-format": "<tt>{calendar}</tt>",
             "calendar": {
                 "format": {
@@ -90,7 +92,9 @@
             "tooltip": true
         },
         "battery": {
-            "interval":30,
+            // udev delivers plug/unplug at once; the interval only paces the
+            // capacity read.
+            "interval": 60,
             "states": {
                 "good": 95,
                 "warning": 30,
@@ -144,16 +148,22 @@
             "on-click": "@LIBEXECDIR@/waybar-colorpicker.sh",
             "signal": 1
         },
+        // The drawer is collapsed by default, but waybar polls a hidden
+        // module just the same (it has no "only while revealed" mode), so
+        // these three run at 30 s instead of the 10 s default.
         "cpu": {
             "format": "󰻠",
+            "interval": 30,
             "tooltip": true
         },
         "memory": {
-            "format": ""
+            "format": "",
+            "interval": 30
         },
         "temperature": {
             "critical-threshold": 80,
-            "format": ""
+            "format": "",
+            "interval": 30
         },
         "custom/media": {
             "return-type": "json",
