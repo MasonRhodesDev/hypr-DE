@@ -39,6 +39,7 @@ Requires:       hyprpwcenter
 Requires:       hyprshutdown
 Requires:       hyprstate >= 2.6.0
 Requires:       dials
+Requires:       accountsservice
 Requires:       jetbrains-mono-fonts
 # Nerd variants come from hypr-de-extras (none exist in Fedora proper); the
 # waybar/swaync stylesheets request these families by name
