@@ -333,10 +333,19 @@ conf="$root/dist/hypr/hypridle.conf"
 # the one place the accounting still applies.
 [ "$(grep -cE '^[[:space:]]*ignore_inhibit=true$' "$conf")" = 2 ] || {
     echo "hypridle.conf: exactly the two lock-gated listeners ignore inhibitors" >&2; exit 1; }
+# Timeouts are hyprlang variables so a host can redefine them (hypridle-launch
+# splices ~/.config/hypr-de/hypridle.conf in after the defaults; see
+# tests/hypridle-override.sh). The decided values are pinned on the defaults.
+has_line() { # has_line <block> <line>: the line, at the listener's indent
+    printf '%s' "$1" | grep -q "^  $(printf '%s' "$2" | sed 's/[$]/\\$/g')"
+}
+knob() { sed -n "s/^\$$1[[:space:]]*=[[:space:]]*\([0-9]*\).*/\1/p" "$conf"; }
+[ "$(knob blank_timeout)" = 30 ] || {
+    echo "hypridle.conf: \$blank_timeout no longer defaults to 30" >&2; exit 1; }
 block=$(awk '/^listener \{/{inb=1;b="";next} inb&&/^\}/{inb=0; if (b ~ /session-locked\.sh/) print b; next} inb{b=b $0 "\n"}' "$conf")
-for want in 'timeout=30' 'condition_cmd=@LIBEXECDIR@/session-locked.sh' 'condition_retry=' \
+for want in 'timeout=$blank_timeout' 'condition_cmd=@LIBEXECDIR@/session-locked.sh' 'condition_retry=' \
             'on-timeout=@LIBEXECDIR@/dpms-off-if-locked.sh'; do
-    printf '%s' "$block" | grep -q "^  $want" || {
+    has_line "$block" "$want" || {
         echo "hypridle.conf: the locked-screen listener lost '$want'" >&2; exit 1; }
 done
 # No raw DPMS-off anywhere in the config -- not an on-timeout, not an
@@ -388,9 +397,11 @@ if [ -s "$LOCK_POLICY_LOG" ]; then
 fi
 # The 180 s lock listener carries the stateless claim gate and keeps
 # hypridle's ledger as the second belt (no ignore_inhibit).
+[ "$(knob lock_timeout)" = 180 ] || {
+    echo "hypridle.conf: \$lock_timeout no longer defaults to 180" >&2; exit 1; }
 lblock=$(awk '/^listener \{/{inb=1;b="";next} inb&&/^\}/{inb=0; if (b ~ /lock-cmd\.sh --idle/) print b; next} inb{b=b $0 "\n"}' "$conf")
-for want in 'timeout=180' 'condition_cmd=@LIBEXECDIR@/no-keep-awake.sh' 'condition_retry='; do
-    printf '%s' "$lblock" | grep -q "^  $want" || {
+for want in 'timeout=$lock_timeout' 'condition_cmd=@LIBEXECDIR@/no-keep-awake.sh' 'condition_retry='; do
+    has_line "$lblock" "$want" || {
         echo "hypridle.conf: the idle-lock listener lost '$want'" >&2; exit 1; }
 done
 if printf '%s' "$lblock" | grep -qE '^[[:space:]]*ignore_inhibit'; then
@@ -401,12 +412,14 @@ fi
 # per the decided model it ignores inhibitors and gates on the compositor
 # lock instead: lock ends every keep-awake claim's authority, and a machine
 # a claim kept unlocked never fires this because the condition fails.
+[ "$(knob suspend_timeout)" = 900 ] || {
+    echo "hypridle.conf: \$suspend_timeout no longer defaults to 900" >&2; exit 1; }
 sblock=$(awk '/^listener \{/{inb=1;b="";next} inb&&/^\}/{inb=0; if (b ~ /idle-suspend\.sh/) print b; next} inb{b=b $0 "\n"}' "$conf")
-for want in 'timeout=900' 'ignore_inhibit=true' \
+for want in 'timeout=$suspend_timeout' 'ignore_inhibit=true' \
             'condition_cmd=@LIBEXECDIR@/session-locked.sh' 'condition_retry=' \
             'on-timeout=@LIBEXECDIR@/idle-suspend.sh' \
             'on-resume=@LIBEXECDIR@/idle-suspend.sh --cancel'; do
-    printf '%s' "$sblock" | grep -q "^  $want" || {
+    has_line "$sblock" "$want" || {
         echo "hypridle.conf: the idle-suspend listener lost '$want'" >&2; exit 1; }
 done
 

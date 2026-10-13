@@ -118,6 +118,12 @@ User overrides (last-wins).
 .TP
 .I ~/.config/hypr/profiles/
 hyprstate monitor profiles.
+.TP
+.I ~/.config/hypr-de/hypridle.conf
+Per-host idle timeouts:
+.BR $lock_timeout ", " $blank_timeout ", " $suspend_timeout
+in seconds, one per line, spliced into the packaged policy by
+hypridle-launch. Restart hypridle.service to apply.
 .SH SEE ALSO
 .BR hypr-de-help (1),
 .BR workspace-zones (7),

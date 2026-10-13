@@ -1,0 +1,127 @@
+#!/bin/bash
+# Start hypridle on the packaged idle policy, with this host's timeouts.
+#
+# Two jobs. The first used to be inline in the hypridle.service drop-in.
+#
+# 1. Find hypridle in a FIXED list of root-owned locations, never $PATH.
+#    The reason for not simply hardcoding @BINDIR@: machines running local
+#    hypr-stack builds have the working hypridle in /usr/local/bin, and the
+#    distro build can lag hyprlang far enough that `-c` aborts on startup
+#    (seen on Fedora: hypridle v0.1.7 + system hyprlang = instant SIGABRT,
+#    which silently kills idle-locking for the whole session).
+#    The reason for not using `command -v`: the systemd user manager's $PATH
+#    includes ~/.local/bin, so any unprivileged code running in the session
+#    could shadow the name "hypridle" and permanently neuter auto-lock while
+#    the unit still reported active. Both entries below are root-owned
+#    directories, so only root can change which binary this resolves to.
+#
+# 2. Apply the host's timeouts. ~/.config/hypr-de/hypridle.conf, when it
+#    exists, may redefine the `$name = seconds` variables the packaged
+#    hypridle.conf declares at its top. The packaged file is never edited:
+#    a copy is assembled under $XDG_RUNTIME_DIR/hypr-de with the host's
+#    lines spliced in right after the packaged defaults (hyprlang takes the
+#    latest definition for every line that follows), and hypridle runs the
+#    copy. A line that is not a known variable, or not a whole number of
+#    seconds in range, or anything else at all, is reported and dropped: the
+#    override is a timeouts file, not a second policy, so the worst a typo
+#    can do is leave a default in place. No override file, no copy: the
+#    packaged file runs exactly as shipped.
+#    hypridle's own `source` keyword would do the splice, but it logs an
+#    error on every start when the sourced file is missing, which is the
+#    state of most hosts.
+PATH=/usr/local/bin:/usr/bin:/bin; export PATH
+set -u
+
+HYPRIDLE_CANDIDATES="/usr/local/bin/hypridle @BINDIR@/hypridle"
+POLICY=@DATADIR@/hypr/hypridle.conf
+OVERRIDE="${XDG_CONFIG_HOME:-$HOME/.config}/hypr-de/hypridle.conf"
+# The packaged policy's defaults end at this line; host values go right after.
+MARKER='# hypr-de: host overrides go below this line (hypridle-launch)'
+# ext-idle-notify takes a uint32 of milliseconds.
+MAX_TIMEOUT=4294967
+
+log() { printf 'hypridle-launch: %s\n' "$*" >&2; }
+
+run_hypridle() { # run_hypridle <conf>
+    local h
+    for h in $HYPRIDLE_CANDIDATES; do
+        [ -x "$h" ] && exec "$h" -c "$1"
+    done
+    log "no hypridle in any of: $HYPRIDLE_CANDIDATES"
+    exit 127
+}
+
+# The variables the packaged policy declares above the marker.
+known_vars() {
+    head -n "$1" "$POLICY" | sed -n 's/^\$\([A-Za-z_][A-Za-z0-9_]*\)[[:space:]]*=.*/\1/p'
+}
+
+# Print the override lines worth keeping; report every other line.
+filter_override() { # filter_override <marker-line-number>
+    local known line body name value n=0
+    known=$(known_vars "$1")
+    while IFS= read -r line || [ -n "$line" ]; do
+        n=$((n + 1))
+        # Drop a trailing comment and surrounding whitespace.
+        body=$(printf '%s' "$line" | sed 's/[[:space:]]*#.*$//; s/^[[:space:]]*//; s/[[:space:]]*$//')
+        [ -z "$body" ] && continue
+        case "$body" in
+            \$*=*) ;;
+            *)  log "$OVERRIDE:$n: only '\$name = seconds' lines are honoured here; dropped: $line"
+                continue ;;
+        esac
+        name=${body%%=*}; name=${name#\$}
+        name=$(printf '%s' "$name" | sed 's/[[:space:]]*$//')
+        value=${body#*=}
+        value=$(printf '%s' "$value" | sed 's/^[[:space:]]*//')
+        if ! printf '%s\n' "$known" | grep -qx -- "$name"; then
+            log "$OVERRIDE:$n: no such knob \$$name (the policy declares: $(printf '%s' "$known" | tr '\n' ' ')); dropped"
+            continue
+        fi
+        case "$value" in
+            ''|*[!0-9]*)
+                log "$OVERRIDE:$n: \$$name must be a whole number of seconds; dropped: $line"
+                continue ;;
+        esac
+        if [ "${#value}" -gt "${#MAX_TIMEOUT}" ] || [ "$value" -lt 1 ] || [ "$value" -gt "$MAX_TIMEOUT" ]; then
+            log "$OVERRIDE:$n: \$$name must be 1..$MAX_TIMEOUT seconds; dropped: $line"
+            continue
+        fi
+        printf '$%s = %s\n' "$name" "$value"
+    done < "$OVERRIDE"
+}
+
+[ -f "$OVERRIDE" ] || run_hypridle "$POLICY"
+
+marker_line=$(grep -nxF -- "$MARKER" "$POLICY" | head -n1 | cut -d: -f1)
+if [ -z "$marker_line" ]; then
+    log "$POLICY has no override marker; running it unchanged, ignoring $OVERRIDE"
+    run_hypridle "$POLICY"
+fi
+if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
+    log "XDG_RUNTIME_DIR is unset; running the packaged policy, ignoring $OVERRIDE"
+    run_hypridle "$POLICY"
+fi
+
+accepted=$(filter_override "$marker_line")
+# Nothing usable (every line dropped, or only comments): the policy as shipped.
+[ -n "$accepted" ] || run_hypridle "$POLICY"
+
+dir="$XDG_RUNTIME_DIR/hypr-de"
+out="$dir/hypridle.conf"
+if ! { mkdir -p "$dir" && chmod 700 "$dir"; }; then
+    log "cannot create $dir; running the packaged policy, ignoring $OVERRIDE"
+    run_hypridle "$POLICY"
+fi
+if ! {
+    printf '# Assembled by hypridle-launch from %s and %s. Edit those, not this.\n' "$POLICY" "$OVERRIDE"
+    head -n "$marker_line" "$POLICY"
+    printf '%s\n' "$accepted"
+    tail -n +"$((marker_line + 1))" "$POLICY"
+} > "$out.tmp" || ! mv -f "$out.tmp" "$out"; then
+    log "cannot write $out; running the packaged policy, ignoring $OVERRIDE"
+    rm -f "$out.tmp"
+    run_hypridle "$POLICY"
+fi
+log "host timeouts from $OVERRIDE: $(printf '%s' "$accepted" | tr '\n' ' ')"
+run_hypridle "$out"

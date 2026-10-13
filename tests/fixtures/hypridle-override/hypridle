@@ -1,0 +1,8 @@
+#!/bin/sh
+# Stand-in for hypridle: records its argv and keeps a copy of the config it
+# was handed, so the suite can inspect what the launcher assembled.
+printf '%s\n' "$*" >> "$HYPRIDLE_LOG"
+if [ "${1:-}" = -c ] && [ -f "${2:-}" ]; then
+    cp "$2" "$HYPRIDLE_CONF_COPY"
+fi
+exit 0

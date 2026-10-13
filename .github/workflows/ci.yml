@@ -62,5 +62,7 @@ jobs:
         run: ./tests/pam-rewrite.sh
       - name: Lock policy routing
         run: ./tests/lock-policy.sh
+      - name: Per-host idle timeouts
+        run: ./tests/hypridle-override.sh
       - name: Screen-share consent scoping
         run: ./tests/share-consent.sh
