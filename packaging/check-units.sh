@@ -9,7 +9,8 @@
 #
 # Build-time, offline checks:
 #   1. every unit hypr-DE ships is preset, is a companion activated by a preset
-#      .path/.timer, or is explicitly declared unmanaged with a reason
+#      .path/.timer, is pulled in by a Wants=/Requires= line of a shipped unit
+#      or drop-in, or is explicitly declared unmanaged with a reason
 #   2. every unit preset but not shipped here comes from a package declared in
 #      deps.toml (presetting a unit nothing installs makes setup warn forever)
 #   3. every unit WantedBy=graphical-session.target is also PartOf= it, so it
@@ -57,6 +58,14 @@ mapfile -t shipped < <(
 mapfile -t preset  < <(grep -oE '^(enable|disable)[[:space:]]+\S+' "$PRESET" | awk '{print $2}' | sort -u)
 
 in_list() { local n="$1"; shift; local x; for x in "$@"; do [ "$x" = "$n" ] && return 0; done; return 1; }
+# A dependency line in any shipped unit or drop-in that names the unit. A
+# oneshot pulled in by Wants= from a preset service is activated on every
+# start of that service, which is an activation path as real as a timer.
+pulled_in() {
+    grep -hE '^(Wants|Requires|BindsTo|Upholds|OnFailure|OnSuccess)=' \
+        "$UNITDIR"/*.service "$UNITDIR"/*/*.conf 2>/dev/null \
+        | tr ' ' '\n' | sed 's/^[A-Za-z]*=//' | grep -qx "$1"
+}
 
 # --- 1. shipped units must be activated somehow -----------------------------
 for u in "${shipped[@]}"; do
@@ -66,8 +75,9 @@ for u in "${shipped[@]}"; do
         && { in_list "$stem.path" "${preset[@]}" || in_list "$stem.timer" "${preset[@]}"; }; then
         continue
     fi
+    pulled_in "$u" && continue
     [ -n "${UNMANAGED[$u]:-}" ] && continue
-    bad "$u is shipped but never preset (and no .path/.timer activates it). Add it to 90-hypr-de.preset, or to UNMANAGED here with a reason."
+    bad "$u is shipped but never preset (and no .path/.timer or Wants= activates it). Add it to 90-hypr-de.preset, or to UNMANAGED here with a reason."
 done
 
 # --- 2. presetting a unit we do not install ---------------------------------

@@ -4,10 +4,14 @@
 # (packaging/gen-deps.sh check) gates drift against these arrays.
 pkgbase=hypr-de
 pkgname=('hypr-de' 'hypr-de-gaming')
-pkgver=0.2.36
+pkgver=0.2.37
 pkgrel=1
 pkgdesc="Alpha Hyprland config set (not ready)"
 arch=('any')
+# Nothing to strip or debug in a config package; without this makepkg lists a
+# -debug package it never produces, which the release workflow treats as a
+# failed build.
+options=('!debug')
 url="https://github.com/MasonRhodesDev/hypr-DE"
 license=('MIT')
 makedepends=('file')
@@ -45,7 +49,9 @@ check() {
   ./packaging/gen-deps.sh check
   ./packaging/check-units.sh
   ./tests/lock-policy.sh
+  ./tests/hypridle-override.sh
   ./tests/command-construction.sh
+  ./tests/media-stream.sh
   ./tests/user-config-safety.sh
   ./tests/privacy-privilege.sh
   ./tests/installer-trust.sh

@@ -22,7 +22,8 @@ jobs:
           mapfile -t scripts < <(
             for f in packaging/*.sh dist/bin/hypr-de-* dist/libexec/*.sh \
                      dist/libexec/osd/*.sh dist/libexec/waybar-updates-check \
-                     dist/libexec/hypr-de-prime-theme get-hypr-de.sh \
+                     dist/libexec/hypr-de-prime-theme dist/libexec/hypridle-launch \
+                     get-hypr-de.sh \
                      tests/qemu-fresh/*.sh; do
               [ -f "$f" ] || continue
               head -n1 "$f" | grep -qE '^#!/((usr/)?bin/(env )?)?(ba)?sh' && printf '%s\n' "$f"
@@ -46,6 +47,8 @@ jobs:
 
       - name: Command construction
         run: ./tests/command-construction.sh
+      - name: Media module streams instead of polling
+        run: ./tests/media-stream.sh
       - name: User config safety
         run: ./tests/user-config-safety.sh
       - name: Privacy and privilege boundaries
@@ -60,5 +63,7 @@ jobs:
         run: ./tests/pam-rewrite.sh
       - name: Lock policy routing
         run: ./tests/lock-policy.sh
+      - name: Per-host idle timeouts
+        run: ./tests/hypridle-override.sh
       - name: Screen-share consent scoping
         run: ./tests/share-consent.sh

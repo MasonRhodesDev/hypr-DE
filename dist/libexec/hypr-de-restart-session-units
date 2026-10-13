@@ -57,6 +57,11 @@
 set -uo pipefail
 
 UNITS=(hypridle.service)
+# Units this version stopped shipping. The file is gone but a session that
+# logged in before the upgrade still has the old unit loaded and running,
+# and a timer keeps firing until it is stopped. Stopping is safe under a
+# lock (nothing here runs in hypridle's cgroup), so it is not gated on it.
+RETIRED=(waybar-watchdog.timer)
 
 # Bounded PER CALL, because $XDG_RUNTIME_DIR/systemd/private belongs to the
 # user: a socket that accepts and never answers makes `systemctl --user`
@@ -121,6 +126,12 @@ for run in /run/user/*; do
     # directory really belongs to the uid the path claims before running
     # anything as them.
     [ "$(stat -c %u "$run" 2>/dev/null)" = "$uid" ] || continue
+
+    # One bounded call for all retired units; stop is a no-op for a unit
+    # that is not loaded, and best-effort like everything else here.
+    if [ "${#RETIRED[@]}" -gt 0 ]; then
+        run_as "$user" "$run" "" systemctl --user stop "${RETIRED[@]}" >/dev/null 2>&1
+    fi
 
     # A locked session keeps its old policy: see above.
     if session_locked "$user" "$run"; then

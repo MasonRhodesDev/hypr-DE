@@ -2,8 +2,13 @@
 Description=Periodic Wayland env + portal stack health check
 
 [Timer]
+# wayland-env-guard.path is the primary: it fires on socket churn under
+# %t/hypr. This timer only sweeps for a portal stack that died with no
+# file change to notice (xdph into start-limit-hit), so it runs rarely,
+# with enough slack for the manager to batch it with other wakeups.
 OnStartupSec=2min
-OnUnitActiveSec=5min
+OnUnitActiveSec=30min
+AccuracySec=5min
 
 [Install]
 WantedBy=timers.target

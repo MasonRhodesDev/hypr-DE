@@ -29,7 +29,6 @@ REQUIRED_UNITS=(
     waybar.service
     swaybg.service
     waybar-reload.path
-    waybar-watchdog.timer
     wayland-env-guard.path
     wayland-env-guard.timer
     hyprland-configreload-listener.service
@@ -39,6 +38,14 @@ REQUIRED_UNITS=(
     logind-idle-control.service
     logind-idle-control-tray.service
     obex.service
+)
+
+# Units an earlier hypr-DE preset that no longer ship. The package manager
+# removes the unit file but not the user's enablement symlink, which then
+# dangles in ~/.config/systemd/user/*.wants/ forever; systemctl disable
+# still removes it once the unit is gone.
+RETIRED_UNITS=(
+    waybar-watchdog.timer      # 0.2.37: the check runs per waybar start and per monitor event
 )
 
 GAMING_UNITS=(
@@ -148,6 +155,18 @@ else
     warn "one or more DE user units failed to enable"
     exit 1
 fi
+
+for u in "${RETIRED_UNITS[@]}"; do
+    for link in "$CONFIG"/systemd/user/*.wants/"$u"; do
+        [ -L "$link" ] || continue
+        # Still loaded in a session that logged in before the upgrade? Stop
+        # it too, or the old timer keeps firing until the next login.
+        systemctl --user stop "$u" >/dev/null 2>&1 || true
+        systemctl --user disable "$u" >/dev/null 2>&1 || rm -f "$link"
+        say "retired $u (no longer shipped)"
+        break
+    done
+done
 
 if ! command -v sni-watcher >/dev/null 2>&1; then
     warn "sni-watcher missing — Waybar may claim org.kde.StatusNotifierWatcher"

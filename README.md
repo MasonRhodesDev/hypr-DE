@@ -138,6 +138,7 @@ existing snapshot/rollback tooling covers them.
 | Wallpaper | `hypr-de-set-wallpaper <image>` |
 | Theme (dark/light + palette from wallpaper) | `lmtt switch` (bound to SUPER+T) |
 | Bar / notification styles | shadow the shipped lmtt module: copy from `/usr/share/lmtt/modules/hypr-de-*.toml` to `~/.config/lmtt/modules/` and edit |
+| Idle timeouts (lock, blank, suspend) | `~/.config/hypr-de/hypridle.conf`, one `$lock_timeout = 600` style line per knob (see below) |
 | Unit behavior | systemd user drop-ins (`systemctl --user edit waybar.service`) |
 | Per-app notification click recovery | plugins in `~/.config/hypr-de/notify-plugins/<app>.sh` |
 | Lock-failure behavior | `/etc/hypr-de/lock.conf`, root-owned (see below) |
@@ -203,6 +204,24 @@ is never locked at all.
 Needs hypridle ≥ 0.1.8 and Hyprland ≥ 0.48. Known gap: resuming from suspend
 without touching anything leaves a locked screen lit until the next
 input→idle cycle (#29).
+
+### Per-host timeouts
+
+The packaged policy declares three knobs at its top, in seconds:
+`$lock_timeout` (180), `$blank_timeout` (30) and `$suspend_timeout` (900).
+A host changes any of them without copying the policy:
+
+```
+# ~/.config/hypr-de/hypridle.conf
+$lock_timeout = 600
+$suspend_timeout = 1800
+```
+
+then `systemctl --user restart hypridle`. The launcher splices those lines
+in after the packaged defaults and runs the result from the runtime dir; the
+policy itself (what each listener does, what gates it) is not overridable
+there, and any other line is reported in the journal and dropped. Values run
+1 to 4294967; a stage a host never wants can be set to the ceiling.
 
 ## Development
 

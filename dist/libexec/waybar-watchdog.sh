@@ -1,6 +1,13 @@
 #!/bin/bash
-# Waybar zombie process watchdog
-# Monitors waybar for zombie processes and restarts if detected
+# Waybar health check: a zombie or dead bar process, or a live process
+# with no layer on any output, gets the service restarted.
+#
+# Runs per event, not per timer: waybar-watchdog.service is pulled in by
+# every start of waybar.service and by the Hyprland event listener after a
+# monitor comes or goes (the unit sleeps 5 s first so the bar has mapped).
+# The restart below pulls the same unit in again, but the start job merges
+# into this running one, so one event means one check and at most one
+# restart.
 
 set -euo pipefail
 
