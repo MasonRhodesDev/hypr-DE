@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.37
+Version:        0.2.38
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -227,6 +227,13 @@ systemctl --global disable --no-reload waybar-watchdog.timer >/dev/null 2>&1 || 
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Tue Oct 13 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.38-1
+- hypr-de-wallpaper lmtt module: after every `lmtt switch`, swaybg and the
+  hyprlock conf follow the appearance registry, so a wallpaper set from
+  dials (or `lmtt wallpaper set`) reaches the desktop without a re-login.
+  swaybg restarts only when it shows a different image; a theme toggle
+  restarts nothing.
+
 * Tue Oct 13 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.37-1
 - Battery: periodic polling replaced by events wherever one exists. The
   waybar clock drops seconds and ticks at 60 s; battery reads at 60 s
