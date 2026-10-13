@@ -8,6 +8,10 @@ pkgver=0.2.37
 pkgrel=1
 pkgdesc="Alpha Hyprland config set (not ready)"
 arch=('any')
+# Nothing to strip or debug in a config package; without this makepkg lists a
+# -debug package it never produces, which the release workflow treats as a
+# failed build.
+options=('!debug')
 url="https://github.com/MasonRhodesDev/hypr-DE"
 license=('MIT')
 makedepends=('file')
