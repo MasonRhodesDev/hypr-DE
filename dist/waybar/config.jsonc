@@ -168,12 +168,13 @@
             "interval": 30
         },
         "custom/media": {
+            // No interval: the script is one long-lived process that
+            // follows playerctl over the bus and prints a line per change;
+            // a blank line hides the module.
             "return-type": "json",
             "max-length": 60,
             "escape": true,
-            "exec": "timeout 3 @LIBEXECDIR@/waybar-mediaplayer.py 2> /dev/null",
-            "exec-if": "timeout 2 playerctl status 2>/dev/null | grep -iq playing",
-            "interval": 2
+            "exec": "@LIBEXECDIR@/waybar-mediaplayer.py"
         },
         "pulseaudio": {
             "format": "{volume}%  {icon}",

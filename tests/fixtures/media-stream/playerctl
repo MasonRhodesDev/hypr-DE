@@ -1,0 +1,18 @@
+#!/bin/bash
+# Stand-in for `playerctl --follow`: records its argv, then plays back the
+# lines in $MEDIA_SCRIPT (one per line, "\t" for a tab) with a short pause
+# between them, then either idles (the bus is alive, nothing changes) or
+# exits with $MEDIA_EXIT when that is set.
+printf '%s\n' "$*" >> "$MEDIA_ARGV_LOG"
+echo $$ > "$MEDIA_PIDFILE"
+if [ -n "${MEDIA_SCRIPT:-}" ] && [ -f "$MEDIA_SCRIPT" ]; then
+    while IFS= read -r line; do
+        printf '%b\n' "$line"
+        sleep 0.05
+    done < "$MEDIA_SCRIPT"
+fi
+if [ -n "${MEDIA_EXIT:-}" ]; then
+    exit "$MEDIA_EXIT"
+fi
+# Idle like the real follower waiting on the bus.
+sleep 30

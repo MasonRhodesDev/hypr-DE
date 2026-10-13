@@ -46,6 +46,8 @@ jobs:
 
       - name: Command construction
         run: ./tests/command-construction.sh
+      - name: Media module streams instead of polling
+        run: ./tests/media-stream.sh
       - name: User config safety
         run: ./tests/user-config-safety.sh
       - name: Privacy and privilege boundaries

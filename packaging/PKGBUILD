@@ -46,6 +46,7 @@ check() {
   ./packaging/check-units.sh
   ./tests/lock-policy.sh
   ./tests/command-construction.sh
+  ./tests/media-stream.sh
   ./tests/user-config-safety.sh
   ./tests/privacy-privilege.sh
   ./tests/installer-trust.sh

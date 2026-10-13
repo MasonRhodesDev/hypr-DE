@@ -139,6 +139,7 @@ find dist-build/bin dist-build/libexec -type f -exec sh -c 'head -1 "$1" | grep 
 ./packaging/check-units.sh
 ./tests/lock-policy.sh
 ./tests/command-construction.sh
+./tests/media-stream.sh
 ./tests/user-config-safety.sh
 ./tests/privacy-privilege.sh
 ./tests/installer-trust.sh

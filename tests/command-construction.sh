@@ -29,18 +29,24 @@ spec = importlib.util.spec_from_file_location("wm", "dist/libexec/waybar-mediapl
 m = importlib.util.module_from_spec(spec); sys.modules["wm"] = m
 spec.loader.exec_module(m)
 seen = []
+class FakeProc:
+    returncode = 0
+    stdout = iter(())
+    def __enter__(self): return self
+    def __exit__(self, *a): return False
+    def poll(self): return 0
 def fake(cmd, **kw):
     seen.append(cmd)
-    return b""
-m.subprocess.check_output = fake
-m.run("playerctl", "-p", 'evil"; id #', "metadata", "artist")
+    return FakeProc()
+m.subprocess.Popen = fake
+m.stream()
 arg = seen[0]
 print("ARGV" if isinstance(arg, (list, tuple)) else "STRING", arg)
 PY
 )
 case "$res" in
-    ARGV*) ok "run() passes argv: ${res#ARGV }" ;;
-    *)     bad "run() built a command string: $res" ;;
+    ARGV*) ok "the follower is spawned from argv: ${res#ARGV }" ;;
+    *)     bad "the follower was built as a command string: $res" ;;
 esac
 
 echo
