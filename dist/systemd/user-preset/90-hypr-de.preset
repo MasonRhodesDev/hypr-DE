@@ -5,7 +5,6 @@ enable swaync.service
 enable waybar.service
 enable swaybg.service
 enable waybar-reload.path
-enable waybar-watchdog.timer
 enable wayland-env-guard.path
 enable wayland-env-guard.timer
 enable hyprland-configreload-listener.service

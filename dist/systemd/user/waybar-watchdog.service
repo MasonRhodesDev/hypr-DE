@@ -1,12 +1,19 @@
 [Unit]
-Description=Waybar zombie process watchdog
+Description=Waybar health check (bars visible, no zombie)
+# Event-driven, not a timer. waybar.service.d/hypr-de.conf Wants= this
+# unit, so every start of the bar (login, a config-reload restart, a
+# Restart=on-failure) is followed by exactly one check, and the Hyprland
+# event listener starts it again after a monitor is added or removed. The
+# 30 s timer this replaces woke a laptop 2880 times a day to look at a
+# process list.
 After=waybar.service
 
 [Service]
 Type=oneshot
+# Let the bar map its layers before judging it. Restarting waybar from
+# inside its own ExecStartPost would deadlock on its own start job, which
+# is why the check is a separate unit with the delay here.
+ExecStartPre=/bin/sleep 5
 ExecStart=@LIBEXECDIR@/waybar-watchdog.sh
 StandardOutput=journal
 StandardError=journal
-
-[Install]
-WantedBy=default.target

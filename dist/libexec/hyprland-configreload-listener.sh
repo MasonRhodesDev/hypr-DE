@@ -2,7 +2,8 @@
 # Hyprland event listener
 # Monitors Hyprland IPC for various events:
 # - configreloaded: restarts waybar (prevents freeze from hyprctl reload)
-# - monitor changes: sets XWayland primary to ultrawide
+# - monitor changes: sets XWayland primary to ultrawide, re-checks the
+#   bar (waybar-watchdog.service), guards locked blanking
 
 set -euo pipefail
 
@@ -49,6 +50,14 @@ fi
 
 echo "Monitoring Hyprland events via $socket_path"
 
+# A bar that lost its outputs can come back with no layer at all; one
+# health check per monitor event catches it (the unit sleeps 5 s first so
+# the bar has had time to map). --no-block: a check already running merges
+# the job and must not stall the event loop.
+check_bar() {
+    systemctl --user start --no-block waybar-watchdog.service 2>/dev/null || true
+}
+
 # Set XWayland primary on startup
 if [[ -x "$XWAYLAND_PRIMARY_SCRIPT" ]]; then
     (sleep 2 && "$XWAYLAND_PRIMARY_SCRIPT") &
@@ -76,12 +85,14 @@ socat -U - "UNIX-CONNECT:$socket_path" | while IFS= read -r line; do
             name="${line#*>>}"; name="${name%%,*}"
             case "$line" in monitoraddedv2*) name=$(printf '%s' "${line#*>>}" | cut -d, -f2);; esac
             (sleep 2 && "@LIBEXECDIR@/blank-guard.sh" "$name") &
+            check_bar
             ;;
         monitorremoved\>\>*)
             echo "$(date '+%Y-%m-%d %H:%M:%S') - Monitor change: $line"
             if [[ -x "$XWAYLAND_PRIMARY_SCRIPT" ]]; then
                 (sleep 1 && "$XWAYLAND_PRIMARY_SCRIPT") &
             fi
+            check_bar
             ;;
     esac
 done
