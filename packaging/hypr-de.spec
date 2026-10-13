@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.36
+Version:        0.2.37
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -222,6 +222,29 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Tue Oct 13 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.37-1
+- Battery: periodic polling replaced by events wherever one exists. The
+  waybar clock drops seconds and ticks at 60 s; battery reads at 60 s
+  (udev still delivers plug/unplug at once); cpu, memory and temperature
+  in the collapsed drawer run at 30 s; custom/power-profile runs once and
+  refreshes only on SIGRTMIN+9 (hyprstate sends it on a profile change,
+  the click keeps sending it as a belt); custom/media is one long-lived
+  `playerctl --follow` stream instead of five processes every 2 s.
+- waybar-watchdog.timer (every 30 s) is gone: waybar.service Wants= the
+  check, so every start of the bar runs it once after a 5 s settle, and
+  the Hyprland event listener runs it after a monitor is added or
+  removed. hypr-de-setup sweeps the retired timer's enablement symlink;
+  the post-transaction hook stops it in sessions logged in before the
+  upgrade.
+- wayland-env-guard.timer runs every 30 min (was 5) with 5 min accuracy;
+  the .path unit remains the primary trigger.
+- Per-host idle timeouts: hypridle.conf declares $lock_timeout (180),
+  $blank_timeout (30) and $suspend_timeout (900) at its top; a host
+  redefines any of them in ~/.config/hypr-de/hypridle.conf and restarts
+  hypridle. hypridle-launch (new, execs hypridle from the drop-in)
+  splices the file in after the defaults, keeps the policy byte for
+  byte, and drops anything that is not a known knob with a whole number
+  of seconds. No file, no change.
 * Fri Oct 02 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.36-1
 - Screen recorder: SHIFT+Print stops the running recording instead of
   starting another, and the waybar REC indicator shows while recording.
