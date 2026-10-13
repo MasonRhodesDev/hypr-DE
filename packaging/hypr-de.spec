@@ -168,6 +168,10 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 # error banner on a live session. Reload once, best-effort.
 %{_libexecdir}/hypr-de/hypr-de-reload-sessions >/dev/null 2>&1 || :
 %{_libexecdir}/hypr-de/hypr-de-restart-session-units >/dev/null 2>&1 || :
+# 0.2.36's %%systemd_user_post left a global enablement symlink for the retired
+# waybar-watchdog.timer; %%preun does not run on upgrade, so retire it here.
+# Migration shim: drop once 0.2.36 is no longer in the field.
+systemctl --global disable --no-reload waybar-watchdog.timer >/dev/null 2>&1 || :
 
 %preun
 %systemd_user_preun swaybg.service waybar-reload.path waybar-reload.service waybar-watchdog.service wayland-env-guard.path wayland-env-guard.service wayland-env-guard.timer hyprland-configreload-listener.service hypr-de-prime-theme.service logind-idle-control-tray.service
