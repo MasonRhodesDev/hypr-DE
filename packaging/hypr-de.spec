@@ -201,6 +201,7 @@ systemctl --global disable --no-reload waybar-watchdog.timer >/dev/null 2>&1 || 
 %{_datadir}/lmtt/modules/hypr-de-waybar.toml
 %{_datadir}/lmtt/modules/hypr-de-swaync.toml
 %{_datadir}/lmtt/modules/hypr-de-nvim.toml
+%{_datadir}/lmtt/modules/hypr-de-wallpaper.toml
 %{_prefix}/lib/systemd/user/*
 %exclude %{_prefix}/lib/systemd/user/bp-game-focus.service
 %exclude %{_prefix}/lib/systemd/user/steam-clean-shutdown.service

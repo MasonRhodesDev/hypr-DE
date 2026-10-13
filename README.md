@@ -135,7 +135,7 @@ existing snapshot/rollback tooling covers them.
 |---|---|
 | Keybinds, rules, autostart | `~/.config/hypr/local.lua` (see `/usr/share/hypr-de/hypr/local.lua.example`) |
 | Monitor layouts | `~/.config/hypr/profiles/*.lua` — `hyprstate profile save <name>` captures the current layout; profiles auto-apply by connected-monitor match |
-| Wallpaper | `hypr-de-set-wallpaper <image>` |
+| Wallpaper | Dials › Displays (select a monitor, Wallpaper › Choose…), or `hypr-de-set-wallpaper <image>`; swaybg and hyprlock follow through the `hypr-de-wallpaper` lmtt module |
 | Theme (dark/light + palette from wallpaper) | `lmtt switch` (bound to SUPER+T) |
 | Bar / notification styles | shadow the shipped lmtt module: copy from `/usr/share/lmtt/modules/hypr-de-*.toml` to `~/.config/lmtt/modules/` and edit |
 | Idle timeouts (lock, blank, suspend) | `~/.config/hypr-de/hypridle.conf`, one `$lock_timeout = 600` style line per knob (see below) |
