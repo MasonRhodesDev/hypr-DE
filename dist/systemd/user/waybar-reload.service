@@ -4,5 +4,7 @@ After=waybar.service
 
 [Service]
 Type=oneshot
+# Skip restarts caused by the stylesheet render during session start.
+ExecCondition=@LIBEXECDIR@/waybar-reload-guard.sh
 ExecStartPre=/bin/sleep 0.5
 ExecStart=/usr/bin/systemctl --user restart waybar
