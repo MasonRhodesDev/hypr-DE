@@ -39,7 +39,10 @@ mk_libexec() {  # mk_libexec <script>
 status=0
 run_lock() {
     status=0
-    "$work/lock-cmd.sh" "$@" 2>>"$work/stderr" || status=$?
+    # lock-cmd.sh takes the session id from XDG_SESSION_ID before asking
+    # loginctl, so a build run from a desktop session would hand it the real
+    # id instead of the fixture's. Clear it so the fixture always answers.
+    env -u XDG_SESSION_ID "$work/lock-cmd.sh" "$@" 2>>"$work/stderr" || status=$?
 }
 assert_log() {
     expected=$1
