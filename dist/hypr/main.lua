@@ -47,40 +47,39 @@ if file_exists(colors_path) then
 end
 
 ----------------------------------------------------------------------
--- PLUGINS -----------------------------------------------------------
+-- WORKSPACE ZONES ---------------------------------------------------
 ----------------------------------------------------------------------
--- workspace-zones (waybar-workspace-buttons repo): workspace N owns special:N,
--- auto-dismissed on leave. Wrapped in pcall: `hyprctl reload` re-executes this
--- file with the plugin already loaded, which would otherwise error and abort
--- the whole config.
---
--- A ~/.local copy wins so a hyprland-git rebuild is not shadowed by the
--- extra-hyprland .so the Arch package ships. Packaged paths cover a fresh
--- install that has never run hyprpm.
-pcall(function()
-    local home_plug = HOME .. "/.local/lib/hyprland-plugins/libworkspace-zones.so"
-    local path
-    if file_exists(home_plug) then
-        path = home_plug
-    else
-        for _, candidate in ipairs({
-            "/usr/lib/hyprland/plugins/libworkspace-zones.so",
-            "/usr/lib64/hyprland/plugins/libworkspace-zones.so",
-        }) do
-            if file_exists(candidate) then
-                path = candidate
-                break
-            end
-        end
-    end
-    if path then
-        hl.plugin.load(path)
-    end
-end)
--- Named specials (special:magic) dismiss via the built-in
--- binds.hide_special_on_workspace_change (see LOOK AND FEEL) — verified
--- same-monitor scoped: it hides only the special on the TARGET workspace's
--- monitor, and also covers switching to the workspace already underneath.
+-- Workspace N owns the scratch zone special:N. This used to be a compiled
+-- compositor plugin (workspace-zones). It is plain config now: the plugin
+-- was built against Hyprland's internal headers, so every Hyprland release
+-- broke it, and its exact version pin held Hyprland upgrades back until a
+-- port existed. The Lua API below is the compositor's public config surface.
+local zones = {}
+
+-- The numbered workspace on the focused monitor, or nil. Named workspaces
+-- have no numeric id, so they own no zone. An open special does not change
+-- the answer: get_active_workspace reports the workspace underneath it.
+local function zone_owner()
+    local ws = hl.get_active_workspace()
+    return ws and ws.id or nil
+end
+
+function zones.toggle()
+    local id = zone_owner()
+    if id then hl.dispatch(hl.dsp.workspace.toggle_special(tostring(id))) end
+end
+
+-- follow = false stashes the window without opening the zone.
+function zones.move(follow)
+    local id = zone_owner()
+    if id then hl.dispatch(hl.dsp.window.move({ workspace = "special:" .. id, follow = follow })) end
+end
+
+-- Leaving a workspace closes its zone, and closes a named special such as
+-- special:magic, through the built-in binds.hide_special_on_workspace_change
+-- (see LOOK AND FEEL). Verified same-monitor scoped: it hides only the
+-- special on the TARGET workspace's monitor, and also covers switching to
+-- the workspace already underneath.
 
 ----------------------------------------------------------------------
 -- MONITORS (hyprstate) ----------------------------------------------
@@ -205,9 +204,9 @@ hl.config({
 
     binds = {
         -- Changing workspaces hides the special open on the TARGET workspace's
-        -- monitor (built-in same-monitor rule). Unlike the plugin's
-        -- workspace.active listener, this also covers switching to the
-        -- workspace already underneath the special (no event fires there).
+        -- monitor (built-in same-monitor rule). This is what closes a
+        -- workspace zone on leave. It also covers switching to the workspace
+        -- already underneath the special, where no workspace event fires.
         hide_special_on_workspace_change = true,
     },
 
@@ -318,13 +317,10 @@ hl.bind(mainMod .. " + SHIFT + 0", hl.dsp.window.move({ workspace = 10 }), { des
 hl.bind(mainMod .. " + S",         hl.dsp.workspace.toggle_special("magic"),          { desc = "Workspaces: Toggle scratchpad" })
 hl.bind(mainMod .. " + SHIFT + S", hl.dsp.window.move({ workspace = "special:magic" }), { desc = "Workspaces: Move window to scratchpad" })
 
--- workspace-zones plugin: first-party Lua functions (hl.plugin.zones.*),
--- registered by the plugin via addLuaFunction. Closures resolve at keypress
--- time, so plugin load order doesn't matter; if the plugin is missing the
--- press logs a Lua error instead of silently doing nothing.
-hl.bind("SUPER + ALT + S",        function() hl.plugin.zones.toggle() end,     { desc = "Workspaces: Toggle zone" })
-hl.bind(hyper .. " + S",          function() hl.plugin.zones.move() end,       { desc = "Workspaces: Move window to zone" })
-hl.bind("SUPER + CTRL + ALT + S", function() hl.plugin.zones.movesilent() end, { desc = "Workspaces: Move window to zone (silent)" })
+-- Workspace zones (see WORKSPACE ZONES above).
+hl.bind("SUPER + ALT + S",        function() zones.toggle() end,    { desc = "Workspaces: Toggle zone" })
+hl.bind(hyper .. " + S",          function() zones.move(true) end,  { desc = "Workspaces: Move window to zone" })
+hl.bind("SUPER + CTRL + ALT + S", function() zones.move(false) end, { desc = "Workspaces: Move window to zone (silent)" })
 
 -- Move current workspace between monitors (relative monitor selectors)
 hl.bind(mainMod .. " + SHIFT + minus", hl.dsp.workspace.move({ monitor = "-1" }), { desc = "Workspaces: Move workspace to previous monitor" })

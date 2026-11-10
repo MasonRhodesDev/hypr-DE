@@ -4,9 +4,9 @@
 # so deps can be dropped when their component goes.
 
 [compositor]
-reason = "Hyprland Lua config API (hl.bind / hyprland.lua). Floor is 0.56: 0.55 has a fullscreen-vs-monitor-removal segfault (null monitor in CLayoutManager::recalculateMonitor, fixed upstream by the #14705 fullscreen refactor, first release v0.56.0). hyprland-git Provides hyprland= so a 0.56+ git build satisfies this."
-fedora = ["hyprland >= 0.56"]
-arch = ["hyprland>=0.56"]
+reason = "Hyprland Lua config API (hl.bind / hyprland.lua). Floor is 0.57: main.lua implements workspace zones with hl.get_active_workspace and hl.dispatch, and 0.56 segfaults when a layer surface unmaps while no real output is enabled (null active workspace in CWorkspace::isVisibleNotCovered via CInputManager::refocusLastWindow, fixed in v0.57.0). hyprland-git Provides hyprland= so a 0.57+ git build satisfies this."
+fedora = ["hyprland >= 0.57"]
+arch = ["hyprland>=0.57"]
 
 [lock-idle]
 reason = "vigil (vigil-lock lock_cmd / before_sleep_cmd), hypridle (idle policy in hypr/hypridle.conf); SUPER+L is loginctl lock-session which hypridle answers. Floor is vigil 0.3: lock-cmd.sh and hypridle.conf use --wait/--warn/--no-warn, which 0.2.x rejects — an unversioned dep let hypr-de 0.2.14 pair with vigil 0.2.16 and silently break idle/suspend locking. Floor is hypridle 0.1.8: the locked-screen listener needs per-listener condition_cmd/condition_retry (0.1.8) and ignore_inhibit (0.1.6); an older hypridle drops the unknown keys and would blank 30 s into any idle, locked or not."
@@ -15,8 +15,8 @@ arch = ["vigil>=0.3.0", "hypridle>=0.1.8"]
 units = ["hypridle.service", "logind-idle-control.service", "logind-idle-control-tray.service"]
 
 [bar]
-reason = "waybar + CFFI workspace buttons module (waybar/config.jsonc). Floor 1.1.2: older modules click-dispatch the classic \"hyprctl dispatch workspace N\", which Hyprland with the Lua config parses as Lua and rejects, so workspace buttons silently do nothing. hyprland-workspace-zones: the workspace-zones compositor plugin (main.lua loads it from /usr/lib64/hyprland/plugins; zones keybinds error without it) — Fedora subpackage since 1.2.0, version-pinned to hyprland; on Arch the plugin ships inside waybar-workspace-buttons itself"
-fedora = ["waybar", "waybar-workspace-buttons >= 1.1.2", "hyprland-workspace-zones"]
+reason = "waybar + CFFI workspace buttons module (waybar/config.jsonc). Floor 1.1.2: older modules click-dispatch the classic \"hyprctl dispatch workspace N\", which Hyprland with the Lua config parses as Lua and rejects, so workspace buttons silently do nothing."
+fedora = ["waybar", "waybar-workspace-buttons >= 1.1.2"]
 arch = ["waybar", "waybar-workspace-buttons>=1.1.2"]
 units = ["waybar.service"]
 

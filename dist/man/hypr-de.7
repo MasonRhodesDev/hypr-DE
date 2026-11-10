@@ -79,15 +79,14 @@ That is built-in Hyprland and needs no plugin.
 .PP
 Each numeric workspace can also own
 .I special:N
-via the workspace-zones plugin. See
+as a zone, implemented in the packaged Lua config. See
 .BR workspace-zones (7).
 .B SUPER+ALT+S
 toggles the focused workspace's zone;
 .B SUPER+ALT+SHIFT+S
 moves the focused window into it;
 .B SUPER+CTRL+ALT+S
-stashes without following. If the plugin is not loaded, those binds log a
-Lua error instead of silently doing nothing.
+stashes without following. Zones need no compositor plugin.
 .SH KEYBINDS
 .B SUPER+/
 opens
