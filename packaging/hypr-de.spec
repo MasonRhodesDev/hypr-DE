@@ -1,5 +1,5 @@
 Name:           hypr-de
-Version:        0.2.38
+Version:        0.2.39
 Release:        1%{?dist}
 Summary:        Alpha Hyprland config set (not ready)
 
@@ -29,10 +29,9 @@ Recommends:     gpu-screen-recorder
 Requires:       grim
 Requires:       gtk4
 Requires:       hypridle >= 0.1.8
-Requires:       hyprland >= 0.56
+Requires:       hyprland >= 0.57
 Requires:       hyprland-guiutils
 Requires:       hyprland-qt-support
-Requires:       hyprland-workspace-zones
 Requires:       hyprpicker
 Requires:       hyprpolkitagent
 Requires:       hyprpwcenter
@@ -228,6 +227,20 @@ systemctl --global disable --no-reload waybar-watchdog.timer >/dev/null 2>&1 || 
 %{_prefix}/lib/environment.d/70-hypr-de-gaming.conf
 
 %changelog
+* Tue Nov 10 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.39-1
+- Workspace zones are plain Lua in main.lua and no longer need the
+  workspace-zones compositor plugin. The plugin was built against
+  Hyprland's internal headers, so each Hyprland release broke it, and its
+  exact version pin held Hyprland upgrades back until a port existed (it
+  kept machines on 0.56.2 after 0.57 fixed a compositor crash). The three
+  zone keybinds behave as before. Leaving a workspace closes its zone
+  through the built-in binds.hide_special_on_workspace_change, which
+  main.lua already set.
+- hyprland-workspace-zones is no longer required. main.lua no longer loads
+  a plugin, and hypr-de-setup no longer warns when it is missing.
+- Requires hyprland >= 0.57, for the Lua query API the zones use and for
+  the crash fix.
+
 * Tue Oct 13 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.38-1
 - hypr-de-wallpaper lmtt module: after every `lmtt switch`, swaybg and the
   hyprlock conf follow the appearance registry, so a wallpaper set from

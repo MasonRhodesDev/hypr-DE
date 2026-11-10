@@ -35,7 +35,7 @@ module is the indicator — left-click Overskride, right-click adapter power.
 <b>Scratchpad vs workspace zones</b>
 SUPER+S / SUPER+0 toggles the named scratchpad <tt>special:magic</tt> (works \
 with stock Hyprland). SUPER+ALT+S toggles this workspace's zone \
-(<tt>special:N</tt> on workspace N) and needs the workspace-zones plugin \
+(<tt>special:N</tt> on workspace N), built into the packaged config \
 (<tt>man workspace-zones</tt>). Named scratchpads are never those zones.
 
 <b>Keys</b>

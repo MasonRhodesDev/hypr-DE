@@ -67,10 +67,6 @@ files=(
     /usr/share/hypr-de/waybar/config.jsonc
     /usr/share/vigil/slint-kit/ui/theme.slint
 )
-# The workspace-zones Hyprland plugin is packaged on Arch only; on Fedora it
-# is ABI-locked to the compositor and installed via hyprpm (main.lua probes
-# both packaged paths and ~/.local, so its absence is not a failure there).
-[ "$DISTRO" = arch ] && files+=(/usr/lib/hyprland/plugins/libworkspace-zones.so)
 for f in "${files[@]}"
 do
     if [ -e "$f" ]; then
@@ -115,10 +111,15 @@ if grep -q 'command -v swaync-client' /usr/share/hypr-de/waybar/config.jsonc; th
 else
     bad "waybar notifications still use which (or exec-if missing)"
 fi
-if grep -q '/usr/lib/hyprland/plugins/libworkspace-zones.so' /usr/share/hypr-de/hypr/main.lua; then
-    ok "main.lua loads packaged workspace-zones"
+if grep -q 'hl.plugin' /usr/share/hypr-de/hypr/main.lua; then
+    bad "main.lua still depends on a compositor plugin"
 else
-    bad "main.lua does not mention packaged workspace-zones path"
+    ok "main.lua needs no compositor plugin"
+fi
+if grep -q 'function zones.toggle' /usr/share/hypr-de/hypr/main.lua; then
+    ok "main.lua defines workspace zones in Lua"
+else
+    bad "main.lua does not define workspace zones"
 fi
 
 echo "== fonts / icons"
