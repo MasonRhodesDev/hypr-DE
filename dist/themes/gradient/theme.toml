@@ -1,5 +1,3 @@
-# @THEMEDIR@ expands to this theme's installed directory at apply time.
-
 [meta]
 name = "gradient"
 description = "The hypr-DE default: dark radial gradient, tonal-spot Material You"
