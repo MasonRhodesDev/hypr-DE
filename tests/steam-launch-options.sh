@@ -1,11 +1,4 @@
 #!/bin/bash
-# steam-set-launch-options: what may reach Steam's LaunchOptions, and how it
-# is written into localconfig.vdf. See issue #12.
-#
-# Steam executes LaunchOptions as `ENV=v wrapper %command%` on every launch,
-# and the strings on offer are produced by a model prompted with ProtonDB and
-# Steam store text. These cases are the boundary between that remote text and
-# code running as the user.
 set -uo pipefail
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 
@@ -113,8 +106,6 @@ cat > "$vdf" <<'VDF'
 VDF
 cp "$vdf" "$work/pristine.vdf"
 
-# A value with the characters the old sed-escape-then-awk-consume path
-# mangled: slashes and percent signs.
 want='WINEPREFIX=/home/p/.wine PROTON_LOG=1 mangohud %command%'
 if update_vdf_launch_options "$vdf" 220 "$want" >/dev/null 2>&1; then
     got=$(parse_vdf_get_launch_options "$vdf" 220)
@@ -127,7 +118,6 @@ n=$(grep -c '"LaunchOptions"' "$vdf")
 grep -q '"1700000001"' "$vdf" && ok "other apps untouched" || bad "clobbered another app"
 ls "$vdf".backup.* >/dev/null 2>&1 && ok "backup written" || bad "no backup"
 
-# An app with no LaunchOptions gets one added.
 if update_vdf_launch_options "$vdf" 440 "mangohud %command%" >/dev/null 2>&1; then
     got=$(parse_vdf_get_launch_options "$vdf" 440)
     [ "$got" = "mangohud %command%" ] && ok "inserted for an app that had none" || bad "insert gave '$got'"
@@ -135,7 +125,6 @@ else
     bad "refused to insert"
 fi
 
-# The chokepoint refuses, so a quote can never add VDF keys of its own.
 cp "$work/pristine.vdf" "$vdf"
 inject='RADV_PERFTEST=aco"  "AllowSkipGameUpdate"  "1'
 if update_vdf_launch_options "$vdf" 220 "$inject" >/dev/null 2>&1; then
@@ -152,8 +141,6 @@ grep -q AllowSkipGameUpdate "$vdf" && bad "injected key landed in the VDF" || ok
 
 echo
 echo "== the force-kill actually kills both processes"
-# pkill takes ONE pattern: "pkill -9 steam steamwebhelper" is a usage error,
-# and the `|| true` swallowed it, so the force-kill silently never ran.
 killdir="$work/killbin"; mkdir -p "$killdir"
 cat > "$killdir/pkill" <<'STUB'
 #!/bin/sh
@@ -163,13 +150,13 @@ exit 0
 STUB
 printf '#!/bin/sh
 exit 0
-' > "$killdir/pgrep"      # "steam is running"
+' > "$killdir/pgrep"
 printf '#!/bin/sh
 exit 0
 ' > "$killdir/steam"
 printf '#!/bin/sh
 exit 0
-' > "$killdir/sleep"      # keep the suite quick
+' > "$killdir/sleep"
 chmod +x "$killdir"/*
 PKILL_LOG="$work/pkill.log"; export PKILL_LOG; : > "$PKILL_LOG"
 PATH="$killdir:$PATH" kill_steam >/dev/null 2>&1
@@ -188,7 +175,6 @@ echo "== the VDF reader does not depend on gawk"
 grep -qE 'match\(.+,.+,.+\)' "$root/dist/gaming/steam-set-launch-options" \
     && bad "three-argument match() is a gawk extension; mawk returns nothing" \
     || ok "no gawk-only match()"
-# and it still reads a value back
 vdf2="$work/reader.vdf"
 cat > "$vdf2" <<'VDF'
 				"apps"

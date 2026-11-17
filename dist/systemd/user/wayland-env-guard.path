@@ -2,8 +2,6 @@
 Description=Watch the runtime dir for Wayland socket churn
 
 [Path]
-# Watch the Hyprland instance dir, not the whole runtime dir: a fresh login
-# creates dozens of files under %t and hits systemd's trigger limit.
 PathModified=%t/hypr
 TriggerLimitIntervalSec=10s
 TriggerLimitBurst=20

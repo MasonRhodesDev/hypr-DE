@@ -1,10 +1,8 @@
 -- hypr-DE Neovim colors — rendered by lmtt. Mode: {{mode}}
--- Sourced from /etc/xdg/nvim/sysinit.vim; your ~/.config/nvim wins.
 local set = vim.api.nvim_set_hl
 vim.o.background = "{{mode}}"
 vim.g.colors_name = "lmtt-material-you"
 
--- editor chrome
 set(0, "Normal",        { fg = "{{on_surface}}", bg = "{{surface}}" })
 set(0, "NormalFloat",   { fg = "{{on_surface}}", bg = "{{surface_container}}" })
 set(0, "FloatBorder",   { fg = "{{outline}}", bg = "{{surface_container}}" })
@@ -34,7 +32,6 @@ set(0, "Title",         { fg = "{{primary}}", bold = true })
 set(0, "NonText",       { fg = "{{outline_variant}}" })
 set(0, "Whitespace",    { fg = "{{outline_variant}}" })
 
--- syntax
 set(0, "Comment",       { fg = "{{outline}}", italic = true })
 set(0, "Constant",      { fg = "{{tertiary}}" })
 set(0, "String",        { fg = "{{secondary}}" })
@@ -57,7 +54,6 @@ set(0, "DiagnosticWarn",  { fg = "{{tertiary}}" })
 set(0, "DiagnosticInfo",  { fg = "{{secondary}}" })
 set(0, "DiagnosticHint",  { fg = "{{on_surface_variant}}" })
 
--- treesitter core (fall back to the classic groups above where unset)
 set(0, "@comment",      { link = "Comment" })
 set(0, "@keyword",      { link = "Keyword" })
 set(0, "@function",     { link = "Function" })

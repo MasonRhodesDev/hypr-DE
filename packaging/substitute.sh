@@ -1,8 +1,4 @@
 #!/bin/bash
-# Substitute @TOKEN@ install paths into a staged copy of dist/.
-#   usage: substitute.sh <staged-dist-dir>
-# Token values come from packaging/paths.conf (env-overridable per distro).
-# Binary files (e.g. wallpapers) are skipped by the text-file test.
 set -euo pipefail
 
 STAGE="${1:?usage: substitute.sh <staged-dist-dir>}"
@@ -19,7 +15,6 @@ find "$STAGE" -type f | while read -r f; do
     fi
 done
 
-# Gate: none of OUR tokens may survive (@DEFAULT_AUDIO_SINK@ etc. are wpctl's)
 if LEFT=$(grep -rn "@\(BINDIR\|DATADIR\|LIBEXECDIR\|WAYBAR_CFFI\|UNITDIR\|PRESETDIR\|ENVGENDIR\|XDGCONFDIR\)@" "$STAGE" -l 2>/dev/null | head -5) && [ -n "$LEFT" ]; then
     echo "ERROR: unsubstituted tokens remain in: $LEFT" >&2
     exit 1

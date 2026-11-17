@@ -1,20 +1,11 @@
 #!/bin/bash
-# Post-upgrade checks. Runs in the guest AFTER hypr-de has been upgraded while
-# a graphical session was live -- the scenario the fresh-install checks cannot
-# reach, because nobody logs in during an automated run.
-#
-# The regression this exists for: pacman/rpm replace a watched config file by
-# unlinking and rewriting it, Hyprland's inotify watcher fires in that window,
-# the open fails, and "Your config has errors: cannot open
-# /etc/xdg/hypr/hyprland.lua" stays latched on screen. hypr-de ships a
-# PostTransaction hook that reloads live sessions to clear it.
 set -uo pipefail
 
 fail=0
 ok()  { printf 'ok   %s\n' "$*"; }
 bad() { printf 'FAIL %s\n' "$*"; fail=1; }
 
-XDG_RUNTIME_DIR="/run/user/$(id -u)"   # split: export+assign masks id(1) status (SC2155)
+XDG_RUNTIME_DIR="/run/user/$(id -u)"
 export XDG_RUNTIME_DIR
 eval "$(systemctl --user show-environment 2>/dev/null \
     | grep -E '^(HYPRLAND_INSTANCE_SIGNATURE|WAYLAND_DISPLAY)=' | sed 's/^/export /')"
@@ -28,9 +19,6 @@ else
 fi
 
 echo "== no config error left by the upgrade"
-# Best-effort: the pacman/rpm unlink->write race is timing dependent and does
-# NOT reproduce on every upgrade, so a clean result here does not by itself
-# prove the fix works. The deterministic proof is the recovery test below.
 errs=$(hyprctl configerrors 2>&1)
 if [ -z "$errs" ] || printf '%s' "$errs" | grep -qi 'no errors'; then
     ok "hyprctl configerrors is clean after the upgrade"
@@ -40,11 +28,6 @@ else
 fi
 
 echo "== recovery mechanism (deterministic red/green)"
-# Reproduce the banner exactly as an upgrade does -- make the watched file
-# briefly absent and let Hyprland's watcher fail to open it -- then prove the
-# shipped helper clears it. Restoring the file alone does NOT clear the error;
-# that is the whole reason the reload helper exists. If the helper regresses,
-# this fails.
 helper=/usr/lib/hypr-de/hypr-de-reload-sessions
 [ -x "$helper" ] || helper=/usr/libexec/hypr-de/hypr-de-reload-sessions
 if [ -x "$helper" ]; then
@@ -96,7 +79,6 @@ if command -v pacman >/dev/null; then
         bad "pacman never ran the reload hook"
     fi
 else
-    # Fedora: %posttrans, no per-hook log line; assert the helper exists.
     if [ -x /usr/libexec/hypr-de/hypr-de-reload-sessions ]; then
         ok "reload helper installed (rpm %posttrans path)"
     else

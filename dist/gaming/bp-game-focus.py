@@ -1,34 +1,4 @@
 #!/usr/bin/env python3
-"""Steam Big Picture / game session state machine for Hyprland.
-
-States (derived from the active window):
-  DESKTOP - normal desktop use. Game windows opening here load in the
-            background (rules.conf blocks their initial focus).
-  BP      - Big Picture is the active window. Kept fullscreen at all times.
-  GAME    - a game window is active. Game windows opening here steal focus
-            and are fullscreened (covers splash -> main window chains).
-
-Inputs:
-  - Hyprland socket2 events: openwindow / closewindow / activewindowv2 /
-    fullscreen
-  - Gamepad guide button (BTN_MODE) via evdev, with bluetooth hotplug:
-      press -> focus newest game window; else focus Big Picture; else launch
-      Big Picture (never the desktop Steam window — it lives on special:magic)
-  - SIGUSR1 simulates a guide press (for testing / keyboard binds)
-  - Steam CEF log (cef_log.txt) tail: detects GPU-process crashes and, on a
-    crash storm with no game running, cleanly restarts Steam (recovery)
-
-rules.conf keeps no_initial_focus/focus_on_activate off on game windows and
-focus_on_activate off on Big Picture; this daemon is the only thing moving
-focus between them, and it touches the BP window as little as possible —
-rapid reparent/resize churn on XWayland is what triggers the CEF GPU
-context-loss crash that drops Big Picture to software rendering (the lag).
-
-On startup it also re-applies the --disable-gpu-process-crash-limit flag to
-Steam's webhelper wrapper (Steam overwrites it on client updates) so a single
-GPU context-loss crash respawns the GPU process instead of permanently
-falling back to software.
-"""
 
 import asyncio
 import json
@@ -47,36 +17,24 @@ SOCKET2 = "{}/hypr/{}/.socket2.sock".format(
 LOG_PATH = f"{RUNTIME}/bp-game-focus.log"
 
 BP_TITLE = "Steam Big Picture Mode"
-BTN_MODE = evdev.ecodes.BTN_MODE  # 316: Xbox guide / PS button
-GUIDE_COOLDOWN = 0.4  # s; dedups physical + Steam-virtual-pad double reports
-FULLSCREEN_GRACE = 0.3  # s; let a game self-fullscreen before we force it
-BP_LAUNCH_TIMEOUT = 20.0  # s; window in which a freshly launched BP gets focused
+BTN_MODE = evdev.ecodes.BTN_MODE
+GUIDE_COOLDOWN = 0.4
+FULLSCREEN_GRACE = 0.3
+BP_LAUNCH_TIMEOUT = 20.0
 
 STEAM_HOME = os.path.expanduser("~/.local/share/Steam")
 CEF_LOG = f"{STEAM_HOME}/logs/cef_log.txt"
-# Steam launches the webhelper through this wrapper; appending the flag here is
-# the one point that reliably reaches CEF (Steam doesn't forward arbitrary
-# -cef-* args). Steam rewrites the file on client updates, so we re-patch it.
 WEBHELPER_WRAP = f"{STEAM_HOME}/ubuntu12_64/steamwebhelper_sniper_wrap.sh"
 CEF_RECOVER_FLAG = "--disable-gpu-process-crash-limit"
-# Keep in sync with the exec-once steam launch in ~/.config/hypr/configs/exec.conf
 STEAM_LAUNCH = ["uwsm", "app", "--", "steam", "-cef-force-glx"]
-# GPU-crash storm -> clean restart (only when no game is running)
-CRASH_WINDOW = 45.0  # s; sliding window for counting GPU-process crashes
-CRASH_LIMIT = 3  # crashes within CRASH_WINDOW that trigger a recovery restart
-RESTART_DEBOUNCE = 300.0  # s; never auto-restart more often than this
+CRASH_WINDOW = 45.0
+CRASH_LIMIT = 3
+RESTART_DEBOUNCE = 300.0
 
 _log_file = open(LOG_PATH, "w", buffering=1)
 
 
 def lua_str(value: str) -> str:
-    """Quote a value as a Lua string literal for a Hyprland dispatch.
-
-    Workspace names and window addresses are interpolated into Lua source
-    that Hyprland parses. They are not app-settable today, so this is
-    defense in depth -- but a name carrying a quote or a backslash would
-    otherwise end the literal and the rest would parse as code.
-    """
     escaped = value.replace("\\", "\\\\").replace('"', '\\"')
     return f'"{escaped}"'
 
@@ -108,10 +66,6 @@ def window_workspace(addr: str) -> str | None:
 
 
 def close_special_except(keep: str | None) -> None:
-    """Toggle off any special workspace shown on a monitor, except `keep`.
-    focuswindow switches the base workspace under the target but leaves a
-    special overlay (e.g. special:magic) toggled on top — close it so guiding
-    to a game/BP on a regular workspace actually leaves the special workspace."""
     for mon in json.loads(hyprctl("monitors", "-j") or "[]"):
         name = mon.get("specialWorkspace", {}).get("name", "")
         if name and name != keep:
@@ -120,14 +74,11 @@ def close_special_except(keep: str | None) -> None:
 
 
 def ensure_webhelper_patch() -> None:
-    """Re-add CEF_RECOVER_FLAG to Steam's webhelper wrapper if missing.
-    Steam overwrites this file on client updates, so the daemon re-applies it
-    on startup. Takes effect on the next Steam (re)launch, not retroactively."""
     try:
         with open(WEBHELPER_WRAP) as f:
             content = f.read()
     except OSError:
-        return  # Steam not installed where we expect; nothing to do
+        return
     if CEF_RECOVER_FLAG in content:
         return
     target = 'exec ./steamwebhelper "$@"'
@@ -143,8 +94,6 @@ def ensure_webhelper_patch() -> None:
 
 
 def restart_steam(reason: str) -> None:
-    """Clean-shutdown + relaunch Steam, detached so it survives this daemon.
-    Used to recover from a CEF GPU-crash storm that left BP in software."""
     log(f"auto-recover: restarting Steam ({reason})")
     script = (
         "/usr/bin/steam -shutdown >/dev/null 2>&1; "
@@ -160,7 +109,7 @@ def restart_steam(reason: str) -> None:
     )
 
 
-LAUNCHER_CLASSES = {"org.prismlauncher.PrismLauncher"}  # Steam-launched, but not games
+LAUNCHER_CLASSES = {"org.prismlauncher.PrismLauncher"}
 
 
 def window_pid(addr: str) -> int | None:
@@ -168,11 +117,7 @@ def window_pid(addr: str) -> int | None:
 
 
 def under_steam_launch(pid: int | None) -> bool:
-    """True if the process hangs off Steam's `reaper SteamLaunch AppId=N`
-    wrapper — i.e. Steam launched it (Steam game or non-Steam shortcut).
-    Steam's own UI (steamwebhelper etc.) is a child of steam but never of
-    reaper, so it never matches."""
-    for _ in range(40):  # ancestry depth guard
+    for _ in range(40):
         if not pid or pid <= 1:
             return False
         try:
@@ -181,16 +126,13 @@ def under_steam_launch(pid: int | None) -> bool:
                     return True
             with open(f"/proc/{pid}/stat") as f:
                 stat = f.read()
-        except OSError:  # process exited mid-walk
+        except OSError:
             return False
-        pid = int(stat.rpartition(")")[2].split()[1])  # ppid
+        pid = int(stat.rpartition(")")[2].split()[1])
     return False
 
 
 def is_game(cls: str, title: str, pid: int | None = None) -> bool:
-    """Class/title set from the game rules in rules.conf, plus anything whose
-    process tree hangs off Steam's launch reaper (catches native games that
-    set their own window class, e.g. Minecraft via Prism)."""
     if cls in LAUNCHER_CLASSES or cls == "steam":
         return False
     if cls.startswith("steam_app_") or cls == "gamescope" or title == "Godot":
@@ -204,13 +146,12 @@ class SteamSession:
     def __init__(self) -> None:
         self.state = self.DESKTOP
         self.bp_addr: str | None = None
-        self.games: dict[str, str] = {}  # addr -> class, newest last
+        self.games: dict[str, str] = {}
         self._last_guide = 0.0
-        self._pending_bp = 0.0  # monotonic time of a guide-triggered BP launch
+        self._pending_bp = 0.0
         self.resync()
 
     def resync(self) -> None:
-        """Rebuild window tracking from hyprctl (daemon may start late)."""
         self.bp_addr = None
         self.games.clear()
         for c in clients():
@@ -221,11 +162,9 @@ class SteamSession:
         self.on_active(active_window().get("address"))
         log(f"resync: state={self.state} bp={self.bp_addr} games={list(self.games)}")
 
-    # --- transitions -------------------------------------------------------
-
     def on_open(self, addr: str, cls: str, title: str) -> None:
         if cls == "steam" and title == BP_TITLE:
-            self.bp_addr = addr  # rules.conf already fullscreens it on ws 7
+            self.bp_addr = addr
             log(f"BP opened: {addr}")
             if time.monotonic() - self._pending_bp < BP_LAUNCH_TIMEOUT:
                 self._pending_bp = 0.0
@@ -250,11 +189,6 @@ class SteamSession:
         prev = self.state
         if addr and addr == self.bp_addr:
             self.state = self.BP
-            # Re-assert fullscreen when BP regains focus (e.g. a fullscreen game
-            # exited — Hyprland allows one fullscreen per workspace, so the game
-            # had un-fullscreened BP). ensure_bp_fullscreen() is a no-op when BP
-            # is already fullscreen, so this only fires when genuinely needed and
-            # isn't the rapid resize churn that crashes CEF's GPU process.
             self.ensure_bp_fullscreen()
         elif addr in self.games:
             self.state = self.GAME
@@ -274,18 +208,13 @@ class SteamSession:
         self._last_guide = now
 
         if self.games:
-            addr = next(reversed(self.games))  # newest game window
+            addr = next(reversed(self.games))
             log(f"guide -> focus game {self.games[addr]}")
             asyncio.create_task(self.focus_fullscreen(addr))
         elif self.bp_addr:
             log("guide -> focus Big Picture")
             asyncio.create_task(self.focus_bp(self.bp_addr))
         else:
-            # No game, no BP window. Open Big Picture — never fall back to the
-            # desktop Steam window (it lives on special:magic, so focusing it
-            # would yank us onto the special workspace, the opposite of intent).
-            # steam://open/bigpicture switches a running Steam into BP, or
-            # starts Steam straight into it. on_open focuses it when it appears.
             log("guide -> launching Big Picture")
             self._pending_bp = now
             subprocess.Popen(
@@ -294,11 +223,7 @@ class SteamSession:
                 stderr=subprocess.DEVNULL,
             )
 
-    # --- actions -----------------------------------------------------------
-
     async def focus_bp(self, addr: str) -> None:
-        # Single focus dispatch (minimise window churn). Then close any special
-        # overlay and assert fullscreen once if BP didn't come up fullscreen.
         hyprctl("dispatch", f'hl.dsp.focus({{ window = {lua_str(f"address:{addr}")} }})')
         close_special_except(window_workspace(addr))
         await asyncio.sleep(FULLSCREEN_GRACE)
@@ -310,26 +235,17 @@ class SteamSession:
         await asyncio.sleep(FULLSCREEN_GRACE)
         aw = active_window()
         if aw.get("address") == addr and aw.get("fullscreen") != 2:
-            # The guard above means the window is not fullscreen: "set" is the
-            # race-safe form of the old toggle.
             hyprctl("dispatch", 'hl.dsp.window.fullscreen({ mode = "fullscreen", action = "set" })')
 
     def ensure_bp_fullscreen(self) -> None:
         aw = active_window()
         if aw.get("address") == self.bp_addr and aw.get("fullscreen") != 2:
             log("re-fullscreening Big Picture")
-            # The guard above means the window is not fullscreen: "set" is the
-            # race-safe form of the old toggle.
             hyprctl("dispatch", 'hl.dsp.window.fullscreen({ mode = "fullscreen", action = "set" })')
 
 
-# --- inputs ----------------------------------------------------------------
-
 
 async def hypr_events(sm: SteamSession) -> None:
-    # NOTE: the writer must stay referenced for the life of the loop — if it is
-    # garbage collected, StreamWriter.__del__ closes the transport and the
-    # reader sees EOF (bit us on Python 3.14).
     reader, writer = await asyncio.open_unix_connection(SOCKET2)
     try:
         await _read_events(reader, sm)
@@ -371,7 +287,6 @@ async def watch_gamepad(sm: SteamSession, dev: evdev.InputDevice, watched: set) 
 
 
 async def gamepad_scanner(sm: SteamSession) -> None:
-    """Watch every device exposing BTN_MODE; rescan for bluetooth hotplug."""
     watched: set[str] = set()
     while True:
         for path in evdev.list_devices():
@@ -391,9 +306,6 @@ async def gamepad_scanner(sm: SteamSession) -> None:
 
 
 async def cef_log_watch(sm: SteamSession) -> None:
-    """Tail Steam's CEF log; on a GPU-process crash storm with no game running,
-    cleanly restart Steam. With CEF_RECOVER_FLAG a lone crash self-heals, so
-    this only fires when CEF can't recover (repeated crashes in a short span)."""
     crashes: deque[float] = deque()
     last_restart = 0.0
     last_patch = time.monotonic()
@@ -405,22 +317,15 @@ async def cef_log_watch(sm: SteamSession) -> None:
                 f = open(CEF_LOG)
                 st_ino = os.fstat(f.fileno()).st_ino
                 if inode is None or st_ino == inode:
-                    # First open (ignore pre-existing history) or reopen of the
-                    # same file after a transient error (avoid double-counting).
                     f.seek(0, 2)
-                # else: rotated/recreated file — read from 0 so crash lines
-                # written between rotation and reopen aren't missed.
                 inode = st_ino
             line = f.readline()
             if not line:
-                # detect log rotation / truncation (e.g. a Steam restart)
                 st = os.stat(CEF_LOG)
                 if st.st_ino != inode or st.st_size < f.tell():
                     f.close()
                     f = None
                     continue
-                # Steam rewrites the webhelper wrapper from its package (seen
-                # reverting our flag mid-session), so re-assert it periodically.
                 if time.monotonic() - last_patch > 120:
                     last_patch = time.monotonic()
                     ensure_webhelper_patch()
@@ -435,7 +340,7 @@ async def cef_log_watch(sm: SteamSession) -> None:
             log(f"CEF GPU crash detected ({len(crashes)} within {int(CRASH_WINDOW)}s)")
             if (
                 len(crashes) >= CRASH_LIMIT
-                and not sm.games  # never restart out from under a running game
+                and not sm.games
                 and now - last_restart > RESTART_DEBOUNCE
             ):
                 last_restart = now
@@ -458,7 +363,7 @@ async def main() -> None:
     asyncio.get_running_loop().add_signal_handler(signal.SIGUSR1, sm.on_guide)
     gamepads = asyncio.create_task(gamepad_scanner(sm))
     cefwatch = asyncio.create_task(cef_log_watch(sm))
-    await hypr_events(sm)  # returns when Hyprland exits
+    await hypr_events(sm)
     gamepads.cancel()
     cefwatch.cancel()
 

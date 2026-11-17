@@ -1,8 +1,4 @@
 #!/bin/bash
-# hypr-de-sys-setup edits /etc/pam.d/greetd as root from the package
-# scriptlet. See issue #15: it used to pipe awk over the live file with no
-# validation and no backup, so a bad rewrite meant a login lockout. These
-# cases pin the rule -- when anything looks wrong, the original survives.
 set -uo pipefail
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 
@@ -50,8 +46,6 @@ wire_keyring_pam "$pam" >/dev/null 2>&1
 
 echo
 echo "== a rewrite that comes out empty must not touch the original"
-# Exactly the reported failure: an awk that produces nothing (a different
-# awk, or a PAM file this was not written against).
 pam="$work/greetd-empty"; arch_pam "$pam"
 before=$(cat "$pam")
 stub="$work/stub"; mkdir -p "$stub"

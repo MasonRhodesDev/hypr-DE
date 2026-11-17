@@ -1,6 +1,4 @@
 #!/bin/bash
-# power-menu.sh runs desktop-boot-exit when it is installed and falls back to
-# hyprshutdown when it is not, passing the same -p post command either way.
 set -uo pipefail
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 work=$(mktemp -d)
@@ -9,7 +7,6 @@ fail=0
 ok()  { printf 'ok   %s\n' "$*"; }
 bad() { printf 'FAIL %s\n' "$*"; fail=1; }
 
-# Stubs: fuzzel picks $PICK, the exit commands record their argv.
 mkdir -p "$work/with" "$work/without"
 for d in with without; do
     printf '#!/bin/sh\ncat >/dev/null; printf "%%s\\n" "$PICK"\n' >"$work/$d/fuzzel"
@@ -18,7 +15,7 @@ done
 printf '#!/bin/sh\necho "desktop-boot-exit $*" >>"$LOG"\n' >"$work/with/desktop-boot-exit"
 chmod +x "$work"/with/* "$work"/without/*
 
-run() {  # run DIR PICK
+run() {
     : >"$work/log"
     LOG="$work/log" PICK="$2" PATH="$work/$1:/usr/bin:/bin" bash "$root/dist/libexec/power-menu.sh"
     cat "$work/log"

@@ -1,13 +1,4 @@
-/* hypr-DE swaync stylesheet — rendered by lmtt into ~/.config/hypr-de/swaync.css.
- * Template: @DATADIR@/lmtt/templates/swaync.css.hbs. Mode: {{mode}}
- *
- * Colors are defined inline from lmtt's Material You tokens so this sheet is
- * self-contained: swaync is launched with --style pointing here (never a
- * ~/.config/swaync/style.css), and lmtt's built-in swaync module only writes
- * the separate lmtt-colors.css when a style.css marks swaync "configured".
- * That gate never fires for the --style setup, so importing it left every
- * @color undefined and the control-center transparent. Defining them here
- * removes the cross-module dependency entirely. */
+/* hypr-DE swaync stylesheet — rendered by lmtt into ~/.config/hypr-de/swaync.css. */
 @define-color background {{surface}};
 @define-color surface_variant {{surface_variant}};
 @define-color surface_container_low {{surface_container_low}};
@@ -26,7 +17,6 @@
   font-size: 14px;
 }
 
-/* Notification row */
 .notification-row {
   outline: none;
   background: transparent;
@@ -37,13 +27,11 @@
   background: transparent;
 }
 
-/* Notification background container */
 .notification-row .notification-background {
   padding: 0;
   background: transparent;
 }
 
-/* The actual notification */
 .notification-row .notification-background .notification {
   background: @background;
   border-radius: 12px;
@@ -52,7 +40,6 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-/* Control Center */
 .control-center {
   background: @background;
   border-radius: 16px;
@@ -62,7 +49,6 @@
   color: @on_surface;
 }
 
-/* Notification content */
 .notification-content {
   padding: 12px;
   background: transparent;
@@ -85,14 +71,12 @@
   font-size: 13px;
 }
 
-/* Collapsed-group headers (app name row above stacked notifications) */
 .notification-group .notification-group-headers .notification-group-header,
 .notification-group .notification-group-headers .notification-group-icon,
 .notification-group .notification-group-buttons {
   color: @on_surface;
 }
 
-/* Action buttons (e.g. "Reply", "Mark as read", 2FA copy) */
 .notification-row .notification-background .notification .notification-action {
   background: @surface_container_high;
   color: @on_surface;
@@ -116,7 +100,6 @@
   opacity: 0.85;
 }
 
-/* Inline reply */
 .notification-row .notification-background .notification .inline-reply {
   margin: 0 6px 6px 6px;
 }
@@ -147,7 +130,6 @@
   opacity: 0.9;
 }
 
-/* Close button */
 .notification-row .notification-background .close-button {
   background: @error;
   color: @on_error;
@@ -165,7 +147,6 @@
   background: @error;
 }
 
-/* Floating notifications */
 .floating-notifications {
   background: transparent;
 }
@@ -174,7 +155,6 @@
   background: transparent;
 }
 
-/* Control center list */
 .control-center .control-center-list {
   background: transparent;
 }
@@ -188,7 +168,6 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-/* Widget titles */
 .widget-title {
   margin-bottom: 8px;
 }
@@ -212,7 +191,6 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
-/* Widgets */
 .widget-dnd,
 .widget-volume,
 .widget-backlight,
@@ -225,7 +203,6 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-/* DND Switch */
 .widget-dnd > label {
   color: @on_surface;
 }
@@ -243,9 +220,6 @@
 }
 
 .widget-dnd > switch slider {
-  /* Fixed white knob: readable on both the unchecked (surface_variant) and
-     checked (primary) track in either mode; a theme-text-colored knob is
-     near-black in light mode */
   background: #ffffff;
   border: 1px solid alpha(@outline, 0.3);
   border-radius: 50%;
@@ -254,7 +228,6 @@
   margin: 2px;
 }
 
-/* Sliders */
 .widget-volume scale,
 .widget-backlight scale {
   min-height: 20px;
@@ -286,14 +259,11 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
-/* Media Player */
 .widget-mpris-player {
   padding: 8px;
   background: transparent;
 }
 
-/* Mpris text renders on a dark scrim over arbitrary album art in BOTH
-   modes — it must stay light regardless of theme */
 .widget-mpris-title {
   color: #ffffff;
   font-weight: 500;
@@ -326,7 +296,6 @@
   color: @on_primary;
 }
 
-/* Blank window */
 .blank-window {
   background: transparent;
 }

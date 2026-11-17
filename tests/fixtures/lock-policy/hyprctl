@@ -1,10 +1,6 @@
 #!/bin/sh
-# Stand-in for hyprctl: answers the compositor-lock query from the
-# environment and logs every dispatch so effects are observable.
 case "${1:-}" in
     -j)
-        # `-j clients`: one inhibiting client when the environment says so,
-        # else an empty list. A query, not an effect - not logged.
         if [ "${2:-}" = clients ]; then
             [ "${LOCK_POLICY_COMPOSITOR_HANG:-0}" = 1 ] && sleep 30
             if [ -n "${LOCK_POLICY_INHIBIT_CLIENT:-}" ]; then
@@ -15,8 +11,6 @@ case "${1:-}" in
             exit 0
         fi ;;
     locked)
-        # A wedged compositor: the scripts run on hypridle's single
-        # synchronous loop, so they must bound this too.
         [ "${LOCK_POLICY_COMPOSITOR_HANG:-0}" = 1 ] && sleep 30
         printf '%s\n' "${LOCK_POLICY_COMPOSITOR_LOCKED:-false}"
         exit 0 ;;

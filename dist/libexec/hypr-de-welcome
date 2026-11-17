@@ -1,7 +1,4 @@
 #!/bin/bash
-# One-time first-login greeting, invoked from main.lua's hyprland.start hook.
-# --adopt: pre-seed the marker so migrating users get no retro-greeting
-# (called by hypr-de-setup --adopt).
 set -u
 
 CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}"
@@ -15,6 +12,6 @@ fi
 
 [ -e "$MARKER" ] && exit 0
 mkdir -p "$CONFIG/hypr-de"
-touch "$MARKER"   # once-ever, regardless of how the window ends
+touch "$MARKER"
 
 exec @BINDIR@/hypr-de-help --welcome

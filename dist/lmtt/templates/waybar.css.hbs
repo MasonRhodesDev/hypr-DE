@@ -1,10 +1,6 @@
-/* hypr-DE waybar stylesheet — rendered by lmtt into ~/.config/hypr-de/waybar.css.
- * Template: @DATADIR@/lmtt/templates/waybar.css.hbs (override via
- * ~/.config/lmtt/modules/hypr-de-waybar.toml). Palette import is relative
- * to the RENDERED file's directory (~/.config/hypr-de/). Mode: {{mode}} */
+/* hypr-DE waybar stylesheet — rendered by lmtt into ~/.config/hypr-de/waybar.css. */
 @import url('../matugen/lmtt-colors.css');
 
-/* Base styling - aligned with swaync */
 * {
     font-size: 14px;
     font-family: sans-serif;
@@ -15,7 +11,6 @@ window#waybar {
     all: unset;
 }
 
-/* Main container modules - scalable and consistent */
 .modules-left,
 .modules-right,
 .modules-center {
@@ -39,13 +34,6 @@ window#waybar {
     box-shadow: none;
 }
 
-/* Screen recorder module - prominent red when recording.
-   The REC button sits to the LEFT of the media module; an invisible,
-   equal-width mirror (#custom-screen-recorder-spacer) sits to its RIGHT so
-   the media module stays perfectly centered while recording. The two boxes
-   must be dimensionally identical (same font-weight, padding, min-width)
-   with mirrored margins so their footprints cancel out. Both are hidden by
-   waybar (empty text) while idle. */
 #custom-screen-recorder,
 #custom-screen-recorder-spacer {
     padding-left: 4px;
@@ -58,12 +46,12 @@ window#waybar {
 }
 
 #custom-screen-recorder {
-    margin-right: 4px;   /* gap between REC button and media */
+    margin-right: 4px;
 }
 
 #custom-screen-recorder-spacer {
-    margin-left: 4px;    /* mirror gap between media and spacer */
-    color: transparent;  /* invisible: reserves width only */
+    margin-left: 4px;
+    color: transparent;
 }
 
 #custom-screen-recorder.recording {
@@ -90,7 +78,6 @@ window#waybar {
     }
 }
 
-/* Media module - same height as other containers, auto-hide when empty */
 #custom-media {
     padding-left: 4px;
     padding-right: 4px;
@@ -101,13 +88,10 @@ window#waybar {
     color: @foreground;
 }
 
-/* Media module auto-hides when empty (waybar handles this automatically) */
-
 #custom-media:hover {
     color: @accent;
 }
 
-/* Tooltip styling */
 tooltip {
     background: @background;
     color: @foreground;
@@ -119,7 +103,6 @@ tooltip {
     border: 1px solid alpha(@foreground, 0.2);
 }
 
-/* Module hover effects - simplified */
 #clock:hover,
 #custom-updates:hover,
 #bluetooth:hover,
@@ -133,7 +116,6 @@ tooltip {
     color: @accent;
 }
 
-/* Width constraints for dynamic content modules */
 #clock {
     min-width: 0px;
 }
@@ -146,7 +128,6 @@ tooltip {
     min-width: 0px;
 }
 
-/* Individual module margins for balanced spacing */
 #bluetooth {
     margin-right: 0px;
 }
@@ -188,7 +169,6 @@ tooltip {
     border-radius: 4px;
 }
 
-/* Notification module - matches workspace styling */
 #custom-notifications {
     padding: 0px 4px;
     border-radius: 8px;
@@ -209,13 +189,11 @@ tooltip {
     background-color: alpha(@accent, 0.1);
 }
 
-/* A hypr-DE release is among the pending updates */
 #custom-updates.de-update {
     color: @accent;
     background-color: alpha(@accent, 0.1);
 }
 
-/* Individual modules - consistent padding */
 #clock,
 #custom-updates,
 #bluetooth,
@@ -237,7 +215,6 @@ tooltip {
     padding-right: 0px;
 }
 
-/* Workspace buttons - consistent styling */
 #workspaces button {
     all: unset;
     padding: 0px 8px;
@@ -254,7 +231,6 @@ tooltip {
     box-shadow: none;
 }
 
-/* Active workspace styling */
 #workspaces button.active,
 #workspaces button.visible,
 #workspaces button.focused {
@@ -263,7 +239,6 @@ tooltip {
     text-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
 }
 
-/* Underline for active workspace */
 #workspaces button.active,
 #workspaces button.empty.active {
     background-image: linear-gradient(to bottom, transparent calc(100% - 1px), @accent calc(100% - 1px));
@@ -272,15 +247,12 @@ tooltip {
     background-position: bottom left;
 }
 
-/* Empty workspace styling */
 #workspaces button.empty {
     color: transparent;
     text-shadow: 0 0 1.5px rgba(0, 0, 0, 0.2);
 }
 
-/* Has special workspace indicator - small dot in tertiary color */
 #workspaces button.has-special {
-    /* Dot is rendered in button label via Pango markup */
 }
 
 #workspaces button.empty:hover {
@@ -294,8 +266,6 @@ tooltip {
     color: @accent;
     text-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
 }
-
-/* Power profile (hyprstate) */
 
 #custom-power-profile.performance {
     color: #f53c3c;
@@ -312,8 +282,6 @@ tooltip {
 #custom-power-profile.unavailable {
     color: #777777;
 }
-
-/* Battery states - keep special colors */
 
 #battery.charging {
     color: #26A65B;
@@ -332,7 +300,6 @@ tooltip {
     animation-direction: alternate;
 }
 
-/* Special module states */
 #group-expand {
     padding-left: 6px;
     padding-right: 6px;

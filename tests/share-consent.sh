@@ -1,8 +1,4 @@
 #!/bin/bash
-# Screen-share consent must not be replayed to a caller that did not ask for
-# it. See issue #17: the cache was keyed on elapsed time alone, so any process
-# opening a ScreenCast session within 15s inherited the user's screen or
-# window with no picker shown.
 set -uo pipefail
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 src="$root/dist/libexec/share-picker-cached"
@@ -16,14 +12,12 @@ bad() { printf 'FAIL %s\n' "$*"; fail=1; }
 export XDG_RUNTIME_DIR="$work"
 calls="$work/picker-calls"
 
-# Stand-in picker: records every invocation, answers with a selection.
 cat > "$work/picker" <<'PICKER'
 #!/bin/sh
 echo x >> "$PICKER_CALLS"
 echo "[SELECTION]0/screen:DP-1"
 exit "${PICKER_STATUS:-0}"
 PICKER
-# Stand-in busctl: prints a portal tree for whatever clients CLIENTS names.
 cat > "$work/busctl" <<'BUSCTL'
 #!/bin/sh
 [ "${BUSCTL_FAIL:-0}" = 1 ] && exit 1
@@ -34,10 +28,6 @@ BUSCTL
 chmod +x "$work/picker" "$work/busctl"
 export PICKER_CALLS="$calls"
 
-# The picker and busctl are absolute, root-owned-directory paths on purpose
-# (BAR-017: the session must not be able to name them), so the suite builds a
-# variant with the candidate lists pointed at the stubs rather than setting
-# environment variables the shipped script deliberately ignores.
 picker_script="$work/share-picker-cached"
 sed -e "s|^PICKER_CANDIDATES=.*|PICKER_CANDIDATES=$work/picker|" \
     -e "s|^BUSCTL_CANDIDATES=.*|BUSCTL_CANDIDATES=$work/busctl|" \
@@ -58,14 +48,14 @@ echo
 echo "== a client that was not there at consent time gets its own picker"
 reset
 run "1_100"
-run "1_100 1_200"          # a second process opens a ScreenCast session
+run "1_100 1_200"
 [ "$(ncalls)" = 2 ] && ok "new client was prompted" || bad "NEW CLIENT INHERITED CONSENT (picker ran $(ncalls) time(s))"
 
 echo
 echo "== a client asking alone after consent still gets its own picker"
 reset
 run "1_100"
-run "1_200"                # the consenting client is gone; someone else asks
+run "1_200"
 [ "$(ncalls)" = 2 ] && ok "unrelated client was prompted" || bad "UNRELATED CLIENT INHERITED CONSENT"
 
 echo
@@ -95,10 +85,8 @@ echo
 echo "== a cancelled picker invalidates the cache"
 reset
 run "1_100"
-# A new client forces the picker to actually open; the user cancels it.
 PICKER_STATUS=1 run "1_100 1_400" ; true
 [ -f "$cache" ] && bad "cache survived a cancel" || ok "cancel cleared the cache"
-# ...and the next caller is prompted rather than replayed.
 before=$(ncalls); run "1_100"; after=$(ncalls)
 [ "$after" -gt "$before" ] && ok "a cancel does not leave a replayable selection" || bad "replayed after a cancel"
 

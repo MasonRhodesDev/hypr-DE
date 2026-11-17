@@ -1,7 +1,4 @@
 #!/bin/bash
-# The media module is one long-lived follower, not a 2 s poll: waybar runs
-# waybar-mediaplayer.py once and reads a line per change. These cases run
-# the script against a scripted playerctl and check what reaches waybar.
 set -uo pipefail
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
@@ -14,8 +11,6 @@ chmod +x "$fixtures/playerctl"
 script="$root/dist/libexec/waybar-mediaplayer.py"
 export MEDIA_ARGV_LOG="$work/argv" MEDIA_PIDFILE="$work/pid"
 
-# run_follow <seconds> [env...]: run the script under the stub for a bounded
-# time; its stdout lands in $out. timeout's SIGTERM is how waybar ends it.
 out="$work/out"
 run_follow() {
     local secs=$1; shift
@@ -65,8 +60,6 @@ firefox\tStopped\t\t
 S
 run_follow 2 MEDIA_SCRIPT="$work/seq.txt"
 mapfile -t lines < "$out"
-# 7 scripted lines, but a blank for "" after a blank for Stopped is a repeat
-# and must be swallowed: 6 emitted.
 [ "${#lines[@]}" -eq 6 ] && ok "one output line per state change, repeats swallowed (${#lines[@]})" \
     || { printf '  %q\n' "${lines[@]}"; bad "expected 6 output lines, got ${#lines[@]}"; }
 n=0
@@ -77,7 +70,7 @@ for l in "${lines[@]}"; do
 done
 ok "every non-blank line is valid JSON"
 j() { printf '%s' "${lines[$1]}" | jq -r "$2"; }
-play=$(printf '\357\201\213')   # U+F04B, the Nerd Font play glyph
+play=$(printf '\357\201\213')
 [ "$(j 0 .text)" = "Song One - A Band $play" ] && ok "playing: title - artist and the play glyph" || bad "playing text: $(j 0 .text)"
 [ "$(j 0 .class)" = playing ] && ok "playing: class playing" || bad "class: $(j 0 .class)"
 [ "$(j 0 .alt)" = spotify ] && ok "playing: alt is the player" || bad "alt: $(j 0 .alt)"
@@ -91,8 +84,6 @@ play=$(printf '\357\201\213')   # U+F04B, the Nerd Font play glyph
 
 echo
 echo "== a dead follower is retried with backoff, never busy-looped"
-# Shrink the delay in a copy rather than through the environment: the shipped
-# script takes no knobs from the session.
 slow="$work/mediaplayer-fast.py"
 sed -e 's/^RETRY_DELAY = .*/RETRY_DELAY = 0.3/' -e 's/^RETRY_CAP = .*/RETRY_CAP = 0.3/' "$script" > "$slow"
 : > "$MEDIA_ARGV_LOG"

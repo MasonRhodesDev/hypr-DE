@@ -1,13 +1,7 @@
 #!/bin/bash
-# Searchable keybind reference (SUPER+SHIFT+/): hyprctl binds -j -> fuzzel dmenu.
-# Descriptions come from the `desc = "Category: text"` opt on every hl.bind;
-# typing a category word filters to that group. Binds without a description
-# (user's local.lua) appear last as "(custom)". Selection just dismisses.
 set -euo pipefail
 
 hyprctl binds -j | jq -r '
-  # jq has no bitwise ops; test bit b via floor-div parity.
-  # modmask bits: SHIFT=1 CAPS=2 CTRL=4 ALT=8 SUPER=64 MOD5=128
   def hasmod(b): ((.modmask / b) | floor) % 2 == 1;
   [ .[]
     | select(.submap == "")

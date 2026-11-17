@@ -44,8 +44,6 @@
             "escape": true
         },
         "clock": {
-            // No seconds: a seconds hand is one wakeup per second for the
-            // whole session. waybar aligns the 60 s tick to the minute.
             "format": "{:%I:%M %p} ",
             "interval": 60,
             "tooltip-format": "<tt>{calendar}</tt>",
@@ -83,8 +81,6 @@
             "on-click-right": "@LIBEXECDIR@/hypr-de-bt-power"
         },
         "custom/power-profile": {
-            // Runs once, then only on SIGRTMIN+9: hyprstate sends it when
-            // the applied profile changes, and the click sends it as a belt.
             "exec": "hyprstate power status --waybar",
             "exec-if": "command -v hyprstate",
             "return-type": "json",
@@ -94,8 +90,6 @@
             "tooltip": true
         },
         "battery": {
-            // udev delivers plug/unplug at once; the interval only paces the
-            // capacity read.
             "interval": 60,
             "states": {
                 "good": 95,
@@ -150,9 +144,6 @@
             "on-click": "@LIBEXECDIR@/waybar-colorpicker.sh",
             "signal": 1
         },
-        // The drawer is collapsed by default, but waybar polls a hidden
-        // module just the same (it has no "only while revealed" mode), so
-        // these three run at 30 s instead of the 10 s default.
         "cpu": {
             "format": "󰻠",
             "interval": 30,
@@ -168,9 +159,6 @@
             "interval": 30
         },
         "custom/media": {
-            // No interval: the script is one long-lived process that
-            // follows playerctl over the bus and prints a line per change;
-            // a blank line hides the module.
             "return-type": "json",
             "max-length": 60,
             "escape": true,

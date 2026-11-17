@@ -1,21 +1,11 @@
 #!/bin/bash
-# waybar updates module backend: counts pending updates, or runs the upgrade
-# in a terminal. Detects the package manager at runtime so one packaged config
-# serves Fedora and Arch.
 set -u
 
-# The terminal this opens is the one place in the bar that asks for a root
-# password, so the program that appears must not be nameable by anything that
-# can write the session environment -- $TERMINAL is settable from
-# ~/.config/environment.d and would otherwise be a bar click away from
-# running an attacker's binary while the user is expecting a sudo prompt.
-# The preference is honoured by NAME, but only ever resolved inside a
-# root-owned directory.
 resolve_terminal() {
     local candidate dir
     for candidate in "${TERMINAL:-}" kitty foot alacritty wezterm ghostty konsole xterm; do
         [ -n "$candidate" ] || continue
-        case "$candidate" in */*) continue ;; esac   # a path, not a name
+        case "$candidate" in */*) continue ;; esac
         for dir in /usr/local/bin /usr/bin /bin; do
             if [ -x "$dir/$candidate" ]; then
                 printf '%s' "$dir/$candidate"
@@ -26,9 +16,6 @@ resolve_terminal() {
     return 1
 }
 
-# Emits waybar JSON: {"text": N, "class": "de-update"?, "tooltip": ...}.
-# The class highlights the module (see lmtt waybar template) when hypr-de
-# itself is among the pending updates.
 count() {
     local out n cls="" tip
     if command -v dnf >/dev/null 2>&1; then
@@ -42,7 +29,6 @@ count() {
     fi
     n=$(printf '%s' "$out" | grep -c .)
     tip="$n updates pending"
-    # hypr-de.noarch (dnf) / "hypr-de " (arch); also matches hypr-de-gaming
     if printf '%s\n' "$out" | grep -q '^hypr-de'; then
         cls="de-update"
         tip="hypr-DE update available — $tip"
@@ -51,10 +37,7 @@ count() {
         '{text: $text, class: $class, tooltip: $tooltip}'
 }
 
-# Show the command before running it. A bar click that goes straight to a
-# password prompt teaches "type the root password into whatever window
-# appears"; naming the command first makes it a decision instead of a reflex.
-run_upgrade() {  # run_upgrade <command line>
+run_upgrade() {
     local term
     term=$(resolve_terminal) || {
         notify-send -a "updates" "No terminal found" \

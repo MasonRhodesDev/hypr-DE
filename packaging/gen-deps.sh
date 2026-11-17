@@ -1,10 +1,4 @@
 #!/bin/bash
-# Render dependency lists from deps.toml (the source of truth) and verify the
-# spec / PKGBUILD carry exactly those deps.
-#   gen-deps.sh print {fedora|arch} {main|gaming}   -> one dep per line, sorted
-#   gen-deps.sh check                               -> exit 1 on any drift
-# TOML parsing is deliberately minimal: top-level [section]s with
-# fedora/arch string arrays and an optional subpackage key.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
@@ -12,7 +6,7 @@ TOML="$REPO/deps.toml"
 SPEC="$REPO/packaging/hypr-de.spec"
 PKGBUILD="$REPO/packaging/PKGBUILD"
 
-deps() { # $1=distro $2=part
+deps() {
     python3 - "$1" "$2" "$TOML" <<'EOF'
 import sys, tomllib
 distro, part, path = sys.argv[1:4]
@@ -29,7 +23,6 @@ EOF
 
 check() {
     fail=0
-    # spec: Requires lines between package headers
     for part in main gaming; do
         want=$(deps fedora "$part")
         if [ "$part" = main ]; then
@@ -43,7 +36,6 @@ check() {
             fail=1
         fi
     done
-    # spec Recommends (main) must exactly match fedora_weak
     want=$(deps fedora_weak main)
     have=$(awk '/^%package gaming/{exit} /^Recommends:/{sub(/^Recommends:[[:space:]]*/, ""); print}' "$SPEC" | LC_ALL=C sort -u)
     if ! diff <(echo "$want") <(echo "$have") >/dev/null; then
@@ -51,7 +43,6 @@ check() {
         diff <(echo "$want") <(echo "$have") >&2 || true
         fail=1
     fi
-    # PKGBUILD: depends arrays from .SRCINFO-style print
     for part in main gaming; do
         want=$(deps arch "$part")
         var=$([ "$part" = main ] && echo "_depends_main" || echo "_depends_gaming")

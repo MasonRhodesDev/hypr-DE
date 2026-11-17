@@ -12,12 +12,7 @@ export XDG_RUNTIME_DIR="$work"
 marker="$work/hypr-de-lock-failed"
 lock_conf="$work/lock.conf"
 
-# Policy is baked into the script (a root-owned /etc file is the only thing
-# that may change it -- see BAR-017), so the suite builds variants by
-# rewriting those constants rather than by setting environment variables.
-# It also keeps the run hermetic: without an explicit fallback list the real
-# hyprlock on the test machine would be found, and would lock the screen.
-mk_lock() {  # mk_lock [fallbacks] [failsafe]
+mk_lock() {
     sed -e "s|^LOCK_CONF=.*|LOCK_CONF=$lock_conf|" \
         -e "s|^FAILSAFE=.*|FAILSAFE=${2:-terminate}|" \
         -e "s|^FALLBACKS=.*|FALLBACKS='${1:-}'|" \
@@ -26,10 +21,7 @@ mk_lock() {  # mk_lock [fallbacks] [failsafe]
     chmod +x "$work/lock-cmd.sh"
 }
 
-# The libexec helpers pin PATH to root-owned directories (BAR-017), so the
-# suite runs copies whose pin is redirected at the fixtures, exactly as
-# mk_lock rewrites lock-cmd.sh's constants.
-mk_libexec() {  # mk_libexec <script>
+mk_libexec() {
     grep -q '^PATH=/usr/local/bin:/usr/bin:/bin; export PATH$' "$root/dist/libexec/$1" || {
         echo "$1 must pin PATH to root-owned directories" >&2; exit 1; }
     sed -e "s|^PATH=.*|PATH=$fixtures:/usr/bin:/bin; export PATH|" \
@@ -39,9 +31,6 @@ mk_libexec() {  # mk_libexec <script>
 status=0
 run_lock() {
     status=0
-    # lock-cmd.sh takes the session id from XDG_SESSION_ID before asking
-    # loginctl, so a build run from a desktop session would hand it the real
-    # id instead of the fixture's. Clear it so the fixture always answers.
     env -u XDG_SESSION_ID "$work/lock-cmd.sh" "$@" 2>>"$work/stderr" || status=$?
 }
 assert_log() {
@@ -65,7 +54,6 @@ assert_marker() {
     fi
 }
 
-# --- routing ---------------------------------------------------------------
 mk_lock
 : > "$LOCK_POLICY_LOG"
 run_lock
@@ -83,10 +71,6 @@ assert_status 0
 assert_log 'vigil-lock:--wait --warn 10'
 assert_marker no
 
-# --- fail-closed escalation (issue #10) ------------------------------------
-
-# The transient scope cannot start: fall back to an unscoped locker rather
-# than returning to hypridle with the session wide open.
 : > "$LOCK_POLICY_LOG"
 LOCK_POLICY_SCOPE_STATUS=1 run_lock
 assert_status 0
@@ -96,7 +80,6 @@ logind-idle-control:disable
 hyprctl:dispatch hl.dsp.dpms({ action = '\''on'\'' })'
 assert_marker no
 
-# vigil-lock itself is broken: use any other installed locker before giving up.
 mk_lock 'swaylock -f'
 : > "$LOCK_POLICY_LOG"
 LOCK_POLICY_VIGIL_STATUS=1 \
@@ -109,8 +92,6 @@ logind-idle-control:disable
 hyprctl:dispatch hl.dsp.dpms({ action = '\''on'\'' })'
 assert_marker no
 
-# Nothing can lock: terminate the session instead of handing back an exposed
-# desktop that hypridle is about to blank into looking locked.
 mk_lock
 : > "$LOCK_POLICY_LOG"
 LOCK_POLICY_VIGIL_STATUS=1 run_lock
@@ -120,8 +101,6 @@ vigil-lock:--wait --no-warn
 loginctl:terminate-session 7'
 assert_marker yes
 
-# ...unless the operator opted out, in which case the session stays up but is
-# marked failed so nothing disguises it as locked.
 mk_lock '' warn
 : > "$LOCK_POLICY_LOG"
 rm -f "$marker"
@@ -131,13 +110,11 @@ assert_log 'vigil-lock:--wait --no-warn
 vigil-lock:--wait --no-warn'
 assert_marker yes
 
-# A later successful lock clears the marker.
 : > "$LOCK_POLICY_LOG"
 run_lock
 assert_status 0
 assert_marker no
 
-# --- the failsafe is not disableable from the session (BAR-017) ------------
 mk_lock
 : > "$LOCK_POLICY_LOG"
 rm -f "$marker" "$lock_conf"
@@ -148,9 +125,6 @@ assert_log 'vigil-lock:--wait --no-warn
 vigil-lock:--wait --no-warn
 loginctl:terminate-session 7'
 
-# A policy file the session can write is ignored, whoever wrote it. The build
-# may run this suite as root (rpm %check does), and root cannot write a
-# file it does not own -- so hand it to nobody to make the case expressible.
 : > "$LOCK_POLICY_LOG"
 : > "$work/stderr"
 rm -f "$marker"
@@ -173,9 +147,6 @@ else
     echo "skip: cannot create a non-root-owned policy file in this environment"
 fi
 
-# The same file, when root owns it, is honoured -- it is the file's owner
-# that matters, not the caller's, which is the real deployment shape: a
-# root-owned /etc file read by an ordinary user session.
 if [ "$(id -u)" -eq 0 ] || sudo -n true 2>/dev/null; then
     printf '# operator policy\nfailsafe = warn\n' > "$lock_conf"
     if [ "$(id -u)" -eq 0 ]; then chown 0:0 "$lock_conf"; else sudo -n chown 0:0 "$lock_conf"; fi
@@ -194,11 +165,6 @@ vigil-lock:--wait --no-warn'
 fi
 rm -f "$lock_conf" 2>/dev/null || sudo -n rm -f "$lock_conf"
 
-# --- an intentional lock releases the idle inhibitor ----------------------
-# Locking on purpose says "I am done with this session", so a held idle
-# inhibitor must not then keep the screen lit all night. The idle path is
-# NOT intentional: it fires because the user walked away, and an inhibitor
-# is precisely the signal that they meant the session to stay awake.
 : > "$LOCK_POLICY_LOG"
 run_lock
 assert_log 'vigil-lock:--wait --no-warn
@@ -214,14 +180,10 @@ logind-idle-control:disable'
 run_lock --idle
 assert_log 'vigil-lock:--wait --warn 10'
 
-# A failing or absent inhibitor CLI must never fail the lock.
 : > "$LOCK_POLICY_LOG"
 LOCK_POLICY_INHIBIT_STATUS=1 run_lock
 assert_status 0
 
-# A wedged toggle daemon must not delay a lock either. hypridle holds its
-# logind sleep inhibitor until before_sleep_cmd returns, so an unbounded
-# release call here postpones the suspend itself.
 started=$(date +%s)
 : > "$LOCK_POLICY_LOG"
 LOCK_POLICY_INHIBIT_HANG=1 run_lock --sleep
@@ -231,11 +193,6 @@ elapsed=$(( $(date +%s) - started ))
     echo "a wedged toggle daemon delayed the lock by ${elapsed}s; the release must be bounded" >&2
     exit 1; }
 
-# --- the locked-screen listener: compositor truth, never a hint ----------
-# hypridle.conf's input-idle listener ignores inhibitors, so its condition is
-# the only thing keeping it from blanking an unlocked, inhibited session 30 s
-# into a film. It must follow the compositor lock, not logind's LockedHint (a
-# hint can outlive its locker).
 mk_libexec session-locked.sh
 mk_libexec dpms-off-if-locked.sh
 LOCK_POLICY_COMPOSITOR_LOCKED=true "$work/session-locked.sh" || {
@@ -244,21 +201,13 @@ if LOCK_POLICY_COMPOSITOR_LOCKED=false LOCK_POLICY_LOCKED_HINT=yes "$work/sessio
     echo "session-locked.sh: a stale LockedHint must not authorise a blank" >&2; exit 1
 fi
 
-# Decided model (2026-09-04): a locked screen ALWAYS blanks. Keep-awake --
-# the user's toggle and app inhibitors alike -- governs only the unlocked
-# machine, so neither the toggle nor anything else defers a blank once the
-# compositor holds the lock.
 LOCK_POLICY_COMPOSITOR_LOCKED=true LOCK_POLICY_INHIBIT_ENABLED=1 "$work/session-locked.sh" || {
     echo "session-locked.sh: a locked screen must blank even with the toggle held" >&2; exit 1; }
 
-# The no-toggle PATH dir is still built: the idle-suspend section below
-# reuses it as an environment with no hyprstate.
 mkdir -p "$work/no-toggle"
 cp "$fixtures/hyprctl" "$work/no-toggle/hyprctl"
 cp "$(command -v timeout)" "$work/no-toggle/timeout"
 
-# A wedged compositor must not stall either script, for the same reason a
-# wedged toggle daemon must not: both run on hypridle's single loop.
 started=$(date +%s)
 LOCK_POLICY_COMPOSITOR_HANG=1 "$work/session-locked.sh" && {
     echo "session-locked.sh: an unanswered compositor must not authorise a blank" >&2; exit 1; }
@@ -269,30 +218,20 @@ elapsed=$(( $(date +%s) - started ))
 [ "$elapsed" -lt 15 ] || {
     echo "a wedged compositor stalled the scripts for ${elapsed}s; both must bound it" >&2
     exit 1; }
-# The on-timeout re-checks the lock itself: safe even without condition_cmd.
 : > "$LOCK_POLICY_LOG"
 LOCK_POLICY_COMPOSITOR_LOCKED=true "$work/dpms-off-if-locked.sh"
 assert_log 'hyprctl:dispatch hl.dsp.dpms({ action = '\''off'\'' })'
 : > "$LOCK_POLICY_LOG"
 LOCK_POLICY_COMPOSITOR_LOCKED=false LOCK_POLICY_LOCKED_HINT=yes "$work/dpms-off-if-locked.sh"
 assert_log ''
-# A hyprctl planted earlier in the caller's PATH is never consulted: the
-# unmodified script resets PATH before asking the compositor.
 mkdir -p "$work/planted"
 printf '#!/bin/sh\necho true\n' > "$work/planted/hyprctl"
 chmod +x "$work/planted/hyprctl"
-# (Empty instance signature: the real hyprctl it then finds must fail, not
-# answer for whatever compositor the developer is sitting in.)
 if PATH="$work/planted:$PATH" HYPRLAND_INSTANCE_SIGNATURE='' LOCK_POLICY_COMPOSITOR_LOCKED=true \
     "$root/dist/libexec/session-locked.sh" 2>/dev/null; then
     echo "session-locked.sh consulted a PATH-planted hyprctl" >&2; exit 1
 fi
 
-# --- ladder entry: the warn/blur never starts under a live claim -----------
-# no-keep-awake.sh is STATELESS: hypridle's ScreenSaver ledger dies with any
-# hypridle restart (a package upgrade mid-game dropped Steam's claim and the
-# blur fired over a live game), so every claim source is re-derived at fire
-# time. Each source blocks alone; no claims means ladder entry is allowed.
 mk_libexec no-keep-awake.sh
 "$work/no-keep-awake.sh" || {
     echo "no-keep-awake.sh: with no claims, ladder entry must be allowed" >&2; exit 1; }
@@ -308,17 +247,12 @@ fi
 if LOCK_POLICY_LOGIND_IDLE_BLOCK=1 "$work/no-keep-awake.sh" >/dev/null; then
     echo "no-keep-awake.sh: a logind idle block must block ladder entry" >&2; exit 1
 fi
-# The Overwatch pin: a running game blocks ladder entry even with every
-# ledger wiped - the game's only claim (Steam's overlay ScreenSaver
-# inhibit) is exactly what a hypridle restart destroys.
 if LOCK_POLICY_GAME=steam "$work/no-keep-awake.sh" >/dev/null; then
     echo "no-keep-awake.sh: a running Steam game must block ladder entry" >&2; exit 1
 fi
 if LOCK_POLICY_GAME=gamescope "$work/no-keep-awake.sh" >/dev/null; then
     echo "no-keep-awake.sh: a gamescope session must block ladder entry" >&2; exit 1
 fi
-# A wedged compositor must not stall the gate (hypridle's single loop) and
-# reads as "no claim from that source", falling through to the others.
 started=$(date +%s)
 LOCK_POLICY_COMPOSITOR_HANG=1 "$work/no-keep-awake.sh" || {
     echo "no-keep-awake.sh: a wedged compositor alone must not read as a claim" >&2; exit 1; }
@@ -326,20 +260,10 @@ elapsed=$(( $(date +%s) - started ))
 [ "$elapsed" -lt 10 ] || {
     echo "no-keep-awake.sh waited ${elapsed}s on a wedged compositor" >&2; exit 1; }
 
-# --- the listener wiring is structural, not a single grep ------------------
 conf="$root/dist/hypr/hypridle.conf"
-# Exactly two listeners ignore hypridle's inhibitor accounting: the
-# locked-screen blanker and the idle-suspend request, both gated on the
-# compositor lock. Decided model: keep-awake claims govern only the
-# unlocked machine (they prevent the 180 s idle lock); once locked, the
-# blank and the suspend march unconditionally. The 180 s lock listener is
-# the one place the accounting still applies.
 [ "$(grep -cE '^[[:space:]]*ignore_inhibit=true$' "$conf")" = 2 ] || {
     echo "hypridle.conf: exactly the two lock-gated listeners ignore inhibitors" >&2; exit 1; }
-# Timeouts are hyprlang variables so a host can redefine them (hypridle-launch
-# splices ~/.config/hypr-de/hypridle.conf in after the defaults; see
-# tests/hypridle-override.sh). The decided values are pinned on the defaults.
-has_line() { # has_line <block> <line>: the line, at the listener's indent
+has_line() {
     printf '%s' "$1" | grep -q "^  $(printf '%s' "$2" | sed 's/[$]/\\$/g')"
 }
 knob() { sed -n "s/^\$$1[[:space:]]*=[[:space:]]*\([0-9]*\).*/\1/p" "$conf"; }
@@ -351,17 +275,9 @@ for want in 'timeout=$blank_timeout' 'condition_cmd=@LIBEXECDIR@/session-locked.
     has_line "$block" "$want" || {
         echo "hypridle.conf: the locked-screen listener lost '$want'" >&2; exit 1; }
 done
-# No raw DPMS-off anywhere in the config -- not an on-timeout, not an
-# on-resume, not after_sleep_cmd. The only blank in the session goes
-# through the lock-checking script, so a literal off dispatch here is a
-# second blanker by definition.
 if grep -F "action = 'off'" "$conf" | grep -q .; then
     echo "hypridle.conf: a raw dpms-off dispatch bypasses the lock checks" >&2; exit 1
 fi
-# Every command hypridle can run is pinned as a set, matched with leading
-# whitespace stripped: counting one exact line let a re-added blanker sit
-# beside it, and a differently-indented or on-resume-mounted script slipped
-# past a check that only read `on-timeout=` at exactly two spaces.
 want_cmds='after_sleep_cmd=hyprctl dispatch "hl.dsp.dpms({ action = '"'"'on'"'"' })"
 before_sleep_cmd=@LIBEXECDIR@/lock-cmd.sh --sleep
 lock_cmd=@LIBEXECDIR@/lock-cmd.sh
@@ -377,9 +293,6 @@ got_cmds=$(sed -n 's/^[[:space:]]*\(on-timeout\|on-resume\|after_sleep_cmd\|befo
     printf 'expected:\n%s\nactual:\n%s\n' "$want_cmds" "$got_cmds" >&2
     exit 1; }
 
-# --- Idle suspend: a REQUEST to hyprstate, never a direct suspend -----------
-# The 900 s listener asks hyprstate and nothing else; idle-suspend.sh is the
-# bridge, and hyprstate owns grace, lock proof, cancellation and Suspend().
 mk_libexec idle-suspend.sh
 : > "$LOCK_POLICY_LOG"
 "$work/idle-suspend.sh"
@@ -387,8 +300,6 @@ assert_log 'hyprstate:suspend request'
 : > "$LOCK_POLICY_LOG"
 "$work/idle-suspend.sh" --cancel
 assert_log 'hyprstate:suspend cancel'
-# Absent hyprstate is a silent no-op, not an error every idle period. Reuse
-# the no-toggle dir (hyprctl + timeout only, no hyprstate) built above.
 : > "$LOCK_POLICY_LOG"
 sed -e "s|^PATH=.*|PATH=$work/no-toggle; export PATH|" \
     "$root/dist/libexec/idle-suspend.sh" > "$work/idle-suspend-no-hyprstate.sh"
@@ -398,8 +309,6 @@ chmod +x "$work/idle-suspend-no-hyprstate.sh"
 if [ -s "$LOCK_POLICY_LOG" ]; then
     echo "idle-suspend.sh ran something with hyprstate absent" >&2; exit 1
 fi
-# The 180 s lock listener carries the stateless claim gate and keeps
-# hypridle's ledger as the second belt (no ignore_inhibit).
 [ "$(knob lock_timeout)" = 180 ] || {
     echo "hypridle.conf: \$lock_timeout no longer defaults to 180" >&2; exit 1; }
 lblock=$(awk '/^listener \{/{inb=1;b="";next} inb&&/^\}/{inb=0; if (b ~ /lock-cmd\.sh --idle/) print b; next} inb{b=b $0 "\n"}' "$conf")
@@ -411,10 +320,6 @@ if printf '%s' "$lblock" | grep -qE '^[[:space:]]*ignore_inhibit'; then
     echo "hypridle.conf: the idle-lock listener must keep the inhibitor ledger as its second belt" >&2; exit 1
 fi
 
-# The suspend listener keeps its 900 s timeout and --cancel on resume, and
-# per the decided model it ignores inhibitors and gates on the compositor
-# lock instead: lock ends every keep-awake claim's authority, and a machine
-# a claim kept unlocked never fires this because the condition fails.
 [ "$(knob suspend_timeout)" = 900 ] || {
     echo "hypridle.conf: \$suspend_timeout no longer defaults to 900" >&2; exit 1; }
 sblock=$(awk '/^listener \{/{inb=1;b="";next} inb&&/^\}/{inb=0; if (b ~ /idle-suspend\.sh/) print b; next} inb{b=b $0 "\n"}' "$conf")
@@ -426,12 +331,7 @@ for want in 'timeout=$suspend_timeout' 'ignore_inhibit=true' \
         echo "hypridle.conf: the idle-suspend listener lost '$want'" >&2; exit 1; }
 done
 
-# --- one blanker, and it blanks only a locked compositor -------------------
-# The locked listener is the session's only DPMS-off. A blank must follow
-# the compositor lock and nothing else: not logind's LockedHint (a hint
-# outlives a locker that died) and never an unlocked session, whose dark
-# screen would be indistinguishable from a locked one.
-blanker() {  # blanker <compositor-locked> <hint>; echoes locked|none
+blanker() {
     : > "$LOCK_POLICY_LOG"
     LOCK_POLICY_COMPOSITOR_LOCKED=$1 LOCK_POLICY_LOCKED_HINT=$2 "$work/session-locked.sh" \
         && LOCK_POLICY_COMPOSITOR_LOCKED=$1 LOCK_POLICY_LOCKED_HINT=$2 "$work/dpms-off-if-locked.sh"
@@ -446,16 +346,6 @@ for case in "true yes locked" "true no locked" "false no none" "false yes none";
         exit 1; }
 done
 
-# --- an upgrade must not leave a stale idle policy running ----------------
-# hypridle reads hypridle.conf once at startup and never watches it, so a
-# package that rewrites the idle policy is inert until something restarts
-# it. On 2026-08-26 that left a four-day-old hypridle with no locked-screen
-# listener at all, on a machine whose packages were fully up to date.
-#
-# Run against a fixture with runuser/id/stat stubbed, the way
-# privacy-privilege.sh already exercises the sibling. Grepping the source
-# for the strings it ought to contain proves nothing: a comment mentioning
-# try-restart satisfies a grep for try-restart.
 restarter="$root/dist/libexec/hypr-de-restart-session-units"
 [ -x "$restarter" ] || {
     echo "the post-transaction unit restarter is missing or not executable" >&2; exit 1; }
@@ -470,11 +360,6 @@ grep -q "$rfix" "$rhelper" || {
     exit 1; }
 
 rbin="$work/rbin2"; mkdir -p "$rbin"
-# The stubs EXECUTE rather than fake: runuser drops its own arguments and
-# runs the command, so the script's real logic -- including the verdict it
-# folds into `sh -c` -- runs against stubbed systemctl and hyprctl. A stub
-# that answered on the script's behalf would test the mock, not the script,
-# and that is exactly how a lock guard that can never fire got through.
 cat > "$rbin/runuser" <<'STUB'
 #!/bin/sh
 printf '%s\n' "$*" >> "$RESTART_OUT"
@@ -513,19 +398,15 @@ import socket
 s = socket.socket(socket.AF_UNIX); s.bind('$rfix/1000/hypr/testsig/.socket.sock')
 " 2>/dev/null || true
 
-run_restarter() { # run_restarter <env assignments...>
+run_restarter() {
     : > "$RESTART_OUT"; rm -f "$RESTART_OUT.did"
     env "$@" PATH="$rbin:$PATH" RESTART_OUT="$RESTART_OUT" bash "$rhelper" 2>&1
 }
 
-# It must bound every call it makes as another user: an unbounded
-# systemctl against a socket the user controls holds pacman's lock for ever.
 grep -qE 'timeout( -k [0-9]+)? [0-9]+ runuser' "$restarter" || {
     echo "the restarter must bound runuser: a user-owned socket can hang systemctl for ever" >&2
     exit 1; }
 
-# An unlocked session is restarted, and the lock check carries a signature
-# (without one the real hyprctl refuses, which reads as "not locked").
 out=$(run_restarter FIXTURE_LOCKED=false || true)
 grep -q 'systemctl try-restart' "$RESTART_OUT" || {
     echo "an unlocked session did not get its unit restarted" >&2; exit 1; }
@@ -534,49 +415,36 @@ grep -q 'HYPRLAND_INSTANCE_SIGNATURE=testsig' "$RESTART_OUT" || {
 printf '%s' "$out" | grep -q 'restarted 1' || {
     echo "a real restart was not reported" >&2; exit 1; }
 
-# A LOCKED session is left alone: hypridle is KillMode=control-group and a
-# locker in its cgroup dies with it, which is a lockout, not an annoyance.
 run_restarter FIXTURE_LOCKED=true >/dev/null || true
 grep -q 'systemctl try-restart' "$RESTART_OUT" && {
     echo "a locked session was restarted; that can kill the locker" >&2; exit 1; }
 
-# Unreadable lock state with a compositor present must FAIL CLOSED.
 run_restarter FIXTURE_LOCKED=false FIXTURE_HYPRCTL_BROKEN=1 >/dev/null || true
 grep -q 'systemctl try-restart' "$RESTART_OUT" && {
     echo "lock state was unreadable and it restarted anyway; that must fail closed" >&2
     exit 1; }
 
-# A restart that dies immediately is NOT a success: the user is left with no
-# idle policy at all, which is worse than the stale one they had.
 out=$(run_restarter FIXTURE_LOCKED=false FIXTURE_ACTIVE=1 FIXTURE_FAILED=0 || true)
 printf '%s' "$out" | grep -q 'failed state' || {
     echo "a unit that died on restart was not reported as failed" >&2; exit 1; }
 printf '%s' "$out" | grep -q 'restarted 1' && {
     echo "a unit that died on restart was counted as a success" >&2; exit 1; }
 
-# Ownership is enforced by behaviour, not by the string being present.
 printf '#!/bin/sh\necho 4242\n' > "$rbin/stat"
 run_restarter FIXTURE_LOCKED=false >/dev/null || true
 [ -s "$RESTART_OUT" ] && {
     echo "ran as a user for a runtime dir that uid does not own" >&2; exit 1; }
 printf '#!/bin/sh\necho 1000\n' > "$rbin/stat"
 
-# Never fails the transaction, whatever happened. Tested with `if !`, since
-# under set -e a bare invocation aborts before $? can be read.
 if ! run_restarter FIXTURE_LOCKED=true >/dev/null 2>&1; then
     echo "the restarter must never fail the transaction" >&2; exit 1
 fi
 
-# Wired into both package managers, in its OWN pacman hook: alpm's Exec is
-# not repeatable, so a second Exec in hook 95 silently replaces the reload
-# that hook exists for.
 grep -q 'hypr-de-restart-session-units' "$root/dist/pacman/96-hypr-de-restart-units.hook" || {
     echo "the restarter has no pacman hook of its own" >&2; exit 1; }
 grep -q 'hypr-de-restart-session-units' "$root/packaging/hypr-de.spec" || {
     echo "the rpm scriptlet does not run the restarter" >&2; exit 1; }
 for hook in "$root"/dist/pacman/*.hook; do
-    # `|| true`: grep -c exits 1 on a zero count, which under set -e would
-    # abort the suite at the assignment and never print why.
     n=$(grep -c '^Exec' "$hook" || true)
     [ "$n" = 1 ] || {
         echo "$(basename "$hook") has $n Exec lines; alpm keeps only the last" >&2; exit 1; }

@@ -1,6 +1,4 @@
 #!/bin/bash
-# Wrapper for hyprctl reload that restarts waybar to prevent freeze
-# Known issue: https://github.com/Alexays/Waybar/issues/4451
 
 /usr/bin/hyprctl reload "$@"
 exit_code=$?

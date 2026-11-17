@@ -1,106 +1,17 @@
 #!/bin/bash
-# Restart the session units whose packaged config this transaction replaced.
-# Run as root from the package manager AFTER a transaction (pacman hook /
-# rpm %posttrans), like its sibling hypr-de-reload-sessions.
-#
-# Why this exists: installing a package does not restart what is already
-# running. hypridle reads @DATADIR@/hypr/hypridle.conf once at startup and
-# never watches it, so an upgrade that rewrites the idle policy leaves the
-# OLD policy live until the user next logs in -- with nothing to indicate
-# anything is pending. Observed on 2026-08-26: hypr-DE 0.2.22 -> 0.2.27
-# installed cleanly while the running hypridle, four days old, still had no
-# locked-screen listener at all.
-#
-# Only units whose configuration THIS package owns belong here. A daemon
-# whose own package was upgraded should be restarted by that package --
-# hyprstate and logind-idle-control each own their unit and binary.
-#
-# DELIBERATELY NOT COVERED, and left to the next login: waybar reads the
-# packaged config.jsonc once (waybar-reload.path watches only the
-# lmtt-rendered stylesheet), swaync likewise reads its packaged config.json
-# once, and the service drop-ins need a restart rather than a daemon-reload.
-# Restarting those is visible mid-session -- bars and notification daemons
-# blinking during an upgrade -- so the trade is different from hypridle,
-# whose restart is invisible unless it goes wrong.
-#
-# WHY IT SKIPS A LOCKED SESSION. hypridle.service is KillMode=control-group,
-# and lock-cmd.sh documents what that means: a locker that landed in
-# hypridle's cgroup dies with it, leaving "the lockscreen app died" and no
-# way in but a TTY. The scoped path puts the locker in its own transient
-# scope, but the unscoped retry, the no-systemd-run fallback and every
-# fallback_lock locker (swaylock/gtklock/hyprlock) all run in hypridle's
-# cgroup. Upgrading while the screen is locked would turn a rare hazard
-# into a scheduled one, so a locked session keeps its old idle policy until
-# the next unlock-and-login. A stale policy for one session beats a lockout.
-#
-# WHAT RESTARTING COSTS, on an unlocked session:
-#   - hypridle holds the logind sleep inhibitor that makes before_sleep_cmd
-#     lock before a suspend. Restarting drops it briefly. hyprstate proves a
-#     live locker before the suspends IT initiates and holds a lid-switch
-#     block inhibitor, so the lid path is covered -- but a manual
-#     `systemctl suspend` or a critical-battery suspend landing in that
-#     window is not, and would suspend unlocked.
-#   - the 180s idle-to-lock countdown restarts, so a session idle for 170s
-#     gets a fresh 180s of unlocked desktop.
-#   - the 900s idle-to-suspend countdown restarts with the other listeners,
-#     so a session near suspend gets a fresh 900s before it asks hyprstate.
-#   - hypridle's ScreenSaver inhibit ledger is WIPED: clients never
-#     re-register, so a D-Bus claim (Steam's "Playing a game", a browser
-#     video) silently ceases to exist. The stateless no-keep-awake.sh gate
-#     on the idle-lock listener exists precisely because of this.
-# These are bounded by how long a restart takes; none has been measured
-# under a package transaction's I/O, so they are stated as real rather than
-# dismissed as negligible.
-#
-# Never fails the transaction: every step is best-effort and it always
-# exits 0.
 set -uo pipefail
 
 UNITS=(hypridle.service)
-# Units this version stopped shipping. The file is gone but a session that
-# logged in before the upgrade still has the old unit loaded and running,
-# and a timer keeps firing until it is stopped. Stopping is safe under a
-# lock (nothing here runs in hypridle's cgroup), so it is not gated on it.
 RETIRED=(waybar-watchdog.timer)
 
-# Bounded PER CALL, because $XDG_RUNTIME_DIR/systemd/private belongs to the
-# user: a socket that accepts and never answers makes `systemctl --user`
-# block with no deadline of its own, which would hold pacman's db.lck for
-# ever and leave the machine unable to install anything, security updates
-# included. Any local user can arrange that.
-#
-# What this does NOT bound is how many calls get made. session_locked walks
-# $XDG_RUNTIME_DIR/hypr/*/, a directory the same user populates, so a
-# session answering just inside the per-call bound can still stretch the
-# total: ~2s for 500 socket dirs answering instantly, and hours for
-# thousands answering slowly. The loop needs a cap as well, which the
-# sibling needs too and which is tracked separately -- do not read this
-# bound as a total. (The sibling is unbounded per call and bounded only
-# because hyprctl currently self-times-out; measured at 5s, not a
-# documented guarantee.)
-run_as() { # run_as <user> <runtime-dir> <sig-or-empty> <cmd...>
+run_as() {
     local envs=(XDG_RUNTIME_DIR="$2" DBUS_SESSION_BUS_ADDRESS="unix:path=$2/bus")
-    # Unset before setting: an admin running the upgrade from inside their
-    # own Hyprland terminal would otherwise leak their signature in, and
-    # every user's lock state would be answered by the admin's compositor.
     [ -n "$3" ] && envs+=(HYPRLAND_INSTANCE_SIGNATURE="$3")
     timeout -k 5 15 runuser -u "$1" -- env -u HYPRLAND_INSTANCE_SIGNATURE \
         "${envs[@]}" "${@:4}"
 }
 
-# Locked, or unreadable while a compositor is present. hyprctl needs
-# HYPRLAND_INSTANCE_SIGNATURE and does not auto-detect it; root's
-# environment under a package hook has none, so it must be derived from the
-# socket path exactly as hypr-de-reload-sessions does. Getting this wrong is
-# silent: hyprctl prints "HYPRLAND_INSTANCE_SIGNATURE not set!" to STDOUT
-# and exits 1, which reads as "not locked" and defeats the guard entirely.
-#
-# Fails CLOSED: a session with a live Hyprland socket whose lock state
-# cannot be read is treated as locked. The cost of guessing wrong that way
-# is one session keeping its old idle policy; the cost of guessing wrong
-# the other way is a locked-out user. A uid with no Hyprland socket at all
-# is not locked -- hypridle users outside Hyprland still get their restart.
-session_locked() { # session_locked <user> <runtime-dir>
+session_locked() {
     local sock sig answer
     for sock in "$2"/hypr/*/.socket.sock; do
         [ -S "$sock" ] || continue
@@ -122,34 +33,18 @@ for run in /run/user/*; do
     case "$uid" in ''|*[!0-9]*) continue ;; esac
     [ -d "$run/systemd" ] || continue
     user=$(id -nu "$uid" 2>/dev/null) || continue
-    # The glob walked /run/user/<uid>/, which that user owns; confirm the
-    # directory really belongs to the uid the path claims before running
-    # anything as them.
     [ "$(stat -c %u "$run" 2>/dev/null)" = "$uid" ] || continue
 
-    # One bounded call for all retired units; stop is a no-op for a unit
-    # that is not loaded, and best-effort like everything else here.
     if [ "${#RETIRED[@]}" -gt 0 ]; then
         run_as "$user" "$run" "" systemctl --user stop "${RETIRED[@]}" >/dev/null 2>&1
     fi
 
-    # A locked session keeps its old policy: see above.
     if session_locked "$user" "$run"; then
         echo "hypr-DE: $user is locked; leaving the idle policy until next login"
         continue
     fi
 
     for unit in "${UNITS[@]}"; do
-        # One runuser for the whole verdict: each call opens and tears down
-        # a logind session through pam_systemd, and each carries its own
-        # 15s bound, so five calls per uid would mean 75s of worst-case
-        # hostile stall instead of 15s.
-        #
-        # try-restart, so a unit that is not running stays that way. It
-        # returns 0 for inactive, masked AND failed units without doing
-        # anything, and a restart that dies immediately still moves the
-        # start timestamp -- so a restart counts only if the unit is
-        # actually up afterwards.
         case "$(run_as "$user" "$run" "" sh -c '
             unit=$1
             before=$(systemctl --user show "$unit" \
@@ -168,9 +63,6 @@ for run in /run/user/*; do
         ' _ "$unit" 2>/dev/null)" in
             restarted) restarted=$((restarted + 1)) ;;
             failed)
-                # Either it was already failed, or it died on the new
-                # config. Both mean the user has no idle policy at all, and
-                # saying so beats counting it as a success.
                 echo "hypr-DE: $user has $unit in a failed state; it is not running"
                 ;;
         esac

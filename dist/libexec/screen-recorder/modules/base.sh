@@ -1,13 +1,4 @@
 #!/bin/bash
-# Shared state for the screen recorder.
-#
-# State lives under $XDG_RUNTIME_DIR (0700, per-user, cleared at logout),
-# never /tmp. /tmp/screen-recorder-state and /tmp/gpu-screen-recorder.pid
-# were predictable names in a world-writable directory: another local user
-# could pre-create either as a symlink and have this script overwrite a file
-# of their choosing as us, seed the pidfile so the stop keybind sent SIGINT
-# to a process they picked, or seed the state file so the path announced and
-# copied to the clipboard was theirs.
 if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
     echo "screen-recorder: XDG_RUNTIME_DIR is unset; refusing to keep state in /tmp" >&2
     exit 1
@@ -29,17 +20,12 @@ get_recording_pid() {
 is_recording() {
     local pid comm
     pid=$(get_recording_pid)
-    # Confirm the pid is still the recorder: a recycled pid would otherwise
-    # take the SIGINT the stop keybind sends.
     if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then
-        # The kernel truncates comm to 15 chars, so "gpu-screen-recorder"
-        # reads back as "gpu-screen-reco".
         comm=$(cat "/proc/$pid/comm" 2>/dev/null)
         case "$comm" in
             gpu-screen-reco*) return 0 ;;
         esac
     fi
-    # Clean up stale PID file
     if [[ -f "$PIDFILE" ]]; then
         rm -f "$PIDFILE" "$STATE_FILE"
     fi

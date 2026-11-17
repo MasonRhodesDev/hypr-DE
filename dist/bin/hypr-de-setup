@@ -1,16 +1,4 @@
 #!/bin/bash
-# hypr-DE per-user setup. Idempotent. Package-owned defaults live under
-# /usr and /etc/xdg; this script does not copy them into home.
-#
-# It:
-#   - presets DE user units (Arch and existing Fedora users; new Fedora
-#     accounts get the preset via %systemd_user_post)
-#   - verifies those units are enabled (fail closed)
-#   - copies xdph.conf into ~/.config/hypr/ if missing (XDPH only reads
-#     that path; it does not search XDG_CONFIG_DIRS)
-#
-# --adopt: back up and remove ~/.config/hypr/hyprland.lua so Hyprland uses
-# the packaged /etc/xdg/hypr/hyprland.lua. Overrides belong in local.lua.
 set -euo pipefail
 
 CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}"
@@ -40,12 +28,8 @@ REQUIRED_UNITS=(
     obex.service
 )
 
-# Units an earlier hypr-DE preset that no longer ship. The package manager
-# removes the unit file but not the user's enablement symlink, which then
-# dangles in ~/.config/systemd/user/*.wants/ forever; systemctl disable
-# still removes it once the unit is gone.
 RETIRED_UNITS=(
-    waybar-watchdog.timer      # 0.2.37: the check runs per waybar start and per monitor event
+    waybar-watchdog.timer
 )
 
 GAMING_UNITS=(
@@ -108,17 +92,12 @@ nvidia_notice() {
     fi
 }
 
-# Screen-share portal config: XDPH hardcodes ~/.config/hypr/xdph.conf.
 if [ ! -e "$CONFIG/hypr/xdph.conf" ]; then
     mkdir -p "$CONFIG/hypr"
     cp "$DATADIR/hypr/xdph.conf" "$CONFIG/hypr/xdph.conf"
     say "xdph.conf seeded (XDPH has no system config path)"
 fi
 
-# Icon theme: adwaita-icon-theme no longer ships app icons, so the gsettings
-# default renders blank icons in fuzzel/swaync/GTK apps. Seed Papirus once
-# (lmtt's gtk module then flips Papirus/Papirus-Dark per mode); never touch a
-# theme the user picked themselves.
 if command -v gsettings >/dev/null 2>&1 && [ -d /usr/share/icons/Papirus ]; then
     current_icons=$(gsettings get org.gnome.desktop.interface icon-theme 2>/dev/null | tr -d "'" || echo "")
     case "$current_icons" in
@@ -159,8 +138,6 @@ fi
 for u in "${RETIRED_UNITS[@]}"; do
     for link in "$CONFIG"/systemd/user/*.wants/"$u"; do
         [ -L "$link" ] || continue
-        # Still loaded in a session that logged in before the upgrade? Stop
-        # it too, or the old timer keeps firing until the next login.
         systemctl --user stop "$u" >/dev/null 2>&1 || true
         systemctl --user disable "$u" >/dev/null 2>&1 || rm -f "$link"
         say "retired $u (no longer shipped)"
@@ -173,8 +150,6 @@ if ! command -v sni-watcher >/dev/null 2>&1; then
     exit 1
 fi
 
-# Packaged look: gradient wallpaper + matugen palette + waybar/swaync CSS.
-# Skip if the user already applied (or reset-and-chose) a theme.
 if [ ! -e "$CONFIG/hypr-de/theme" ]; then
     if command -v hypr-de-theme >/dev/null 2>&1; then
         say "Applying packaged gradient theme"
