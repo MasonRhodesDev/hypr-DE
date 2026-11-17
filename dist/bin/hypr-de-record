@@ -1,8 +1,5 @@
 #!/bin/bash
-# Modern screen recording with gpu-screen-recorder (hardware encoding)
 
-# Installed to @BINDIR@, while its helpers live in @LIBEXECDIR@.
-# A copy run from a checkout or symlinked dir may ship them alongside.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE="$SCRIPT_DIR/screen-recorder/modules/base.sh"
 [[ -f "$BASE" ]] || BASE=@LIBEXECDIR@/screen-recorder/modules/base.sh
@@ -13,13 +10,11 @@ source "$BASE" || {
 }
 
 if is_recording; then
-  # Stop recording
   FILENAME=$(get_output_file)
   PID=$(get_recording_pid)
   
   kill -SIGINT "$PID" 2>/dev/null
   
-  # Wait a moment for file to finalize
   sleep 0.5
   
   clear_state
@@ -35,7 +30,6 @@ if is_recording; then
     notify-send "Screen Recording" "Recording stopped"
   fi
 else
-  # Start recording with region selection
   REGION=$(slurp -f "%wx%h+%x+%y")
   if [ -n "$REGION" ]; then
     FILENAME=~/Videos/$(date +%s).mp4

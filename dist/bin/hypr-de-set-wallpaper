@@ -1,12 +1,4 @@
 #!/bin/bash
-# Set the hypr-DE wallpaper. Single owner of all three wallpaper consumers:
-#   ~/.config/hypr-de/wallpaper.conf          ($WALLPAPER for hyprlock)
-#   ~/.config/environment.d/wallpaper.conf    (WALLPAPER_PATH for swaybg.service)
-#   ~/.config/appearance-profiles/default.toml   (shared wallpaper registry)
-# then applies live (swaybg restart + lmtt re-render). Since the
-# hypr-de-wallpaper lmtt module, every `lmtt switch` also syncs swaybg and
-# the hyprlock conf from the registry, so dials (which writes the registry
-# through lmtt) reaches the same consumers without this script.
 set -euo pipefail
 
 usage() { echo "usage: hypr-de-set-wallpaper <image-path>" >&2; exit 2; }
@@ -21,9 +13,6 @@ mkdir -p "$CONFIG/hypr-de" "$CONFIG/environment.d"
 printf '$WALLPAPER = %s\n' "$WP" > "$CONFIG/hypr-de/wallpaper.conf"
 printf 'WALLPAPER_PATH=%s\n' "$WP" > "$CONFIG/environment.d/wallpaper.conf"
 
-# LMTT implements the appearance-profiles standard and publishes a
-# greeter-readable copy for Vigil. Keep the old config writer only as a
-# transition fallback when an older lmtt is installed.
 if command -v lmtt >/dev/null 2>&1 && lmtt wallpaper set "$WP"; then
     :
 else
@@ -45,19 +34,10 @@ else
 fi
 
 if [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ] || [ -n "${XDG_RUNTIME_DIR:-}" ]; then
-    # No set-environment. swaybg-launch reads the registry written above, so
-    # the environment is not consulted - and an override here would outrank
-    # environment.d forever, which is how the desktop and the lock screen
-    # came to show different wallpapers for eight days. The environment.d
-    # file stays for anything of the user's own that still reads it.
     systemctl --user try-restart swaybg.service 2>/dev/null || true
-    # Re-render the theme from the new wallpaper in the CURRENT mode.
-    # NEVER bare `lmtt switch` — that toggles light/dark.
     if command -v lmtt >/dev/null 2>&1; then
         MODE=$(lmtt status 2>/dev/null | sed -n 's/^Current theme: //p')
         case "$MODE" in light|dark) ;; *) MODE=dark ;; esac
-        # First-boot setup has a user bus but no compositor; notify-send
-        # would stall waiting for a notification daemon that is not up.
         if [ -n "${WAYLAND_DISPLAY:-}" ]; then
             lmtt switch "$MODE" >/dev/null 2>&1 || true
         else

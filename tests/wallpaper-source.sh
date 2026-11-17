@@ -1,12 +1,4 @@
 #!/bin/bash
-# swaybg must show the wallpaper the lock screen shows.
-#
-# Both now read ~/.config/appearance-profiles/default.toml. Before this,
-# swaybg read ${WALLPAPER_PATH} from the user manager's environment, which
-# is frozen at manager start and outranked by any set-environment override
-# for as long as the manager lives - eight days, under Linger=yes, on
-# 2026-08-30. The stubs below make the launcher run without a compositor:
-# a fake swaybg records what it was asked to display.
 set -uo pipefail
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 work=$(mktemp -d)
@@ -15,7 +7,6 @@ fail=0
 ok()  { printf 'ok   %s\n' "$*"; }
 bad() { printf 'FAIL %s\n' "$*"; fail=1; }
 
-# Stage the launcher with tokens substituted, and a swaybg that only records.
 mkdir -p "$work/bin" "$work/share/wallpapers" "$work/cfg/appearance-profiles"
 sed "s|@DATADIR@|$work/share|g" "$root/dist/libexec/swaybg-launch" > "$work/swaybg-launch"
 chmod +x "$work/swaybg-launch"

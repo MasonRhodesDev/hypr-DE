@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Welcome / help window: session explanation plus live Hyprland binds."""
 from __future__ import annotations
 
 import json
@@ -95,8 +94,6 @@ def load_binds() -> tuple[list[tuple[str, str]], str | None]:
 
 
 def resolve_editor() -> str | None:
-    """First usable editor: $VISUAL/$EDITOR if on PATH, else nvim (the hypr-DE
-    default), then common fallbacks. None when nothing is installed."""
     for env in (os.environ.get("VISUAL"), os.environ.get("EDITOR")):
         if env and shutil.which(env.split()[0]):
             return env

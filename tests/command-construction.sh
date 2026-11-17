@@ -1,8 +1,4 @@
 #!/bin/bash
-# Commands and Lua dispatches are built from argv and quoted literals, never
-# by interpolating a value into a string a shell or a Lua parser will read.
-# See issue #18. Most of these values are not attacker-settable today; the
-# point is that the shape does not depend on that staying true.
 set -uo pipefail
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
@@ -16,8 +12,6 @@ hits=$(grep -rn "shell=True" "$root/dist" 2>/dev/null)
 
 echo
 echo "== no gawk-only three-argument match()"
-# mawk and busybox awk silently return nothing for match(s, re, arr), so a
-# gawk-ism is a value that quietly becomes empty on another distro.
 hits=$(grep -rnE 'match\(.+,.+,.+\)' "$root/dist" 2>/dev/null)
 [ -z "$hits" ] && ok "no three-argument match()" || { printf '%s\n' "$hits"; bad "gawk-only match()"; }
 
@@ -51,11 +45,6 @@ esac
 
 echo
 echo "== Lua dispatch values are quoted literals"
-# The two implementations must agree, so a workspace name cannot mean one
-# thing to the Python path and another to the shell path.
-# Take the function out of the source rather than importing the module: it
-# pulls in evdev, a runtime dependency of the gaming subpackage that is absent
-# in CI and in the RPM %check buildroot.
 py=$(cd "$root" && python3 - <<'PYX'
 src = open("dist/gaming/bp-game-focus.py").read()
 start = src.index("def lua_str(")
@@ -66,7 +55,6 @@ for v in ['games', 'a"b', 'a\\b', 'x") os.execute("id']:
     print(ns["lua_str"](v))
 PYX
 )
-# Same helper, lifted out of the shell implementation.
 eval "$(grep -m1 '^\s*lua_str()' "$root/dist/libexec/swaync-focus-sender.sh" | sed 's/^[[:space:]]*//')"
 sh_out=$(for v in 'games' 'a"b' 'a\b' 'x") os.execute("id'; do lua_str "$v"; echo; done)
 if [ "$(printf '%s\n' "$py" | grep -c .)" -ne 4 ]; then
@@ -80,8 +68,6 @@ else
     printf 'python:\n%s\nshell:\n%s\n' "$py" "$sh_out"
     bad "the two Lua quoters disagree"
 fi
-# Substring tests cannot tell \" from ": strip the outer quotes and look for
-# a quote that is not preceded by a backslash.
 breakout=$(printf '%s' "$py" | tail -1)
 inner=${breakout#\"}; inner=${inner%\"}
 if [ -z "$inner" ]; then
@@ -95,7 +81,6 @@ fi
 
 echo
 echo "== no raw interpolation left at the dispatch sites"
-# Any dispatch line that interpolates a value must route it through lua_str.
 raw=$(grep -rn 'hl\.dsp' "$root/dist/libexec/swaync-focus-sender.sh" "$root/dist/gaming/bp-game-focus.py" 2>/dev/null \
       | grep -E '\{[a-z_]|\$[0-9a-zA-Z_]' \
       | grep -v 'lua_str')

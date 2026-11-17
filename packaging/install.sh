@@ -1,8 +1,4 @@
 #!/bin/bash
-# Install the (already token-substituted) staged dist/ tree into DESTDIR.
-# Shared by the RPM spec (%install) and PKGBUILD (package_*) so the file
-# layout lives in exactly one place. paths.conf provides the target dirs.
-#   usage: install.sh <staged-dist-dir> <destdir> {main|gaming}
 set -euo pipefail
 
 STAGE="${1:?usage: install.sh <staged-dist-dir> <destdir> main|gaming}"
@@ -15,7 +11,6 @@ instx() { install -Dpm755 "$1" "$DEST$2"; }
 
 case "$PART" in
 main)
-    # /usr/share/hypr-de payload
     for f in "$STAGE"/hypr/*;   do inst "$f" "$DATADIR/hypr/$(basename "$f")"; done
     inst "$STAGE/waybar/config.jsonc" "$DATADIR/waybar/config.jsonc"
     inst "$STAGE/swaync/config.json"  "$DATADIR/swaync/config.json"
@@ -38,7 +33,6 @@ main)
         done
     fi
 
-    # binaries + libexec helpers
     for f in "$STAGE"/bin/*; do
         instx "$f" "$BINDIR/$(basename "$f")"
     done
@@ -46,23 +40,15 @@ main)
         instx "$STAGE/libexec/$f" "$LIBEXECDIR/${f#./}"
     done
 
-    # systemd user units, drop-ins, preset
     (cd "$STAGE/systemd/user" && find . -type f) | while read -r f; do
         inst "$STAGE/systemd/user/$f" "$UNITDIR/${f#./}"
     done
     inst "$STAGE/systemd/user-preset/90-hypr-de.preset" "$PRESETDIR/90-hypr-de.preset"
 
-    # uwsm env for the stock Hyprland (uwsm) session. No wayland-sessions
-    # entry: hypr-DE is configs + deps, not a competing greeter session.
     inst "$STAGE/uwsm/env"          "$XDGCONFDIR/uwsm/env"
     inst "$STAGE/uwsm/env-hyprland" "$XDGCONFDIR/uwsm/env-hyprland"
-    # Neovim baseline + Material You colorscheme. These go in the nvim SITE
-    # dir (in nvim's default runtimepath); /etc/xdg/nvim/sysinit.vim is owned
-    # by the neovim package on Arch and shipping it is a file conflict.
     inst "$STAGE/nvim/site/plugin/hypr-de-defaults.lua" "$NVIMSITE/plugin/hypr-de-defaults.lua"
     inst "$STAGE/nvim/site/colors/lmtt-material-you.lua" "$NVIMSITE/colors/lmtt-material-you.lua"
-    # vigil greeter defaults: the uwsm session must be the default or nothing
-    # WantedBy=graphical-session.target (waybar, swaync) ever starts.
     inst "$STAGE/greetd/vigil.toml" "$GREETDDIR/vigil.toml"
     inst "$STAGE/environment.d/60-hypr-de.conf" "$ENVGENDIR/60-hypr-de.conf"
     inst "$STAGE/xdg/hypr/hyprland.lua" "$XDGCONFDIR/hypr/hyprland.lua"

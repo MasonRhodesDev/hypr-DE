@@ -1,18 +1,9 @@
 #!/bin/bash
-# Build the SRPM (source tarball from a git tag) and optionally submit it to
-# COPR. Derived from waybar-workspace-buttons' non-Rust variant.
-#
-# Release flow (Fedora + Arch from the same tag):
-#   1. Bump spec Version (+ %changelog) + PKGBUILD pkgver — one commit.
-#   2. git tag vX.Y.Z && git push --tags
-#   3. CI (packaging-workflows release.yml) publishes both distros.
-#
-# --head builds from HEAD instead of the tag (local/CI testing only).
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 NAME=hypr-de
-TARPREFIX=hypr-DE            # GitHub repo name != pkgname; tarball prefix must match spec %autosetup -n
+TARPREFIX=hypr-DE
 SPEC="$REPO/packaging/$NAME.spec"
 SOURCES="${HOME}/rpmbuild/SOURCES"
 COPR_PROJECT="${COPR_PROJECT:-$NAME}"
@@ -25,7 +16,6 @@ if [ "$PKGBUILD_VER" != "$VER" ]; then
     exit 1
 fi
 
-# Dependency drift gate (deps.toml is the source of truth)
 "$REPO/packaging/gen-deps.sh" check
 
 REF="v$VER"

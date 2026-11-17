@@ -1,7 +1,4 @@
 #!/bin/bash
-# The session must not destroy or silently break the user's own state.
-# See issue #18: a config rewritten on every screenshot, and a bar module that
-# emits invalid JSON when its cache is malformed.
 set -uo pipefail
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
@@ -11,11 +8,6 @@ bad() { printf 'FAIL %s\n' "$*"; fail=1; }
 
 echo "== the wallpaper unit does not read the environment"
 unit="$root/dist/systemd/user/swaybg.service"
-# It used to expand ${WALLPAPER_PATH}, which is frozen at manager start and
-# outranked by any set-environment override for the manager's lifetime -
-# under Linger=yes, indefinitely. The launcher reads the appearance-profiles
-# registry instead, the file vigil reads. Space-safety and the no-wallpaper
-# fallback now live in tests/wallpaper-source.sh, against the launcher.
 if grep -q '^ExecStart=@LIBEXECDIR@/swaybg-launch$' "$unit"; then
     ok "ExecStart is the launcher"
 else
@@ -28,7 +20,6 @@ grep -v '^[[:space:]]*#' "$unit" | grep -q 'ConditionEnvironment\|WALLPAPER_PATH
 
 echo
 echo "== a screenshot does not overwrite the user's swappy config"
-# The seeding block, lifted out and pointed at a fixture DATADIR.
 datadir="$work/datadir"; mkdir -p "$datadir/swappy"
 cp "$root/dist/swappy/config" "$datadir/swappy/config"
 block=$(sed -n '/^SWAPPY_CFG=/,/^fi$/p' "$root/dist/bin/hypr-de-snip" | sed "s|@DATADIR@|$datadir|g")
@@ -37,9 +28,6 @@ if [ -z "$block" ]; then
     block='false'
 fi
 
-# Pin XDG_CONFIG_HOME too: a runner that already exports it (CI does) would
-# otherwise send the seeded file outside the fixture, and the case would read
-# as "no config seeded".
 home1="$work/h1"; mkdir -p "$home1"
 HOME="$home1" XDG_CONFIG_HOME="$home1/.config" bash -c "$block"
 if [ -e "$home1/.config/swappy/config" ]; then
@@ -63,7 +51,6 @@ else
     bad "CLOBBERED the user's swappy config"
 fi
 
-# ...and nothing writes it unconditionally any more.
 grep -qE 'cat > *~?.*swappy/config' "$root/dist/bin/hypr-de-snip" \
     && bad "still writes the swappy config unconditionally" \
     || ok "no unconditional write"
@@ -78,7 +65,6 @@ out=$(emit)
 if printf '%s' "$out" | jq -e . >/dev/null 2>&1; then ok "valid colors -> valid JSON"; else printf '%s\n' "$out"; bad "valid colors -> invalid JSON"; fi
 printf '%s' "$out" | jq -r .tooltip | grep -q '#00ff00' && ok "lists the saved colors" || bad "colors missing from the tooltip"
 
-# A quote in the cache used to end the JSON string; markup used to be injected.
 printf '#ff0000\n<b>&"junk\n\n#zz\n' > "$cp_home/.cache/colorpicker/colors"
 out=$(emit)
 if printf '%s' "$out" | jq -e . >/dev/null 2>&1; then

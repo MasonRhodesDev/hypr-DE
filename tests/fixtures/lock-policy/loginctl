@@ -1,12 +1,6 @@
 #!/bin/sh
-# Stand-in for loginctl: reports a controllable LockedHint and logs session
-# termination so the fail-closed path is observable.
 case "${1:-}" in
     show-session)
-        # logind resolves `self` from the caller's cgroup. hypridle.service
-        # (and everything it spawns) lives in app.slice, not session-N.scope,
-        # so `self` fails there exactly like this -- only an explicit id or
-        # `auto` resolves. Keep the fixture as strict as the real thing.
         case "${2:-}" in
             self)
                 echo "Failed to get path for session 'self': Caller does not belong to any known session." >&2

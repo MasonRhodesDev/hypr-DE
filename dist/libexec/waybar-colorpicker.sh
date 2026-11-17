@@ -16,21 +16,16 @@ limit=10
   exit
 }
 
-# Pango markup and JSON, built from ~/.cache/colorpicker/colors. That file is
-# the user's own, but a malformed line used to produce invalid JSON or invalid
-# markup, and waybar drops the whole module when either happens. Values are
-# validated as colors, escaped for markup, and the object is built by jq.
 pango_escape() { printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'; }
 is_color()     { printf '%s' "$1" | grep -qE '^#[0-9A-Fa-f]{3,8}$'; }
 
-emit_json() {  # emit_json <text-markup> <tooltip-markup>
+emit_json() {
   jq -cn --arg text "$1" --arg tooltip "$2" '{text: $text, tooltip: $tooltip}'
 }
 
 [[ $# -eq 1 && $1 = "-j" ]] && {
   text="$(head -n 1 "$loc/colors")"
 
-  # If no color saved yet, use default placeholder
   if [[ -z "$text" ]] || ! is_color "$text"; then
     emit_json "󰉦" $'<b>   COLORS</b>\n\nNo colors picked yet'
     exit

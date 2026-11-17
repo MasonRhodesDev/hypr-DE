@@ -1,12 +1,4 @@
 #!/bin/bash
-# Add the hypr-DE package repo and install hypr-de.
-#
-#   curl -fsSL https://raw.githubusercontent.com/MasonRhodesDev/hypr-DE/main/get-hypr-de.sh | sudo sh
-#   wget -qO- https://raw.githubusercontent.com/MasonRhodesDev/hypr-DE/main/get-hypr-de.sh | sudo sh
-#
-# Options (after the pipe, via `sudo sh -s --`):
-#   --gaming    also install hypr-de-gaming
-#   --no-setup  skip per-user hypr-de-setup
 set -euo pipefail
 
 KEY_URL="https://masonrhodesdev.github.io/arch-repo/mason-repo.asc"
@@ -42,29 +34,14 @@ fetch() {
 }
 
 
-# Repo metadata can be served mid-republish: GitHub Pages (and any CDN in
-# front of a COPR mirror) will happily hand out a database from one publish
-# and its index from another, and the install dies with
-#   error: failed to synchronize all databases (invalid or corrupted database)
-# It is transient and clears within a minute, but a one-shot installer just
-# fails in the user's face. Retry those specific errors after dropping the
-# cached metadata; anything else fails immediately as before.
 TRANSIENT_RE='invalid or corrupted (database|package)|Status code: 5[0-9][0-9]|Connection (timed out|reset)'
 
-# Signature failures are deliberately NOT transient, and this list is checked
-# first so the "(PGP signature)" flavour of a corrupt-database error cannot
-# fall through to the retry set above. pacman and dnf refuse the artifact
-# either way, so a retry was never a bypass -- but calling a failed signature
-# "transient repo metadata" four times over trains the user to read a real
-# attack, or a hijacked mirror, as a CDN glitch. It fails once, loudly.
 UNTRUSTED_RE='signature from .* is invalid|signature .* is unknown trust|could not be verified|repomd\.xml.*(signature|GPG)|GPG check FAILED|invalid or corrupted (database|package) \(PGP signature\)'
 
-retry_pkg() {  # retry_pkg <label> <cmd...>
+retry_pkg() {
     local label="$1"; shift
     local tries="${HYPR_DE_RETRIES:-4}" delay="${HYPR_DE_RETRY_DELAY:-15}" i out rc
     for i in $(seq 1 "$tries"); do
-        # `if cmd` is exempt from errexit, so this captures the status without
-        # toggling set -e (which would leak out of this function).
         if out=$("$@" 2>&1); then rc=0; else rc=$?; fi
         printf '%s\n' "$out"
         [ "$rc" -eq 0 ] && return 0
@@ -80,7 +57,7 @@ installer will not retry past it. Re-run once; if it fails the same way
 again, stop and find out why before installing anything."
         fi
         if ! printf '%s' "$out" | grep -qiE "$TRANSIENT_RE"; then
-            return "$rc"   # a real failure: do not paper over it
+            return "$rc"
         fi
         if [ "$i" -eq "$tries" ]; then
             die "$label failed after $tries attempts (repo metadata still inconsistent)"
@@ -98,7 +75,6 @@ again, stop and find out why before installing anything."
 install_arch() {
     say "Installing [mason] repo key"
     pacman -S --needed --noconfirm gnupg curl >/dev/null
-    # pubring can exist without a secret key; lsign still needs --init.
     pacman-key --init
     key=$(mktemp)
     fetch "$KEY_URL" "$key"
@@ -123,20 +99,9 @@ EOF
     pkgs=(hypr-de)
     [ "$GAMING" = 1 ] && pkgs+=(hypr-de-gaming)
     say "Installing ${pkgs[*]}"
-    # -Syy on retry: the cached db is exactly what may be inconsistent.
     retry_pkg "install" pacman -Syyu --needed --noconfirm "${pkgs[@]}"
 }
 
-# Pinned COPR signing keys. `dnf copr enable -y` accepts whatever key the
-# repository serves at enable time, so the one-liner would hand permanent
-# root package trust to eleven publishers -- two of them unrelated third
-# parties -- on nothing but "the URL looked right". The Arch path has always
-# pinned its key (KEY_FPR); this is the Fedora half of that.
-#
-# Re-pin after a legitimate key rotation, verifying the new fingerprint out
-# of band first:
-#   curl -fsSL https://download.copr.fedorainfracloud.org/results/<owner>/<project>/pubkey.gpg \
-#     | gpg --show-keys --with-colons | awk -F: '$1 == "fpr" { print $10; exit }'
 COPR_KEYS=(
     "solaris765/hypr-de                  35DAF337625EC32DFEDFEAB5F984020F51D7DA3D"
     "solaris765/hyprstate                F165E7735518C392EB7EEAF0C4A6E35AB4EBE64F"
@@ -151,9 +116,7 @@ COPR_KEYS=(
     "heus-sueh/packages                  3FF21D0C4A29C4145780C98A1EE41438D0EFE2B9"
 )
 
-# Fetch a COPR's signing key, refuse it unless it is the pinned one, and
-# install it locally. Prints the path to the verified key.
-copr_pin_key() {  # copr_pin_key <owner/project> <fingerprint>
+copr_pin_key() {
     local copr="$1" want="$2"
     local owner="${copr%%/*}" project="${copr##*/}"
     local tmp got dest
@@ -188,9 +151,6 @@ install_fedora() {
         project=${copr##*/}
         keyfile=$(copr_pin_key "$copr" "$want")
         dnf copr enable -y "$copr"
-        # Point the generated .repo at the copy we just verified. Left as the
-        # upstream URL, a later key swap would be re-fetched and auto-imported
-        # by -y on the next update, which is the whole thing being prevented.
         repofile=$(grep -ls "results/$owner/$project" /etc/yum.repos.d/*.repo 2>/dev/null | head -1)
         if [ -n "$repofile" ]; then
             sed -i "s|^gpgkey=.*|gpgkey=file://$keyfile|" "$repofile"
@@ -204,8 +164,6 @@ install_fedora() {
     retry_pkg "install" dnf install -y --refresh "${pkgs[@]}"
 }
 
-# Sourced by tests/installer-trust.sh to exercise the classifiers and the key
-# pinning without running an install.
 if [ -n "${HYPR_DE_INSTALLER_LIB:-}" ]; then
     return 0 2>/dev/null || exit 0
 fi

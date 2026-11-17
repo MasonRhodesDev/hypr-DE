@@ -1,21 +1,11 @@
 #!/bin/bash
-# Does the screen locker survive its launcher?
-#
-# Every lock path goes through hypridle's lock_cmd, so without care the locker
-# ends up inside hypridle.service's cgroup. That unit is KillMode=control-group,
-# so restarting hypridle -- a config change, a crash, an upgrade -- kills the
-# locker while the session is still locked. The compositor then shows "the
-# lockscreen app died" and the only way back in is a TTY.
-#
-# Red/green: this fails on a build that launches the locker inline, passes on
-# one that runs it in its own transient scope.
 set -uo pipefail
 
 fail=0
 ok()  { printf 'ok   %s\n' "$*"; }
 bad() { printf 'FAIL %s\n' "$*"; fail=1; }
 
-XDG_RUNTIME_DIR="/run/user/$(id -u)"   # split: export+assign masks id(1) status (SC2155)
+XDG_RUNTIME_DIR="/run/user/$(id -u)"
 export XDG_RUNTIME_DIR
 eval "$(systemctl --user show-environment 2>/dev/null \
     | grep -E '^(HYPRLAND_INSTANCE_SIGNATURE|WAYLAND_DISPLAY)=' | sed 's/^/export /')"
@@ -32,10 +22,6 @@ if locker_up; then
 fi
 
 echo "== the idle driver cannot be shadowed from ~/.local/bin"
-# hypridle drives every lock. The user manager's PATH includes ~/.local/bin,
-# so a unit that resolved the binary through PATH could be pointed at an
-# attacker-supplied stub by anything running in the session -- auto-lock
-# silently dead, unit still active. Requires the fix from issue #16.
 execline=$(systemctl --user cat hypridle.service 2>/dev/null | grep -E '^ExecStart=.' | tail -1)
 if printf '%s' "$execline" | grep -qE 'command -v|which '; then
     bad "hypridle.service resolves its binary through \$PATH: $execline"
@@ -70,9 +56,6 @@ systemctl --user restart hypridle.service 2>/dev/null
 sleep 2
 
 echo "== lock the session the way a user does (loginctl -> hypridle lock_cmd)"
-# Must name the GRAPHICAL session: this script runs over ssh, and a bare
-# loginctl lock-session would lock the ssh session instead -- hypridle is
-# bound to the seat session and would never see it.
 gsid=""
 for s in $(loginctl list-sessions --no-legend | awk '{print $1}'); do
     [ -n "$(loginctl show-session "$s" -p Seat --value 2>/dev/null)" ] || continue

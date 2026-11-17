@@ -1,9 +1,4 @@
 #!/bin/bash
-# A host sets its own idle timeouts without copying the packaged policy.
-# ~/.config/hypr-de/hypridle.conf may redefine the `$name = seconds` knobs the
-# packaged hypridle.conf declares; hypridle-launch splices them in after the
-# defaults and runs the copy. Everything else in the policy is the decided
-# model and must reach hypridle byte for byte.
 set -uo pipefail
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
@@ -18,9 +13,6 @@ policy="$work/policy.conf"
 sed 's|@LIBEXECDIR@|/nonexistent|g' "$root/dist/hypr/hypridle.conf" > "$policy"
 marker='# hypr-de: host overrides go below this line (hypridle-launch)'
 
-# The launcher pins PATH and its binary list to root-owned places (BAR-017);
-# the suite runs a copy with both redirected at the fixtures, the way
-# lock-policy.sh does for the other libexec helpers.
 grep -q '^PATH=/usr/local/bin:/usr/bin:/bin; export PATH$' "$src" \
     && ok "the launcher pins PATH to root-owned directories" \
     || bad "the launcher must pin PATH (the user manager's PATH has ~/.local/bin)"
@@ -36,14 +28,13 @@ chmod +x "$launch"
 export HYPRIDLE_LOG="$work/argv" HYPRIDLE_CONF_COPY="$work/handed.conf"
 home="$work/home"; export HOME="$home" XDG_CONFIG_HOME="$home/.config" XDG_RUNTIME_DIR="$work/run"
 override="$XDG_CONFIG_HOME/hypr-de/hypridle.conf"
-run_launch() { # argv lands in $HYPRIDLE_LOG, stderr in $work/err
+run_launch() {
     : > "$HYPRIDLE_LOG"; rm -f "$HYPRIDLE_CONF_COPY"
     mkdir -p "$XDG_RUNTIME_DIR"
     bash "$launch" 2> "$work/err"
 }
 handed() { head -n1 "$HYPRIDLE_LOG"; }
-# The assembled file minus its header and the spliced lines must be the policy.
-policy_intact() { # policy_intact <assembled> <accepted-lines-file>
+policy_intact() {
     grep -vxF -f "$2" "$1" | sed 1d | cmp -s - "$policy"
 }
 
@@ -58,7 +49,6 @@ raw=$(grep -nE '^[[:space:]]*timeout[[:space:]]*=[[:space:]]*[0-9]' "$policy")
 uses=$(grep -cE '^[[:space:]]*timeout[[:space:]]*=[[:space:]]*\$(lock|blank|suspend)_timeout' "$policy")
 [ "$uses" -eq 3 ] && ok "three listeners, three knobs" || bad "expected 3 knob uses, found $uses"
 grep -qxF "$marker" "$policy" && ok "the splice marker is present" || bad "no splice marker in hypridle.conf"
-# hyprlang: a variable must be defined before the line that uses it.
 first_use=$(grep -nE '\$(lock|blank|suspend)_timeout' "$policy" | grep -v '^[0-9]*:\$' | head -n1 | cut -d: -f1)
 marker_at=$(grep -nxF "$marker" "$policy" | cut -d: -f1)
 [ "$marker_at" -lt "$first_use" ] && ok "defaults and marker come before the first use (line $marker_at < $first_use)" \
@@ -94,8 +84,6 @@ cmp -s "$assembled" "$HYPRIDLE_CONF_COPY" && ok "the copy handed over is the one
 printf '$lock_timeout = 600\n$suspend_timeout = 1800\n' > "$work/accepted"
 policy_intact "$assembled" "$work/accepted" && ok "every policy line reaches hypridle byte for byte" \
     || { diff <(grep -vxF -f "$work/accepted" "$assembled" | sed 1d) "$policy" | head; bad "the policy text was altered"; }
-# hyprlang takes the latest definition for the lines that follow: the host's
-# value must come after the default and before the listener that uses it.
 d=$(grep -nE '^\$lock_timeout[[:space:]]*=[[:space:]]*180([[:space:]]|$)' "$assembled" | cut -d: -f1 | head -n1)
 h=$(grep -nxF '$lock_timeout = 600' "$assembled" | cut -d: -f1 | head -n1)
 u=$(grep -nE '^[[:space:]]*timeout[[:space:]]*=[[:space:]]*\$lock_timeout' "$assembled" | cut -d: -f1 | head -n1)

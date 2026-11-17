@@ -1,6 +1,3 @@
-# Shipped by hypr-de (installed under /usr/share/lmtt/modules/). Requires
-# lmtt with [template] path support + system module search path. Override by
-# creating ~/.config/lmtt/modules/hypr-de-waybar.toml (same filename wins).
 name = "hypr-de-waybar"
 description = "hypr-DE waybar stylesheet (rendered from packaged template)"
 priority = 110

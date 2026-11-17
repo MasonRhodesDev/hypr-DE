@@ -2,11 +2,6 @@
 Description=swaybg wallpaper daemon
 PartOf=graphical-session.target
 After=graphical-session.target
-# No ConditionEnvironment and no ${WALLPAPER_PATH}: the launcher resolves
-# the wallpaper from the appearance-profiles registry on every start, which
-# is the file vigil reads, so the desktop and the lock screen cannot
-# disagree. The environment route froze at manager start and, under
-# Linger=yes, could lag every login.
 
 [Service]
 Type=simple

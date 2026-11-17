@@ -1,13 +1,10 @@
 #!/bin/bash
-# Second-boot checks for a hypr-DE QEMU guest. Run on the guest (or via ssh).
-# Exit 0 only when packaged login path, man pages, plugins, and units look sane.
 set -euo pipefail
 
 fail=0
 ok() { printf 'ok   %s\n' "$*"; }
 bad() { printf 'FAIL %s\n' "$*"; fail=1; }
 
-# arch or fedora — picks the package tool and per-distro file paths below.
 if command -v pacman >/dev/null; then
     DISTRO=arch
     LIBDIR=/usr/lib
@@ -77,7 +74,6 @@ do
 done
 
 echo "== lmtt styles"
-# These only exist after hypr-de-setup applies the packaged gradient theme.
 lmtt_files=(
     "$HOME/.config/hypr-de/theme"
     "$HOME/.config/hypr/lmtt-colors.lua"
@@ -98,9 +94,6 @@ if grep -q 'command = "/usr/bin/vigil"' /etc/greetd/config.toml 2>/dev/null; the
 else
     bad "greetd is not pointed at /usr/bin/vigil"
 fi
-# Without this default vigil picks the plain "Hyprland" entry (sorts first),
-# uwsm never runs, graphical-session.target stays inactive, and waybar/swaync
-# silently never start on a fresh install.
 if grep -q 'default = "Hyprland (uwsm-managed)"' /etc/greetd/vigil.toml 2>/dev/null; then
     ok "vigil default session is uwsm-managed"
 else
@@ -123,11 +116,6 @@ else
 fi
 
 echo "== fonts / icons"
-# The waybar/swaync stylesheets request these families by name; without them
-# every glyph is tofu (Fedora shipped zero Nerd fonts before hypr-de-extras).
-# Snapshot once. NOT `fc-list | grep -q`: under pipefail grep -q's early
-# exit SIGPIPEs fc-list and the pipeline "fails" whenever the font list is
-# long enough — an intermittent false negative.
 fonts=$(fc-list 2>/dev/null || true)
 if grep -qi "JetBrainsMono Nerd Font" <<<"$fonts"; then
     ok "JetBrainsMono Nerd Font present"
@@ -139,7 +127,6 @@ if grep -qi "Symbols Nerd Font" <<<"$fonts"; then
 else
     bad "Symbols Nerd Font missing"
 fi
-# adwaita-icon-theme dropped app icons; Papirus supplies them for fuzzel/GTK.
 if [ -f /usr/share/icons/Papirus/index.theme ]; then
     ok "Papirus icon theme installed"
 else
@@ -164,7 +151,6 @@ if systemctl is-active --quiet greetd; then
 else
     bad "greetd is $(systemctl is-active greetd 2>/dev/null || echo missing)"
 fi
-# Arch's greetd runs the greeter as "greeter", Fedora's as "greetd".
 greeter_user=greeter
 [ "$DISTRO" = fedora ] && greeter_user=greetd
 if pgrep -u "$greeter_user" -x vigil >/dev/null; then
@@ -219,9 +205,6 @@ fi
 echo "== editor + nvim theme"
 pkg_at_least neovim 0.9
 if command -v nvim >/dev/null; then ok "nvim on PATH"; else bad "nvim missing (default editor)"; fi
-# EDITOR comes from the uwsm session env, so an SSH shell (and an automated
-# run, where nobody logs in at the greeter) never has it. Assert the packaged
-# contract instead, and the live session env only when a session exists.
 ed_decl=$(grep -hoE '^export EDITOR=.*' /etc/xdg/uwsm/env 2>/dev/null | head -1)
 if [ -n "$ed_decl" ] && command -v "${ed_decl#export EDITOR=}" >/dev/null; then
     ok "uwsm env sets ${ed_decl#export } and it resolves"
@@ -243,7 +226,6 @@ fi
 for f in /usr/share/nvim/site/plugin/hypr-de-defaults.lua /usr/share/nvim/site/colors/lmtt-material-you.lua; do
     if [ -f "$f" ]; then ok "$f"; else bad "$f missing"; fi
 done
-# End-to-end: a user with no nvim config must actually get the themed scheme.
 if command -v nvim >/dev/null; then
     got=$(HOME="$HOME" nvim --headless -c 'lua io.write(vim.g.colors_name or "NONE")' -c qa 2>&1 | tail -1)
     if [ "$got" = "lmtt-material-you" ]; then
@@ -266,7 +248,6 @@ if [ "$DISTRO" = arch ]; then
         bad "pacman reload hook missing"
     fi
 fi
-# The packaged config Hyprland actually loads must exist and be readable.
 if [ -r /etc/xdg/hypr/hyprland.lua ] && grep -q 'main.lua' /etc/xdg/hypr/hyprland.lua; then
     ok "/etc/xdg/hypr/hyprland.lua present and sources the packaged main.lua"
 else
@@ -274,8 +255,6 @@ else
 fi
 
 echo "== workspace button click dispatch"
-# Older modules used "hyprctl dispatch workspace N"; newer Hyprland parses
-# dispatch args as Lua and rejects that, so clicks silently did nothing.
 wsb_so="$LIBDIR/waybar/workspace_buttons.so"
 if ! command -v strings >/dev/null; then
     ok "skipped dispatcher check (no strings/binutils in guest)"

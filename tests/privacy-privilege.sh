@@ -1,6 +1,4 @@
 #!/bin/bash
-# What the session reveals to someone at a locked machine, and what it will
-# run as root on a single click. See issue #18.
 set -uo pipefail
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
@@ -64,7 +62,7 @@ echo "== the update click cannot be pointed at an arbitrary program"
 source <(sed -n '/^resolve_terminal()/,/^}/p' "$root/dist/libexec/waybar-updates-check")
 if ! declare -F resolve_terminal >/dev/null; then
     bad "there is no resolve_terminal: \$TERMINAL is used as-is"
-    resolve_terminal() { printf '%s' "${TERMINAL:-kitty}"; }   # so the cases below still mean something
+    resolve_terminal() { printf '%s' "${TERMINAL:-kitty}"; }
 fi
 shadow="$work/shadowbin"; mkdir -p "$shadow"
 printf '#!/bin/sh\necho pwned\n' > "$shadow/kitty"; chmod +x "$shadow/kitty"
@@ -97,8 +95,6 @@ echo
 echo "== the reload helper only talks to sockets the uid owns"
 helper="$work/reload"
 fixture="$work/run"; mkdir -p "$fixture/1000/hypr/sig"
-# Both the glob and the prefix it strips, or the uid parse silently yields
-# nothing and every case below passes for the wrong reason.
 sed -e "s|/run/user/\*|$fixture/*|" -e "s|\${sock#/run/user/}|\${sock#$fixture/}|" \
     "$root/dist/libexec/hypr-de-reload-sessions" > "$helper"
 chmod +x "$helper"
@@ -110,7 +106,6 @@ rbin="$work/rbin"; mkdir -p "$rbin"
 printf '#!/bin/sh\necho \"%s\" > \"$STAT_OUT\"\nexit 0\n' "runuser-called" > "$rbin/runuser"
 printf '#!/bin/sh\nexit 0\n' > "$rbin/pgrep"
 printf '#!/bin/sh\necho notmyuser\n' > "$rbin/id"
-# stat reports an owner that is NOT the uid in the path
 printf '#!/bin/sh\necho 4242\n' > "$rbin/stat"
 chmod +x "$rbin"/*
 export STAT_OUT="$work/runuser.out"; : > "$STAT_OUT"

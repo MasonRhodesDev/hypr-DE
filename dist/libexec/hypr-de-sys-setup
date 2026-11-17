@@ -1,21 +1,8 @@
 #!/bin/bash
-# System-level setup run from the package install scriptlet. Idempotent.
-# Enables NetworkManager and bluetooth, and wires gnome-keyring into greetd
-# PAM when missing.
 set -euo pipefail
 
 warn() { printf 'hypr-de-sys-setup: %s\n' "$*" >&2; }
 
-# Wire gnome-keyring into a greetd PAM stack.
-#
-# This runs as root from %post/post_install and edits the file that decides
-# whether anyone can log in. It used to pipe awk straight over the live file
-# with no check and no backup, so any awk that produced nothing useful --
-# mawk/busybox/gawk differences, a greetd PAM file that does not look like
-# the one this was written against -- truncated the auth stack and locked the
-# machine out. So: validate the rewrite first, back the original up, and on
-# anything unexpected leave the original alone and carry on. A missing
-# keyring is a nuisance; a broken PAM stack is a reinstall.
 wire_keyring_pam() {
     local pam="$1" tmp backup added line
 
@@ -57,9 +44,6 @@ wire_keyring_pam() {
         return 0
     fi
 
-    # The awk prints every input line and only ever inserts, so the output
-    # must contain everything the input had. Anything missing means the awk
-    # did something other than what this expects.
     while IFS= read -r line; do
         if ! grep -qxF -- "$line" "$tmp"; then
             warn "rewrite of $pam dropped a line ('$line'); leaving the original in place"
@@ -81,8 +65,6 @@ wire_keyring_pam() {
         return 0
     fi
 
-    # `cat >` rather than `mv`: it keeps the live file's inode, mode, owner
-    # and SELinux label, which for a PAM file matter more than atomicity.
     if cat "$tmp" > "$pam"; then
         printf 'hypr-de-sys-setup: wired gnome-keyring into %s (backup: %s)\n' "$pam" "$backup"
     else
@@ -92,7 +74,6 @@ wire_keyring_pam() {
     rm -f "$tmp"
 }
 
-# Sourced by tests/pam-rewrite.sh to drive wire_keyring_pam against fixtures.
 if [ -n "${HYPR_DE_SYS_SETUP_LIB:-}" ]; then
     return 0 2>/dev/null || exit 0
 fi

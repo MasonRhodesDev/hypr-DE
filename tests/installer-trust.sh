@@ -1,6 +1,4 @@
 #!/bin/bash
-# get-hypr-de.sh trust behaviour: what the installer retries, what it refuses,
-# and that no COPR is enabled on an unpinned key. See issue #11.
 set -euo pipefail
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 
@@ -16,17 +14,14 @@ fail=0
 ok()  { printf 'ok   %s\n' "$*"; }
 bad() { printf 'FAIL %s\n' "$*"; fail=1; }
 
-# A stand-in package manager: records each attempt, prints canned output.
 attempts="$work/attempts"
-emit() {  # emit <status> <output>
+emit() {
     echo x >> "$attempts"
     printf '%s\n' "$2"
     return "$1"
 }
 
-# Drive the real retry_pkg so precedence between the two classifiers is
-# exercised rather than re-implemented here.
-check_retry() {  # check_retry <label> <expected attempts> <status> <output>
+check_retry() {
     local label="$1" want="$2" status="$3" out="$4" rc=0 n
     : > "$attempts"
     ( HYPR_DE_RETRIES=3 HYPR_DE_RETRY_DELAY=0 \
@@ -85,8 +80,8 @@ done
 echo "== a key that is not the pinned one is refused"
 if command -v gpg >/dev/null 2>&1; then
     fixture="$root/tests/fixtures/installer/copr-solaris765-hypr-de.pubkey.asc"
-    PATH="$root/tests/fixtures/installer/bin:$PATH"   # stub install(1)/rpm(1)
-    fetch() { cp "$fixture" "$2"; }                   # no network in a test
+    PATH="$root/tests/fixtures/installer/bin:$PATH"
+    fetch() { cp "$fixture" "$2"; }
     real_fpr=35DAF337625EC32DFEDFEAB5F984020F51D7DA3D
 
     rc=0; ( copr_pin_key solaris765/hypr-de "$real_fpr" ) >/dev/null 2>&1 || rc=$?

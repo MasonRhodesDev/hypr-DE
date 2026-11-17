@@ -1,42 +1,7 @@
 #!/bin/bash
-# xdph custom_picker_binary wrapper (packaged xdph.conf; XDPH only loads
-# ~/.config/hypr/xdph.conf).
-#
-# Chromium/Electron opens several portal ScreenCast sessions per share —
-# preview enumeration, then the actual capture — and each one would pop
-# hyprland-share-picker (2-4 dialogs per share). Serialize prompts and replay
-# the first real selection for repeats within TTL so the user picks once.
-#
-# The replay is scoped to the client that gave consent, not just to a stretch
-# of time. Keyed on time alone, any process opening a ScreenCast session
-# inside the window inherited the user's screen or window with no picker
-# shown — the exact opposite of what xdph.conf's allow_token_by_default =
-# false is for.
-#
-# xdph passes the picker no caller identity (argv is just --allow-token), so
-# it comes from the portal frontend: every live portal session is exported at
-# /org/freedesktop/portal/desktop/session/<requesting client's bus name>/<token>.
-# A selection is replayed only while no client that was not already holding a
-# session at consent time has turned up. A new consumer means a new bus name,
-# which means a fresh picker. Unrelated portal use (a file chooser opening
-# mid-share) also forces a fresh picker — one extra dialog, never a silent
-# capture.
-#
-# Protocol (xdph ScreencopyShared.cpp): stdout must contain
-# [SELECTION]<flags>/<screen:NAME|window:HANDLE|region:OUT@X,Y,W,H> and xdph
-# passes --allow-token when screencopy:allow_token_by_default is set.
 set -u
 CACHE="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/xdph-share-picker.cache"
 TTL=15
-# Both are named absolutely and searched only in root-owned directories.
-# Resolving either through $PATH (or letting the environment name them) would
-# hand the session a way to disable the consent prompt entirely -- point
-# PICKER at something that prints a selection and every share is approved
-# silently, point BUSCTL at something that prints a constant client set and
-# the scoping below is neutered. desktop-commons BAR-017: a protected mode
-# must not be disableable through a file, environment value, or control path
-# the protected principal can write, and ~/.local/bin and
-# ~/.config/environment.d are both such paths.
 PICKER_CANDIDATES="/usr/local/bin/hyprland-share-picker /usr/bin/hyprland-share-picker"
 BUSCTL_CANDIDATES="/usr/bin/busctl /usr/local/bin/busctl"
 
@@ -49,8 +14,6 @@ first_executable() {
 PICKER=$(first_executable "$PICKER_CANDIDATES" /usr/bin/hyprland-share-picker)
 BUSCTL=$(first_executable "$BUSCTL_CANDIDATES" /usr/bin/busctl)
 
-# The set of D-Bus clients currently holding a portal session, comma-wrapped.
-# Empty means "could not tell", which is never treated as a match.
 portal_clients() {
     "$BUSCTL" --user tree org.freedesktop.portal.Desktop 2>/dev/null \
         | grep -oE '/session/[^/ ]+' \
@@ -60,10 +23,9 @@ portal_clients() {
         | sed 's/^/,/'
 }
 
-# Every client asking now was already asking when consent was given.
-no_new_client() {  # no_new_client <now> <at-consent>
+no_new_client() {
     local now="$1" then="$2" c
-    [ -n "$now" ] && [ "$now" != "," ] || return 1   # cannot tell: no replay
+    [ -n "$now" ] && [ "$now" != "," ] || return 1
     [ -n "$then" ] || return 1
     for c in $(printf '%s' "$now" | tr ',' ' '); do
         case "$then" in
@@ -75,7 +37,7 @@ no_new_client() {  # no_new_client <now> <at-consent>
 }
 
 exec 9>"$CACHE.lock"
-flock 9 # a concurrent prompt waits here, then reads the fresh cache
+flock 9
 
 clients=$(portal_clients)
 
@@ -96,13 +58,9 @@ out=$("$PICKER" "$@")
 ec=$?
 sel=$(printf '%s\n' "$out" | grep -o '\[SELECTION\].*' | tail -1)
 if [ "$ec" -eq 0 ] && [ -n "$sel" ]; then
-    # Stamp after the picker closes — the user may deliberate longer than TTL
-    # — but record the client set from BEFORE it opened. Anything that turned
-    # up while the user was deliberating is a new consumer, not the one being
-    # consented to.
     printf '%s\n%s\n%s\n' "$(date +%s)" "$clients" "$sel" > "$CACHE"
 else
-    rm -f "$CACHE" # a cancel invalidates any previous selection
+    rm -f "$CACHE"
 fi
 printf '%s\n' "$out"
 exit "$ec"

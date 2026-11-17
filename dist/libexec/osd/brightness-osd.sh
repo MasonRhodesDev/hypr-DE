@@ -9,7 +9,6 @@ case $1 in
         ;;
 esac
 
-# Get current brightness percentage
 brightness=$(brightnessctl get)
 max_brightness=$(brightnessctl max)
 brightness_percent=$((brightness * 100 / max_brightness))

@@ -10,13 +10,9 @@ Source0:        %{url}/archive/v%{version}/hypr-DE-%{version}.tar.gz
 BuildArch:      noarch
 BuildRequires:  systemd-rpm-macros
 BuildRequires:  file
-# %%check's gen-deps.sh drift gate parses deps.toml with python3/tomllib
 BuildRequires:  python3
-# %check drives the waybar colorpicker, which builds its JSON with jq.
 BuildRequires:  jq
 
-# Runtime deps are generated from deps.toml — edit THAT file and re-run
-# packaging/gen-deps.sh print fedora main; CI (gen-deps.sh check) gates drift.
 Requires:       SwayNotificationCenter
 Requires:       bluez
 Requires:       bluez-obexd
@@ -40,8 +36,6 @@ Requires:       hyprstate >= 2.6.0
 Requires:       dials
 Requires:       accountsservice
 Requires:       jetbrains-mono-fonts
-# Nerd variants come from hypr-de-extras (none exist in Fedora proper); the
-# waybar/swaync stylesheets request these families by name
 Requires:       jetbrains-mono-nerd-fonts
 Requires:       jq
 Requires:       kitty
@@ -66,8 +60,6 @@ Requires:       playerctl
 Requires:       python3
 Requires:       python3-dbus
 Requires:       python3-gobject
-# nett00n's uwsm RPM omits this; without the xdg module uwsm tracebacks on
-# import and every greeter login dies instantly (see deps.toml [session])
 Requires:       python3-pyxdg
 Requires:       qt6ct
 Requires:       slurp
@@ -127,12 +119,10 @@ cp -a dist dist-build
 LIBEXECDIR=%{_libexecdir}/hypr-de \
 WAYBAR_CFFI=%{_libdir}/waybar/workspace_buttons.so \
     ./packaging/substitute.sh dist-build
-# lmtt modules install under the generic system module dir
 mkdir -p dist-build/lmtt-system-modules
 mv dist-build/lmtt/modules/* dist-build/lmtt-system-modules/
 
 %check
-# Syntax-check every shipped shell script, the Lua payload, and Python helpers
 find dist-build/bin dist-build/libexec -type f -exec sh -c 'head -1 "$1" | grep -q "^#!/bin/bash" && bash -n "$1"' _ {} \;
 find dist-build/bin dist-build/libexec -type f -exec sh -c 'head -1 "$1" | grep -q python && python3 -m py_compile "$1"' _ {} \;
 ./packaging/gen-deps.sh check
@@ -154,7 +144,6 @@ LIBEXECDIR=%{_libexecdir}/hypr-de \
     ./packaging/install.sh dist-build %{buildroot} main
 LIBEXECDIR=%{_libexecdir}/hypr-de \
     ./packaging/install.sh dist-build %{buildroot} gaming
-# lmtt system modules (searched by lmtt's system module path)
 install -d %{buildroot}%{_datadir}/lmtt/modules
 install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt/modules/
 
@@ -163,14 +152,8 @@ install -Dpm644 dist-build/lmtt-system-modules/* -t %{buildroot}%{_datadir}/lmtt
 %{_libexecdir}/hypr-de/hypr-de-sys-setup >/dev/null 2>&1 || :
 
 %posttrans
-# Same reason as the Arch pacman hook: rpm replaces watched config files by
-# unlinking and rewriting them, which can latch a bogus Hyprland config
-# error banner on a live session. Reload once, best-effort.
 %{_libexecdir}/hypr-de/hypr-de-reload-sessions >/dev/null 2>&1 || :
 %{_libexecdir}/hypr-de/hypr-de-restart-session-units >/dev/null 2>&1 || :
-# 0.2.36's %%systemd_user_post left a global enablement symlink for the retired
-# waybar-watchdog.timer; %%preun does not run on upgrade, so retire it here.
-# Migration shim: drop once 0.2.36 is no longer in the field.
 systemctl --global disable --no-reload waybar-watchdog.timer >/dev/null 2>&1 || :
 
 %preun

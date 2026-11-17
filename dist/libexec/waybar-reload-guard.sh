@@ -1,14 +1,4 @@
 #!/bin/bash
-# ExecCondition for waybar-reload.service: exit 0 to proceed with the restart,
-# exit 1 to skip it cleanly (the unit stays inactive, not failed).
-#
-# hypr-de-prime-theme renders waybar.css during session start, before the bar
-# exists, so the stylesheet the first waybar reads is already current. That
-# write still trips waybar-reload.path, and the queued restart would kill the
-# bar mid-init and start it a second time. A stylesheet change that lands while
-# waybar is starting, or within a few seconds of it becoming active, is
-# therefore already applied and needs no restart. Later edits (theme
-# hot-reload) are unaffected.
 
 set -u
 

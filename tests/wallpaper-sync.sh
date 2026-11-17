@@ -1,13 +1,4 @@
 #!/bin/bash
-# A wallpaper set anywhere reaches the desktop without a re-login.
-#
-# dials and `lmtt wallpaper set` write the appearance registry; vigil reads
-# it directly, but swaybg reads it only when it starts and hyprlock reads
-# its own $WALLPAPER file. hypr-de-wallpaper-sync, run by the
-# hypr-de-wallpaper lmtt module after every `lmtt switch`, closes that gap
-# and must restart nothing when the wallpaper did not change (SUPER+T must
-# not flicker). Stubs: a swaybg that only sleeps, so /proc shows the argv a
-# real one has; a systemctl that reports its PID and records restarts.
 set -uo pipefail
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 work=$(mktemp -d)
@@ -20,10 +11,8 @@ bad() { printf 'FAIL %s\n' "$*"; fail=1; }
 mkdir -p "$work/bin" "$work/share/wallpapers" "$work/cfg/appearance-profiles"
 sed "s|@DATADIR@|$work/share|g" "$root/dist/libexec/hypr-de-wallpaper-sync" > "$work/sync"
 chmod +x "$work/sync"
-# A swaybg that keeps its argv visible in /proc and goes away on TERM.
 printf '#!/bin/sh\ntrap '"'"'kill $child'"'"' TERM\nsleep 60 & child=$!\nwait\n' > "$work/bin/swaybg"
 chmod +x "$work/bin/swaybg"
-# systemctl: MainPID of our stub, and a record of every restart.
 cat > "$work/bin/systemctl" <<STUB
 #!/bin/sh
 case "\$*" in
@@ -36,7 +25,7 @@ chmod +x "$work/bin/systemctl"
 : > "$work/cfg/mine.png"
 : > "$work/cfg/my wall.png"
 
-show() {  # (re)start the stub swaybg on an image, as swaybg-launch would
+show() {
     [ -f "$work/swaybg.pid" ] && kill "$(cat "$work/swaybg.pid")" 2>/dev/null
     "$work/bin/swaybg" -i "$1" -m fill & echo $! > "$work/swaybg.pid"
     sleep 0.1

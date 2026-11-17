@@ -1,6 +1,3 @@
-# Clear the transient "Your config has errors" banner that Hyprland latches
-# when pacman rewrites a watched config file mid-session, and apply the new
-# config right away. Runs once after the whole transaction.
 [Trigger]
 Operation = Install
 Operation = Upgrade

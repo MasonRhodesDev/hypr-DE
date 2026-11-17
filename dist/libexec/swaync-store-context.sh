@@ -1,32 +1,14 @@
 #!/usr/bin/env bash
-# swaync-store-context
-#
-# run-on: "receive" hook — archives every notification's metadata the moment
-# it arrives, keyed by swaync notification id, so that action-time hooks
-# (focus-sender.sh) still have full context long after the sender has
-# forgotten about the notification (e.g. Electron apps whose GC'd
-# Notification objects silently drop clicks).
-#
-# Per-app plugins in ~/.config/hypr-de/notify-plugins/<name>.sh can define an `enrich` function that
-# emits extra KEY=VALUE lines (e.g. a deep link reconstructed from the app's
-# own logs) to store alongside the generic fields.
 
 set -u
 
-# No /tmp fallback: focus-sender sources files out of this directory, so a
-# world-writable location would be arbitrary code execution as us.
 : "${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR is unset; refusing to keep notification context in /tmp}"
 CTX_DIR="$XDG_RUNTIME_DIR/swaync-context"
-# Per-app plugins are user-owned (work/personal specific, e.g. Slack log
-# parsing) — packaged framework, user plugins:
 APPS_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/hypr-de/notify-plugins"
 
 [ -n "${SWAYNC_ID:-}" ] || exit 0
 mkdir -p "$CTX_DIR"
 
-# Normalized handler-name candidates from the sender identity, most
-# specific first. Handles flatpak reverse-DNS ids (com.discordapp.Discord →
-# discord) as well as plain names (Slack → slack).
 candidates() {
     local raw
     for raw in "${SWAYNC_DESKTOP_ENTRY:-}" "${SWAYNC_APP_NAME:-}"; do
@@ -59,7 +41,6 @@ ctx_file="$CTX_DIR/$SWAYNC_ID.env"
     done < <(candidates)
 } > "$ctx_file"
 
-# Prune: contexts older than 7 days are useless (swaync CC caps retention).
 find "$CTX_DIR" -name '*.env' -mmin +10080 -delete 2>/dev/null
 
 exit 0
