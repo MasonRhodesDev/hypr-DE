@@ -3,10 +3,24 @@ set -uo pipefail
 here=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 root=$(dirname -- "$here")
 
-command -v bwrap >/dev/null 2>&1 || {
-    echo "tests/run: bubblewrap (bwrap) is required; refusing to run tests unsealed" >&2
-    exit 2
+reachable() {
+    local p
+    for p in /run/systemd/private /run/dbus/system_bus_socket /var/run/dbus/system_bus_socket \
+             /run/user/*/bus /run/user/*/wayland-* /run/user/*/hypr /tmp/.X11-unix/X*; do
+        [ -e "$p" ] && { printf '%s\n' "$p"; return 0; }
+    done
+    return 1
 }
+
+sealed=1
+if ! command -v bwrap >/dev/null 2>&1 || ! bwrap --unshare-all --ro-bind / / true 2>/dev/null; then
+    if endpoint=$(reachable); then
+        echo "tests/run: no working bubblewrap sandbox and $endpoint exists; refusing to run tests unsealed" >&2
+        exit 2
+    fi
+    echo "tests/run: no working bubblewrap sandbox; running unsealed, nothing here has a session or system bus" >&2
+    sealed=0
+fi
 
 tripwired=(
     systemctl loginctl shutdown reboot poweroff halt systemd-run systemd-inhibit
@@ -39,7 +53,7 @@ if [ $# -eq 0 ]; then
     set -- "$here"/*.sh
 fi
 
-log=$(mktemp -d)
+log=$(mktemp -d) || exit 2
 trap 'rm -rf "$log"' EXIT
 hidden=(--tmpfs /tmp --tmpfs /run --tmpfs /home)
 [ -d /root ] && hidden+=(--tmpfs /root)
@@ -49,21 +63,28 @@ for t in "$@"; do
     t=$(readlink -f -- "$t")
     name=${t#"$root"/}
     : >"$log/hits"
-    bwrap --unshare-all --die-with-parent --new-session --cap-drop ALL \
-        --ro-bind / / --dev /dev --proc /proc "${hidden[@]}" \
-        --ro-bind "$root" "$root" \
-        --bind "$log" /run/tripwire \
-        --dir /tmp/home \
-        "${wires[@]}" \
-        --clearenv \
-        --setenv PATH /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
-        --setenv HOME /tmp/home \
-        --setenv LANG C.UTF-8 \
-        --setenv TERM "${TERM:-dumb}" \
-        --setenv PYTHONPYCACHEPREFIX /tmp/pycache \
-        --setenv HYPR_DE_SEALED 1 \
-        --chdir "$root" \
-        "$t"
+    if [ "$sealed" = 0 ]; then
+        mkdir -p "$log/home"
+        (cd "$root" && env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+            HOME="$log/home" LANG=C.UTF-8 TERM="${TERM:-dumb}" \
+            PYTHONPYCACHEPREFIX="$log/pycache" HYPR_DE_SEALED=1 "$t")
+    else
+        bwrap --unshare-all --die-with-parent --new-session --cap-drop ALL \
+            --ro-bind / / --dev /dev --proc /proc "${hidden[@]}" \
+            --ro-bind "$root" "$root" \
+            --bind "$log" /run/tripwire \
+            --dir /tmp/home \
+            "${wires[@]}" \
+            --clearenv \
+            --setenv PATH /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+            --setenv HOME /tmp/home \
+            --setenv LANG C.UTF-8 \
+            --setenv TERM "${TERM:-dumb}" \
+            --setenv PYTHONPYCACHEPREFIX /tmp/pycache \
+            --setenv HYPR_DE_SEALED 1 \
+            --chdir "$root" \
+            "$t"
+    fi
     rc=$?
     if [ -s "$log/hits" ]; then
         printf 'TRIPWIRE %s reached real commands:\n' "$name"
