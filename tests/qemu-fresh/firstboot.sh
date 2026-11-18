@@ -1,4 +1,5 @@
 #!/bin/bash
+systemd-detect-virt --vm --quiet || { echo "$0: runs only inside the qemu-fresh VM" >&2; exit 2; }
 set -euo pipefail
 mkdir -p /var/log /var/lib
 exec >>/var/log/get-hypr-de.log 2>&1

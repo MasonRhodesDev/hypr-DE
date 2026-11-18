@@ -44,8 +44,13 @@ jobs:
           sudo sysctl -qw kernel.apparmor_restrict_unprivileged_userns=0 || true
           bad=0
           for f in tests/*.sh; do
-            sed -n 2p "$f" | grep -qxF '[ -n "${HYPR_DE_SEALED-}" ] || exec "$(dirname -- "$0")/run" "$0"' \
+            sed -n 2p "$f" | grep -qxF '[ -e /run/tripwire/hits ] || { [ "${HYPR_DE_SEALED-}" = build-root ] && [ ! -e /run/systemd/private ]; } || exec "$(dirname -- "$0")/run" "$0"' \
               || { echo "$f must re-enter tests/run on line 2"; bad=1; }
+          done
+          for f in tests/qemu-fresh/*.sh; do
+            [ "$f" = tests/qemu-fresh/run.sh ] && continue
+            sed -n 2p "$f" | grep -qxF 'systemd-detect-virt --vm --quiet || { echo "$0: runs only inside the qemu-fresh VM" >&2; exit 2; }' \
+              || { echo "$f must refuse to run outside a VM on line 2"; bad=1; }
           done
           exit "$bad"
 

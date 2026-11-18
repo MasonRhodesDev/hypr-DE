@@ -1,5 +1,5 @@
 #!/bin/sh
-[ -n "${HYPR_DE_SEALED-}" ] || exec "$(dirname -- "$0")/run" "$0"
+[ -e /run/tripwire/hits ] || { [ "${HYPR_DE_SEALED-}" = build-root ] && [ ! -e /run/systemd/private ]; } || exec "$(dirname -- "$0")/run" "$0"
 set -eu
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 fixtures="$root/tests/fixtures/lock-policy"
