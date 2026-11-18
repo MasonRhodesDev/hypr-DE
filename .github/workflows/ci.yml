@@ -49,7 +49,7 @@ jobs:
           done
           for f in tests/qemu-fresh/*.sh; do
             [ "$f" = tests/qemu-fresh/run.sh ] && continue
-            sed -n 2p "$f" | grep -qxF 'systemd-detect-virt --vm --quiet || { echo "$0: runs only inside the qemu-fresh VM" >&2; exit 2; }' \
+            sed -n 2p "$f" | grep -qxF '[ -e /etc/hypr-de-qemu-fresh ] || { echo "$0: runs only inside the qemu-fresh VM" >&2; exit 2; }' \
               || { echo "$f must refuse to run outside a VM on line 2"; bad=1; }
           done
           exit "$bad"
