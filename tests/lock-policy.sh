@@ -1,4 +1,5 @@
 #!/bin/sh
+[ -e /run/tripwire/hits ] || { [ "${HYPR_DE_SEALED-}" = build-root ] && [ ! -e /run/systemd/private ]; } || exec "$(dirname -- "$0")/run" "$0"
 set -eu
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 fixtures="$root/tests/fixtures/lock-policy"
@@ -224,11 +225,16 @@ assert_log 'hyprctl:dispatch hl.dsp.dpms({ action = '\''off'\'' })'
 : > "$LOCK_POLICY_LOG"
 LOCK_POLICY_COMPOSITOR_LOCKED=false LOCK_POLICY_LOCKED_HINT=yes "$work/dpms-off-if-locked.sh"
 assert_log ''
-mkdir -p "$work/planted"
+mkdir -p "$work/planted" "$work/system"
 printf '#!/bin/sh\necho true\n' > "$work/planted/hyprctl"
-chmod +x "$work/planted/hyprctl"
-if PATH="$work/planted:$PATH" HYPRLAND_INSTANCE_SIGNATURE='' LOCK_POLICY_COMPOSITOR_LOCKED=true \
-    "$root/dist/libexec/session-locked.sh" 2>/dev/null; then
+printf '#!/bin/sh\necho false\n' > "$work/system/hyprctl"
+ln -s "$(command -v timeout)" "$work/system/timeout"
+chmod +x "$work/planted/hyprctl" "$work/system/hyprctl"
+sed -e "s|^PATH=/usr/local/bin:/usr/bin:/bin;|PATH=$work/system;|" \
+    "$root/dist/libexec/session-locked.sh" > "$work/session-locked-pinned.sh"
+grep -q "^PATH=$work/system;" "$work/session-locked-pinned.sh" || {
+    echo "session-locked.sh must pin PATH to root-owned directories" >&2; exit 1; }
+if PATH="$work/planted:$PATH" sh "$work/session-locked-pinned.sh" 2>/dev/null; then
     echo "session-locked.sh consulted a PATH-planted hyprctl" >&2; exit 1
 fi
 

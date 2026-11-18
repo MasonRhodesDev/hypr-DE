@@ -1,4 +1,5 @@
 #!/bin/bash
+[ -e /etc/hypr-de-qemu-fresh ] || { echo "$0: runs only inside the qemu-fresh VM" >&2; exit 2; }
 set -uo pipefail
 
 fail=0

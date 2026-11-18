@@ -119,6 +119,9 @@ growpart:
 resize_rootfs: true
 package_update: false
 write_files:
+  - path: /etc/hypr-de-qemu-fresh
+    permissions: '0644'
+    content: ""
   - path: /usr/local/sbin/hypr-de-firstboot.sh
     permissions: '0755'
     encoding: b64

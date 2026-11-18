@@ -1,4 +1,5 @@
 #!/bin/bash
+[ -e /run/tripwire/hits ] || { [ "${HYPR_DE_SEALED-}" = build-root ] && [ ! -e /run/systemd/private ]; } || exec "$(dirname -- "$0")/run" "$0"
 set -uo pipefail
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
@@ -7,7 +8,6 @@ ok()  { printf 'ok   %s\n' "$*"; }
 bad() { printf 'FAIL %s\n' "$*"; fail=1; }
 
 fixtures="$root/tests/fixtures/media-stream"
-chmod +x "$fixtures/playerctl"
 script="$root/dist/libexec/waybar-mediaplayer.py"
 export MEDIA_ARGV_LOG="$work/argv" MEDIA_PIDFILE="$work/pid"
 

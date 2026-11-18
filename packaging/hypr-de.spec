@@ -12,6 +12,7 @@ BuildRequires:  systemd-rpm-macros
 BuildRequires:  file
 BuildRequires:  python3
 BuildRequires:  jq
+BuildRequires:  bubblewrap
 
 Requires:       SwayNotificationCenter
 Requires:       bluez
@@ -127,6 +128,7 @@ find dist-build/bin dist-build/libexec -type f -exec sh -c 'head -1 "$1" | grep 
 find dist-build/bin dist-build/libexec -type f -exec sh -c 'head -1 "$1" | grep -q python && python3 -m py_compile "$1"' _ {} \;
 ./packaging/gen-deps.sh check
 ./packaging/check-units.sh
+export HYPR_DE_ALLOW_UNSEALED=1
 ./tests/lock-policy.sh
 ./tests/hypridle-override.sh
 ./tests/command-construction.sh
