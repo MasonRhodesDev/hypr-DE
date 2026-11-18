@@ -1,4 +1,5 @@
 #!/bin/bash
+[ -n "${HYPR_DE_SEALED-}" ] || exec "$(dirname -- "$0")/run" "$0"
 set -uo pipefail
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 

@@ -21,7 +21,7 @@ jobs:
             for f in packaging/*.sh dist/bin/hypr-de-* dist/libexec/*.sh \
                      dist/libexec/osd/*.sh dist/libexec/waybar-updates-check \
                      dist/libexec/hypr-de-prime-theme dist/libexec/hypridle-launch \
-                     get-hypr-de.sh \
+                     get-hypr-de.sh tests/run tests/tripwire \
                      tests/qemu-fresh/*.sh; do
               [ -f "$f" ] || continue
               head -n1 "$f" | grep -qE '^#!/((usr/)?bin/(env )?)?(ba)?sh' && printf '%s\n' "$f"
@@ -37,6 +37,17 @@ jobs:
 
       - name: Service-activation completeness
         run: ./packaging/check-units.sh
+
+      - name: Tests run sealed
+        run: |
+          sudo apt-get install -y bubblewrap
+          sudo sysctl -qw kernel.apparmor_restrict_unprivileged_userns=0 || true
+          bad=0
+          for f in tests/*.sh; do
+            sed -n 2p "$f" | grep -qxF '[ -n "${HYPR_DE_SEALED-}" ] || exec "$(dirname -- "$0")/run" "$0"' \
+              || { echo "$f must re-enter tests/run on line 2"; bad=1; }
+          done
+          exit "$bad"
 
       - name: Installer trust behaviour
         run: ./tests/installer-trust.sh
@@ -61,6 +72,8 @@ jobs:
         run: ./tests/blank-guard.sh
       - name: PAM rewrite safety
         run: ./tests/pam-rewrite.sh
+      - name: Power menu exits through desktop-boot-exit
+        run: ./tests/power-menu-exit.sh
       - name: Lock policy routing
         run: ./tests/lock-policy.sh
       - name: Per-host idle timeouts

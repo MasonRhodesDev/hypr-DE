@@ -1,4 +1,5 @@
 #!/bin/bash
+[ -n "${HYPR_DE_SEALED-}" ] || exec "$(dirname -- "$0")/run" "$0"
 set -uo pipefail
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 work=$(mktemp -d)
@@ -7,7 +8,8 @@ fail=0
 ok()  { printf 'ok   %s\n' "$*"; }
 bad() { printf 'FAIL %s\n' "$*"; fail=1; }
 
-mkdir -p "$work/with" "$work/without"
+mkdir -p "$work/with" "$work/without" "$work/sys"
+ln -s "$(command -v cat)" "$work/sys/cat"
 for d in with without; do
     printf '#!/bin/sh\ncat >/dev/null; printf "%%s\\n" "$PICK"\n' >"$work/$d/fuzzel"
     printf '#!/bin/sh\necho "hyprshutdown $*" >>"$LOG"\n' >"$work/$d/hyprshutdown"
@@ -17,7 +19,7 @@ chmod +x "$work"/with/* "$work"/without/*
 
 run() {
     : >"$work/log"
-    LOG="$work/log" PICK="$2" PATH="$work/$1:/usr/bin:/bin" bash "$root/dist/libexec/power-menu.sh"
+    LOG="$work/log" PICK="$2" PATH="$work/$1:$work/sys" "$BASH" "$root/dist/libexec/power-menu.sh"
     cat "$work/log"
 }
 

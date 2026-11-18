@@ -1,0 +1,77 @@
+#!/bin/bash
+set -uo pipefail
+here=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+root=$(dirname -- "$here")
+
+command -v bwrap >/dev/null 2>&1 || {
+    echo "tests/run: bubblewrap (bwrap) is required; refusing to run tests unsealed" >&2
+    exit 2
+}
+
+tripwired=(
+    systemctl loginctl shutdown reboot poweroff halt systemd-run systemd-inhibit
+    busctl dbus-send gdbus desktop-boot-exit hyprshutdown fuzzel hyprctl hypridle
+    hyprlock swaylock vigil vigil-lock greetd hyprstate uwsm notify-send
+    swaync-client playerctl wpctl pactl brightnessctl swaybg
+)
+
+wires=()
+declare -A seen=()
+if bwrap --help 2>&1 | grep -q -- --tmp-overlay; then
+    wires+=(--overlay-src /usr/bin --tmp-overlay /usr/bin)
+    for name in "${tripwired[@]}"; do
+        [ -L "/usr/bin/$name" ] && continue
+        seen[/usr/bin/$name]=1
+        wires+=(--ro-bind "$here/tripwire" "/usr/bin/$name")
+    done
+fi
+for name in "${tripwired[@]}"; do
+    for dir in /usr/local/sbin /usr/local/bin /usr/sbin /usr/bin /sbin /bin; do
+        [ -e "$dir/$name" ] || continue
+        real=$(readlink -f -- "$dir/$name")
+        [ -n "${seen[$real]-}" ] && continue
+        seen[$real]=1
+        wires+=(--ro-bind "$here/tripwire" "$real")
+    done
+done
+
+if [ $# -eq 0 ]; then
+    set -- "$here"/*.sh
+fi
+
+log=$(mktemp -d)
+trap 'rm -rf "$log"' EXIT
+hidden=(--tmpfs /tmp --tmpfs /run --tmpfs /home)
+[ -d /root ] && hidden+=(--tmpfs /root)
+
+failed=0
+for t in "$@"; do
+    t=$(readlink -f -- "$t")
+    name=${t#"$root"/}
+    : >"$log/hits"
+    bwrap --unshare-all --die-with-parent --new-session --cap-drop ALL \
+        --ro-bind / / --dev /dev --proc /proc "${hidden[@]}" \
+        --ro-bind "$root" "$root" \
+        --bind "$log" /run/tripwire \
+        --dir /tmp/home \
+        "${wires[@]}" \
+        --clearenv \
+        --setenv PATH /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+        --setenv HOME /tmp/home \
+        --setenv LANG C.UTF-8 \
+        --setenv TERM "${TERM:-dumb}" \
+        --setenv PYTHONPYCACHEPREFIX /tmp/pycache \
+        --setenv HYPR_DE_SEALED 1 \
+        --chdir "$root" \
+        "$t"
+    rc=$?
+    if [ -s "$log/hits" ]; then
+        printf 'TRIPWIRE %s reached real commands:\n' "$name"
+        sed 's/^/    /' "$log/hits"
+        failed=1
+    elif [ "$rc" -ne 0 ]; then
+        printf 'FAILED %s (exit %s)\n' "$name" "$rc"
+        failed=1
+    fi
+done
+exit "$failed"
