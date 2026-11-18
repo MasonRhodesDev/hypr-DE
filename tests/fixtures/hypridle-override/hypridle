@@ -3,4 +3,7 @@ printf '%s\n' "$*" >> "$HYPRIDLE_LOG"
 if [ "${1:-}" = -c ] && [ -f "${2:-}" ]; then
     cp "$2" "$HYPRIDLE_CONF_COPY"
 fi
+[ -n "${HYPRIDLE_PID:-}" ] && echo $$ > "$HYPRIDLE_PID"
+[ -n "${HYPRIDLE_STDOUT:-}" ] && cat "$HYPRIDLE_STDOUT"
+[ -n "${HYPRIDLE_HOLD:-}" ] && sleep "$HYPRIDLE_HOLD"
 exit 0

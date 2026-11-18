@@ -65,5 +65,7 @@ jobs:
         run: ./tests/lock-policy.sh
       - name: Per-host idle timeouts
         run: ./tests/hypridle-override.sh
+      - name: hypridle retries log only on state change
+        run: ./tests/hypridle-retry-log.sh
       - name: Screen-share consent scoping
         run: ./tests/share-consent.sh

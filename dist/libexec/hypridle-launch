@@ -10,10 +10,39 @@ MAX_TIMEOUT=4294967
 
 log() { printf 'hypridle-launch: %s\n' "$*" >&2; }
 
+quiet_retries() {
+    trap '' TERM
+    exec awk '
+        function emit(s) { print s; fflush() }
+        function flush_block(   i) { for (i = 1; i <= n; i++) emit(buf[i]); n = 0; rule = "" }
+        rule != "" {
+            buf[++n] = $0
+            if ($0 ~ /\] condition_cmd exited with /) { code = $NF; next }
+            if ($0 ~ /\] Failed to run condition_cmd: /) { code = "failed"; err = 1; next }
+            if ($0 ~ /\] Running condition_cmd: /) next
+            if ($0 ~ /\] Condition still not met, retrying in /) {
+                if (!err && rule in last && last[rule] == code) { n = 0; rule = "" }
+                else { last[rule] = code; flush_block() }
+                next
+            }
+            if ($0 ~ /\] Condition met, running /) delete last[rule]
+            flush_block()
+            next
+        }
+        /\] Retrying condition_cmd for rule / { rule = $NF; code = ""; err = 0; n = 0; buf[++n] = $0; next }
+        /\] Idled: rule / { idled = $NF }
+        /\] condition_cmd exited with / && idled != "" { last[idled] = $NF }
+        /\] Failed to run condition_cmd: / && idled != "" { last[idled] = "failed" }
+        /\] Resumed: rule / { split("", last); idled = "" }
+        { emit($0) }
+        END { flush_block() }
+    '
+}
+
 run_hypridle() {
     local h
     for h in $HYPRIDLE_CANDIDATES; do
-        [ -x "$h" ] && exec "$h" -c "$1"
+        [ -x "$h" ] && exec "$h" -c "$1" > >(quiet_retries)
     done
     log "no hypridle in any of: $HYPRIDLE_CANDIDATES"
     exit 127
