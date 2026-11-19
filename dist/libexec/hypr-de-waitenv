@@ -1,0 +1,124 @@
+#!/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin; export PATH
+set -f
+
+# Drop-in replacement for `uwsm aux waitenv`, which checks every 0.5 s.
+# Same inputs, wait list, timeout source and settle. One deliberate
+# difference: a timeout exits 1, where uwsm falls through to exit 0.
+interval=0.01
+end_buffer=3
+
+declare -A listed=()
+want=()
+for v in WAYLAND_DISPLAY "$@" ${UWSM_WAIT_VARNAMES-}; do
+    case $v in _|SHELL|PWD|OLDWD) continue ;; esac
+    if [[ ! $v =~ ^([A-Za-z_][A-Za-z0-9_]+|[A-Za-z][A-Za-z0-9_]*)$ ]]; then
+        echo "Warning! Encountered illegal var \"$v\"."
+        continue
+    fi
+    [ -n "${listed[$v]-}" ] && continue
+    listed[$v]=1
+    want+=("$v")
+done
+
+joined() {
+    local s
+    printf -v s '%s, ' "$@"
+    printf '  %s\n' "${s%, }"
+}
+
+timeout=
+usec=$(busctl --user get-property org.freedesktop.systemd1 \
+    /org/freedesktop/systemd1/unit/wayland_2dsession_2dwaitenv_2eservice \
+    org.freedesktop.systemd1.Service TimeoutStartUSec 2>/dev/null)
+if [[ $usec =~ ^t\ ([0-9]+)$ ]]; then
+    usec=${BASH_REMATCH[1]}
+    if (( ${#usec} > 15 )); then
+        timeout=999999999
+    elif (( 10#$usec >= 1000000 )); then
+        timeout=$(( 10#$usec / 1000000 ))
+    fi
+fi
+if [ -z "$timeout" ]; then
+    t=${UWSM_WAIT_VARNAMES_TIMEOUT-30}
+    if [[ $t =~ ^0*([1-9][0-9]*)$ ]]; then
+        t=${BASH_REMATCH[1]}
+        (( ${#t} > 9 )) && t=999999999
+        timeout=$t
+    else
+        echo "Warning! Expected a positive integer in UWSM_WAIT_VARNAMES_TIMEOUT, got: $t"
+        timeout=30
+    fi
+fi
+
+settle=${UWSM_WAIT_VARNAMES_SETTLETIME-0.2}
+if [[ ! $settle =~ ^([0-9]+\.?[0-9]*|\.[0-9]+)$ ]]; then
+    echo "Warning! \"UWSM_WAIT_VARNAMES_SETTLETIME\" contains invalid value \"$settle\", using \"0.2\""
+    settle=0.2
+fi
+
+start=${EPOCHREALTIME//[!0-9]/}
+deadline=$(( start + timeout * 1000000 ))
+warn_at=$(( start + timeout * 800000 ))
+attempt=0
+warned=0
+declare -A reported=()
+while :; do
+    attempt=$(( attempt + 1 ))
+    if ! manager_env=$(systemctl --user show-environment); then
+        echo "Error! Could not read the systemd user manager's activation environment." >&2
+        exit 1
+    fi
+    declare -A present=()
+    while IFS= read -r line; do
+        [[ $line == ?*=* ]] && present[${line%%=*}]=1
+    done <<<"$manager_env"
+
+    missing=()
+    appeared=()
+    for v in "${want[@]}"; do
+        if [ -z "${present[$v]-}" ]; then
+            missing+=("$v")
+        elif [ -z "${reported[$v]-}" ]; then
+            appeared+=("$v")
+            reported[$v]=1
+        fi
+    done
+    unset present
+
+    if [ "${#missing[@]}" -eq 0 ]; then
+        if [ "$attempt" -eq 1 ]; then
+            echo "All expected variables appeared in activation environment:"
+            joined "${want[@]}"
+        else
+            echo "All expected variables appeared in activation environment."
+        fi
+        break
+    fi
+
+    now=${EPOCHREALTIME//[!0-9]/}
+    if [ "${#appeared[@]}" -gt 0 ]; then
+        echo "Expected variables appeared in activation environment:"
+        joined "${appeared[@]}"
+        echo "Still expecting:"
+        joined "${missing[@]}"
+    elif [ "$attempt" -eq 1 ]; then
+        echo "Expecting variables to appear in activation environment:"
+        joined "${want[@]}"
+    elif [ "$warned" = 0 ] && (( now >= warn_at )); then
+        warned=1
+        echo "Warning! Still waiting for variables in activation environment, nearing timeout:"
+        joined "${missing[@]}"
+    fi
+
+    if (( now > deadline )); then
+        sleep "$end_buffer"
+        echo "Error! Timed out waiting for variables in activation environment:" >&2
+        joined "${missing[@]}" >&2
+        exit 1
+    fi
+    sleep "$interval"
+done
+
+[[ $settle =~ ^[0.]*$ ]] || sleep "$settle"
+exit 0

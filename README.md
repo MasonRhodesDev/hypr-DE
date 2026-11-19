@@ -248,17 +248,19 @@ frame in which every declared layer is mapped on every output, and Hyprland's
 own wallpaper has loaded when it draws one. Every output fades together over
 0.2 s, and input and the cursor come back on the first faded frame.
 
-`graphical-session.target` waits until the session's Wayland environment is
-in place. hypr-DE exports the session's variables in one call, then declares
-the session ready at once, so no stock login waits on uwsm's timers. For
-that, `/etc/xdg/uwsm/env-hyprland` sets `UWSM_WAIT_VARNAMES_SETTLETIME` to 0,
-which drops uwsm's 0.2 s settle pause. It also sets `HYPRLAND_NO_SD_NOTIFY`
-to 1, which stops Hyprland declaring itself ready before the export. A
-drop-in then skips `wayland-session-waitenv.service`, whose 0.5 s poll would
-otherwise hold the target. The drop-in applies only while those two values
-and uwsm's wait list are hypr-DE's stock ones. A value set earlier in the
-environment, or in `~/.config/uwsm/env-hyprland`, wins and brings uwsm's
-waits back.
+`graphical-session.target` waits until uwsm's wait list is in the user
+manager's environment: `WAYLAND_DISPLAY`, plus whatever `UWSM_WAIT_VARNAMES`
+names (uwsm adds `HYPRLAND_INSTANCE_SIGNATURE` for Hyprland). hypr-DE keeps
+that guard and makes it quick. A drop-in runs `wayland-session-waitenv.service`
+with hypr-DE's `hypr-de-waitenv` in place of `uwsm aux waitenv`. It reads the
+same variables, timeout and settle, but checks every 10 ms instead of every
+0.5 s, and a timeout fails the unit. uwsm then shuts the session down rather
+than start it half configured. The drop-in applies to every uwsm compositor,
+since the waiter keeps uwsm's semantics. `/etc/xdg/uwsm/env-hyprland` also sets
+`UWSM_WAIT_VARNAMES_SETTLETIME` to 0, because hypr-DE exports the session's
+variables in one call, and that takes uwsm's 0.2 s settle pause off every
+login. A value set earlier in the environment, or in
+`~/.config/uwsm/env-hyprland`, wins.
 
 Every output there means each output that shows a frame of its own. A mirror,
 an output that is off or disabled, and the `FALLBACK` output Hyprland puts in
