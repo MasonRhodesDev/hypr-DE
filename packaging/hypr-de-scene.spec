@@ -26,9 +26,9 @@ login never shows an unrendered or empty frame. Opt in by adding
   hl.plugin.load("%{_libdir}/hypr-de/hypr-de-scene.so")
 to ~/.config/hypr/local.lua. Without desktop-boot's scene files the plugin
 stays idle. It works only in the Hyprland build it was compiled against.
-After a Hyprland upgrade it stays idle until this package is rebuilt. The
-journal tag hypr-de-scene says so, unless Hyprland could not load the
-module at all, which Hyprland reports itself.
+After a Hyprland upgrade it loads idle, with nothing on screen, until this
+package is rebuilt, and the journal tag hypr-de-scene says so. If Hyprland
+cannot load the module at all, Hyprland reports that itself.
 
 %prep
 %autosetup -n hypr-DE-%{version}

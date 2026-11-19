@@ -6,7 +6,6 @@
 #include <chrono>
 #include <cstdlib>
 #include <format>
-#include <stdexcept>
 #include <syslog.h>
 
 static UP<Scene::CScene> scene;
@@ -33,6 +32,10 @@ APICALL EXPORT std::string PLUGIN_API_VERSION() {
     return HYPRLAND_API_VERSION;
 }
 
+static PLUGIN_DESCRIPTION_INFO describedAs(const std::string& description) {
+    return {"hypr-de-scene", description, "hypr-DE", "0.1.0"};
+}
+
 APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     // syslog keeps this pointer, so the module has to closelog before it is unloaded
     openlog("hypr-de-scene", LOG_PID, LOG_USER);
@@ -40,13 +43,14 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     const std::string RUNNING = __hyprland_api_get_hash();
     const std::string BUILT   = __hyprland_api_get_client_hash();
 
-    // Hyprland hands plugins its C++ objects, so any other build has a different layout
+    // Hyprland hands plugins its C++ objects, so any other build has a different layout.
+    // Throwing would put Hyprland's failed-to-load notification on screen.
     if (RUNNING != BUILT) {
         const auto REASON =
             std::format("idle, boot scene off: built for Hyprland {} but {} is running. Rebuild the hypr-de-scene package against the installed Hyprland", BUILT, RUNNING);
         syslog(LOG_ERR, "%s", REASON.c_str());
         closelog();
-        throw std::runtime_error("hypr-de-scene " + REASON);
+        return describedAs(REASON);
     }
 
     const auto SETTINGS = settings();
@@ -61,7 +65,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     else
         scene = makeUnique<Scene::CScene>(SETTINGS);
 
-    return {"hypr-de-scene", "Keeps the boot scene on screen from Hyprland's first frame", "hypr-DE", "0.1.0"};
+    return describedAs("Keeps the boot scene on screen from Hyprland's first frame");
 }
 
 APICALL EXPORT void PLUGIN_EXIT() {

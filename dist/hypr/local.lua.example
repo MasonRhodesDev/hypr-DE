@@ -22,8 +22,8 @@
 -- desktop-boot's login splash covers it, so a login shows no empty frame.
 -- It stays idle without desktop-boot's scene files, and in any Hyprland
 -- build other than the one it was compiled against. After a Hyprland
--- upgrade, journalctl -t hypr-de-scene or Hyprland's failed-to-load
--- notification says so until the package is rebuilt. Opt in with:
+-- upgrade, journalctl -t hypr-de-scene says so until the package is
+-- rebuilt. Opt in with:
 -- hl.plugin.load("@SCENE_PLUGIN@")
 
 -- Extra window rules (examples):

@@ -234,17 +234,19 @@ black or empty frame. `hypr-de` does not depend on it. Load it with the
 
 A Hyprland plugin is compiled against one Hyprland build and cannot run in
 another. The package does not pin a Hyprland version, so Hyprland upgrades
-are never held back. After an upgrade the plugin refuses to start instead:
-the frames it covered come back, Hyprland shows a failed-to-load
-notification, and the journal says why and names both builds:
+are never held back. After an upgrade the plugin loads and stays idle
+instead: the frames it covered come back, nothing is shown on screen, and
+the journal says why and names both builds:
 
 ```bash
 journalctl -b -t hypr-de-scene
 ```
 
+`hyprctl plugin list` shows the same line as the plugin's description.
+
 When the new Hyprland no longer has a symbol the module needs, Hyprland
-cannot load it at all. That journal then has no line, and only Hyprland's
-notification and its own log name the failure.
+cannot load it at all. That journal then has no line, and Hyprland shows
+its own failed-to-load notification for a few seconds at login.
 
 Either way, rebuild the package on the machine, against the Hyprland now
 installed, and log in again.

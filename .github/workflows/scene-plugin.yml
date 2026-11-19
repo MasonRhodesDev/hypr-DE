@@ -42,6 +42,16 @@ jobs:
             exit 1
           fi
 
+      - name: Plugin stays quiet in a Hyprland it was not built for
+        shell: bash
+        run: |
+          set -o pipefail
+          ./tests/scene-plugin-foreign.sh | tee foreign.log
+          if grep -q '^skip' foreign.log; then
+            echo "::error::the plugin was not loaded into another Hyprland"
+            exit 1
+          fi
+
   arch:
     uses: MasonRhodesDev/packaging-workflows/.github/workflows/arch-package.yml@v1
     with:
