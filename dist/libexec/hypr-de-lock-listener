@@ -8,6 +8,8 @@ LOCK_CMD = "@LIBEXECDIR@/lock-cmd.sh"
 # Longer than lock-cmd.sh's own bounded worst case, so the watchdog never cuts off its failsafe.
 LOCK_DEADLINE_SECONDS = 90
 BIND_RETRY_SECONDS = 2
+# The unit lists this in RestartPreventExitStatus=, so only "not Hyprland" stops the restarts.
+NOT_HYPRLAND = 78
 LOGIND = "org.freedesktop.login1"
 MANAGER_PATH = "/org/freedesktop/login1"
 MANAGER = "org.freedesktop.login1.Manager"
@@ -210,7 +212,7 @@ class Binder:
     def attempt(self):
         try:
             session_id, path = own_session(self.bus, self.signature)
-        except LookupError as error:
+        except Exception as error:  # a retry that stopped on a surprise would leave Lock unanswered
             if str(error) != self.last_reason:
                 self.last_reason = str(error)
                 log(f"waiting for this user's Hyprland session; Lock requests go unanswered until then: {error}")
@@ -228,7 +230,7 @@ def main():
     signature = os.environ.get("HYPRLAND_INSTANCE_SIGNATURE")
     if not signature:
         log("HYPRLAND_INSTANCE_SIGNATURE is not set, so this is not a Hyprland session; not answering Lock requests")
-        return 0
+        return NOT_HYPRLAND
     bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
     locker = Locker()
     delay = SleepDelay(bus)

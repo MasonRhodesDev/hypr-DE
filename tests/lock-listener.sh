@@ -48,9 +48,10 @@ echo "lock-cmd.sh session=$XDG_SESSION_ID $*" >>"$LOCKS"
 sleep "${STUB_HOLD:-0}"
 STUB
 chmod +x "$work/lock-cmd.sh"
-sed -e "s|@LIBEXECDIR@|$work|g" -e "s|^LOCK_DEADLINE_SECONDS = .*|LOCK_DEADLINE_SECONDS = 2|" \
-    "$root/dist/libexec/hypr-de-lock-listener" >"$work/listener"
-chmod +x "$work/listener"
+sed "s|@LIBEXECDIR@|$work|g" "$root/dist/libexec/hypr-de-lock-listener" >"$work/listener"
+sed "s|^LOCK_DEADLINE_SECONDS = .*|LOCK_DEADLINE_SECONDS = 2|" "$work/listener" >"$work/listener-short"
+chmod +x "$work/listener" "$work/listener-short"
+listener_bin="$work/listener"
 
 wait_for() {
     for _ in $(seq 50); do eval "$1" && return 0; sleep 0.1; done
@@ -65,7 +66,7 @@ start_logind() {
 }
 start_listener() {
     : >"$work/listener.err"
-    env "$@" "$work/listener" 2>"$work/listener.err" & listener=$!; pids+=("$listener")
+    env "$@" "$listener_bin" 2>"$work/listener.err" & listener=$!; pids+=("$listener")
     wait_for 'grep -q "locking session" "$work/listener.err"'
 }
 
@@ -128,7 +129,8 @@ wait_for '[ "$(locks)" = 7 ]' && [ "$(tail -n1 "$LOCKS")" = "lock-cmd.sh session
     || bad "the listener bound to a tty session: $(tail -n1 "$LOCKS")"
 kill "$listener"; wait "$listener" 2>/dev/null
 
-: >"$NOTES"
+[ -s "$NOTES" ] && bad "a failure notification for locks that returned in time: $(cat "$NOTES")" || ok "locks that return in time post no failure"
+listener_bin="$work/listener-short"
 start_listener XDG_SESSION_ID=7 STUB_HOLD=30 || { cat "$work/listener.err"; exit 1; }
 kill -USR1 "$logind"
 wait_for '[ "$(locks)" = 8 ]' || bad "no lock-cmd.sh run for a logind Lock"
@@ -143,6 +145,7 @@ kill -WINCH "$logind"
 kill -USR1 "$logind"
 wait_for '[ "$(locks)" = 9 ]' && ok "a Lock after a stuck lock-cmd.sh runs lock-cmd.sh again" || bad "a stuck lock-cmd.sh swallowed later Lock requests"
 kill "$listener"; wait "$listener" 2>/dev/null
+listener_bin="$work/listener"
 
 env XDG_SESSION_ID=7 XDG_SEAT=seat0 sleep 300 & hyprland=$!; pids+=("$hyprland")
 mkdir -p "$work/runtime/hypr/live"
@@ -188,8 +191,8 @@ kill "$listener"; wait "$listener" 2>/dev/null
 env -u HYPRLAND_INSTANCE_SIGNATURE "$work/listener" 2>"$work/listener.err" & listener=$!; pids+=("$listener")
 if wait_for '! kill -0 "$listener" 2>/dev/null'; then
     wait "$listener"; rc=$?
-    [ "$rc" = 0 ] && grep -q "not a Hyprland session" "$work/listener.err" \
-        && ok "outside Hyprland the listener says so and exits 0, so systemd does not restart it" \
+    [ "$rc" = 78 ] && grep -q "not a Hyprland session" "$work/listener.err" \
+        && ok "outside Hyprland the listener says so and exits 78, which the unit does not restart" \
         || bad "outside Hyprland: exit $rc, $(cat "$work/listener.err")"
 else
     bad "the listener kept running outside Hyprland"
@@ -200,7 +203,9 @@ grep -qx 'ExecStart=@LIBEXECDIR@/hypr-de-lock-listener' "$unit" && ok "the unit 
 grep -qx 'KillMode=process' "$unit" && ok "restarting the unit leaves a bare locker running" || bad "a unit restart would kill a bare locker that holds the lock"
 [ "$(sed -n '/^\[Unit\]/,/^\[/{/^StartLimitIntervalSec=/p}' "$unit")" = StartLimitIntervalSec=0 ] \
     && ok "the start limit never gives up on the listener" || bad "systemd's default start limit can leave Lock unanswered"
-grep -qx 'Restart=on-failure' "$unit" && ok "a clean exit outside Hyprland is not restarted" || bad "the unit restarts a clean exit"
+grep -qx 'Restart=always' "$unit" && ok "any exit or signal restarts the listener" || bad "a SIGTERM or clean exit would leave the listener dead"
+grep -qx 'RestartPreventExitStatus=78' "$unit" && grep -qx 'SuccessExitStatus=78' "$unit" \
+    && ok "only the not-Hyprland exit stops the restarts" || bad "the not-Hyprland exit would restart every second"
 grep -q '^ConditionEnvironment=' "$unit" && bad "a ConditionEnvironment skip is silent" || ok "no silent start condition"
 python3 -I -c '
 import sys, tomllib
