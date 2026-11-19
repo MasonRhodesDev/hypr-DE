@@ -61,9 +61,13 @@ lid close through hyprstate) and holds a sleep delay that waits for the lock
 before any suspend. hypridle's lock_cmd, before_sleep_cmd and idle timeout run
 the same script. The session counts as locked only while the compositor
 holds the lock and a locker is alive; a request then starts no second locker.
-If the lock screen crashed, a request tries to lock again and otherwise ends
-the session (the failsafe in
-.IR /etc/hypr-de/lock.conf ).
+If the lock screen crashes while the session stays locked, a watcher started
+with each lock respawns vigil-lock onto it (Hyprland's
+.B misc:allow_session_lock_restore
+is on), and so does any later request. After 3 respawns in 30 s, or with that
+option set false, the failsafe in
+.I /etc/hypr-de/lock.conf
+runs instead.
 Every path shows one lock screen (vigil-lock), whose output
 reaches the journal as
 .BR vigil-lock ;

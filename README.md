@@ -188,11 +188,23 @@ user believes is locked. (Since 0.2.25 nothing blanks an unlocked session, so
 an exposed desktop at least stays visibly exposed — but it is still exposed,
 which is what the failsafe exists to prevent.)
 
-The same failsafe covers a crashed lock screen. When the locker dies, Hyprland
-keeps the session locked on its lock-dead screen and refuses a new locker
-(`misc:allow_session_lock_restore` is off). The next lock request finds no live
-locker, tries to lock again, and when that is refused terminates the session,
-so the user can log in again instead of staring at a screen nothing unlocks.
+A crashed lock screen is recovered, not ended. When the locker dies, Hyprland
+keeps the session locked on its lock-dead screen, and hypr-DE ships
+`misc:allow_session_lock_restore = true` so a new locker may take that lock
+over. A watcher that `lock-cmd.sh` starts beside each lock notices the locker
+die and respawns vigil-lock within about a second, and any lock request on
+that screen does the same. The password is still required; the session is
+never unlocked in between. Only `vigil-lock` from `/usr/local/bin:/usr/bin:/bin`
+is respawned (lock-cmd.sh pins its `PATH`), and only once no locker of yours is
+left alive, because Hyprland also hands a healthy lock to a newcomer. One run at
+a time respawns, under the same lock file as the fallbacks. Respawns are counted
+in `$XDG_RUNTIME_DIR/hypr-de-lock-respawns`: after 3 in 30 s the fallbacks run,
+then the failsafe, so a locker that keeps crashing ends the session rather than
+loop. Each step is logged as `hypr-de-lock`.
+
+If your Hyprland config sets `misc:allow_session_lock_restore = false`, no
+locker can take a crashed lock screen over, so a request on it goes straight
+to the failsafe below and the journal says why.
 
 To keep the session instead, create `/etc/hypr-de/lock.conf`:
 
