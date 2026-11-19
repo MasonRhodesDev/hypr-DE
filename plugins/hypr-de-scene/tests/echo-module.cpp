@@ -1,5 +1,6 @@
 // stands in for the module and reports what the loader hands it and when it is closed.
 // Built without GNU unique symbols, like the packaged module, since glibc never closes a library that has them.
+#include <csignal>
 #include <cstdio>
 #include <format>
 #include <stdexcept>
@@ -19,6 +20,9 @@ extern "C" __attribute__((visibility("default"))) std::string pluginAPIVersion()
 extern "C" __attribute__((visibility("default"))) SInfo pluginInit(void* handle) {
 #ifdef ECHO_INIT_THROWS
     throw std::runtime_error("the module failed to start");
+#endif
+#ifdef ECHO_INIT_FAULTS
+    std::raise(SIGSEGV);
 #endif
     return {"echo", std::format("handle {}", handle), "", ""};
 }

@@ -41,6 +41,7 @@ if ! { cmake -S "$src" -B "$work/build" -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_F
         && "${CXX:-c++}" -shared -fPIC -Wl,-z,lazy -o "$work/current/hypr-de-scene-impl.so" "$src/tests/renamed-symbol.cpp" \
         && echo_module echo \
         && echo_module throwing -DECHO_INIT_THROWS \
+        && echo_module faulting -DECHO_INIT_FAULTS \
         && echo_module another-api -UHYPRLAND_API_VERSION '-DHYPRLAND_API_VERSION="0.0-another"' \
         && echo_module without-exit -DECHO_WITHOUT_EXIT \
         && echo_module nameless -DECHO_VERSION_THROWS \
@@ -118,6 +119,13 @@ if [ "$(unloading "$out")" = "module exit plugin exited module closed plugin clo
     ok "with a module whose init throws: the module's exit runs at once, and the module stays open until Hyprland closes the loader"
 else
     bad "with a module whose init throws, the order was: $(unloading "$out")"
+fi
+
+out=$(load "$work/faulting/hypr-de-scene.so")
+if grep -qx 'outcome faulted' <<<"$out" && [ "$(unloading "$out")" = "plugin closed " ]; then
+    ok "with a module that faults in init, which Hyprland unloads without its exit: the module, which never stopped, stays open"
+else
+    bad "with a module that faults in init: $(grep '^outcome ' <<<"$out"), the order was: $(unloading "$out")"
 fi
 
 declare -A unfit=([another-api]="with a module for another API version" [without-exit]="with a module that has no pluginExit")

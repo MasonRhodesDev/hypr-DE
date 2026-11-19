@@ -1,4 +1,6 @@
 #include <dlfcn.h>
+#include <setjmp.h>
+#include <signal.h>
 #include <syslog.h>
 #include <unistd.h>
 #include <cstdarg>
@@ -14,6 +16,7 @@ struct SInfo {
 extern "C" const char* __hyprland_api_get_hash();
 
 static bool            logOpen = false;
+static sigjmp_buf      fault;
 
 extern "C" void        openlog(const char*, int, int) {
     logOpen = true;
@@ -45,6 +48,10 @@ extern "C" void __syslog_chk(int priority, int, const char* format, ...) {
     va_start(args, format);
     vsyslog(priority, format, args);
     va_end(args);
+}
+
+static void faulted(int) {
+    siglongjmp(fault, 1);
 }
 
 static void* open(const char* path, const char* what) {
@@ -79,6 +86,17 @@ __attribute__((constructor)) static void load() {
     }
     if (VERSION() != HYPRLAND_API_VERSION) {
         printf("outcome rejected, API version %s\n", VERSION().c_str());
+        _exit(0);
+    }
+
+    // as Hyprland does, a fault in init unloads the plugin without its exit
+    struct sigaction action = {};
+    action.sa_handler       = faulted;
+    sigaction(SIGSEGV, &action, nullptr);
+    if (sigsetjmp(fault, 1)) {
+        printf("outcome faulted\n");
+        dlclose(module);
+        printf("plugin closed\n");
         _exit(0);
     }
 
