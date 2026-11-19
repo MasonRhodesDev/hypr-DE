@@ -11,6 +11,8 @@ check_pie_supported(LANGUAGES CXX)
 
 add_compile_options(-Wall -Wextra -Wconversion -Wshadow -fstack-protector-strong -fstack-clash-protection)
 add_compile_definitions(_GLIBCXX_ASSERTIONS)
+# Release and RelWithDebInfo pass -DNDEBUG first; assertions stay on in every build
+add_compile_options(-UNDEBUG)
 add_link_options(LINKER:-z,relro LINKER:-z,now)
 
 # only x86 has control-flow protection
