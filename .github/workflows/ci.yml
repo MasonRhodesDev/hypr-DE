@@ -51,6 +51,8 @@ jobs:
         run: ./tests/scene-geometry.sh
       - name: Scene plugin releases the scene by its readiness rule, and refuses bad scene commands
         run: ./tests/scene-readiness.sh
+      - name: uwsm's settle pause stays off the Hyprland login
+        run: ./tests/session-env.sh
       - name: Every package names the scene plugin at the path it is installed to
         run: ./tests/scene-plugin-path.sh
       - name: Steam launch-option validation
