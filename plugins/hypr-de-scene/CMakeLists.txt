@@ -38,13 +38,16 @@ set_property(TARGET hypr-de-scene-impl APPEND PROPERTY LINK_DEPENDS ${CMAKE_CURR
 find_file(HYPRLAND_PLUGIN_API src/plugins/PluginAPI.hpp PATHS ${headers_INCLUDE_DIRS} NO_DEFAULT_PATH REQUIRED)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${HYPRLAND_PLUGIN_API})
 file(READ ${HYPRLAND_PLUGIN_API} api)
-string(REGEX MATCH "#define HYPRLAND_API_VERSION [^\n]+" api_version "${api}")
+string(REGEX MATCH "#define HYPRLAND_API_VERSION ([^\n]+)" api_version "${api}")
+set(api_version "${CMAKE_MATCH_1}")
 # CMake 4.3 drops a semicolon that ends a match, so the template supplies it
 string(REGEX MATCH "using PLUGIN_DESCRIPTION_INFO = struct {[^}]+}" description "${api}")
 string(FIND "${api}" "__hyprland_api_get_client_hash() {" hash_begin)
 if(NOT api_version OR NOT description OR hash_begin EQUAL -1)
     message(FATAL_ERROR "${HYPRLAND_PLUGIN_API} no longer has the API version, PLUGIN_DESCRIPTION_INFO and client hash the loader copies")
 endif()
+# the module checks the loader's copy of the API version against the macro it compiles with
+target_compile_definitions(hypr-de-scene-impl PRIVATE HYPR_DE_SCENE_LOADER_API_VERSION=${api_version})
 string(SUBSTRING "${api}" ${hash_begin} -1 hash)
 string(FIND "${hash}" "\n}\n" hash_end)
 string(SUBSTRING "${hash}" 0 ${hash_end} hash)
@@ -56,7 +59,7 @@ file(CONFIGURE OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/loader/PluginEntry.hpp @ONLY C
 #include <string>
 #include <string_view>
 
-@api_version@
+#define HYPRLAND_API_VERSION @api_version@
 
 @description@;
 
@@ -66,7 +69,7 @@ inline const char* @hash@
 
 add_library(hypr-de-scene SHARED src/Loader.cpp)
 set_target_properties(hypr-de-scene PROPERTIES PREFIX "")
-target_include_directories(hypr-de-scene PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/loader)
+target_include_directories(hypr-de-scene PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/loader ${headers_INCLUDE_DIRS})
 target_compile_options(hypr-de-scene PRIVATE -Wall -Wextra)
 target_compile_definitions(hypr-de-scene PRIVATE HYPR_DE_SCENE_MODULE="$<TARGET_FILE_NAME:hypr-de-scene-impl>")
 target_link_options(hypr-de-scene PRIVATE -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/src/loader.map)

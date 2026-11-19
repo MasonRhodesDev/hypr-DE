@@ -6,7 +6,11 @@
 #include <chrono>
 #include <cstdlib>
 #include <format>
+#include <string_view>
 #include <syslog.h>
+
+static_assert(std::string_view{HYPR_DE_SCENE_LOADER_API_VERSION} == HYPRLAND_API_VERSION,
+              "the loader copied another API version than the one this module is built against");
 
 static UP<Scene::CScene> scene;
 
