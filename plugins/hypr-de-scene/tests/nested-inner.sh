@@ -142,6 +142,7 @@ case $case in
         sleep 0.5; state after
         ;;
     N9) ;;
+    unload) scene expect layer waybar; scene ready session; sleep 0.5; hc plugin unload "$plugin" ;;
     N10)
         client foot -e sh -c "cat >'$out/typed'"
         sleep 1.5

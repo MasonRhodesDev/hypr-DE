@@ -65,6 +65,19 @@ def main():
     def index(kind, test):
         return next((i for i, (k, g) in enumerate(events) if k == kind and test(g)), None)
 
+    with open(os.path.join(out, "shots", "times")) as f:
+        shots = [(os.path.join(out, "shots", name), float(at)) for name, at in (line.split() for line in f)]
+
+    if case == "unload":
+        with open(os.path.join(out, "dumps", "log")) as f:
+            unloaded = [float(m.group(1)) for m in map(re.compile(r"^scene: released at (\S+), unload while covering").match, f) if m]
+        check(len(unloaded) == 1 and not all_of("fading"), "unload: unloading while covering releases the scene at once, with no fade")
+        after = [(p, at) for p, at in shots if unloaded and at >= unloaded[0] + 0.3]
+        stuck = [os.path.basename(p) for p, at in after if share(Image.open(p), GROUND) >= 0.5]
+        check(after and not stuck, f"unload: {len(after)} screenshots after the unload show the desktop"
+              + (f", but {' '.join(stuck)} still show the scene" if stuck else ""))
+        sys.exit(1 if failures else 0)
+
     fadings, released = all_of("fading"), all_of("released")
     check(len(fadings) == 1, f"{case}: the scene starts fading once ({len(fadings)})")
     check(len(released) == 1, f"{case}: the scene is released once ({len(released)})")
@@ -84,8 +97,6 @@ def main():
     check(final is not None and final["state"] == "released" and final["reason"] == reason,
           f"{case}: hyprctl scene reports the scene released by {reason}")
 
-    with open(os.path.join(out, "shots", "times")) as f:
-        shots = [(os.path.join(out, "shots", name), float(at)) for name, at in (line.split() for line in f)]
     # the host window starts small and black around it, so the scene is in full from the first shot that shows it
     start = next((at for p, at in shots if share(Image.open(p), GROUND) >= 0.9), None)
     covered = [(p, at) for p, at in shots if start is not None and start <= at <= fading_at]

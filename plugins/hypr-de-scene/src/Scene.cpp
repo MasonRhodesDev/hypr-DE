@@ -129,8 +129,14 @@ CScene::CScene(const SSettings& settings) : m_settings(settings) {
 }
 
 CScene::~CScene() {
-    if (m_state != eState::RELEASED)
+    if (m_state != eState::RELEASED) {
         note("scene: released at {:.3f}, unload while {}", monotonic(), m_state == eState::COVERING ? "covering" : "fading");
+        // the last frame drawn still has the scene in it
+        for (const auto& output : m_outputs) {
+            if (const auto MONITOR = output->monitor.lock())
+                g_pHyprRenderer->damageMonitor(MONITOR);
+        }
+    }
 
     unlockCursors();
     dropTimer();
