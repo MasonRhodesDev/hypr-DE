@@ -76,9 +76,11 @@ mk_libexec() {
     chmod +x "$work/$1"
 }
 status=0
+lock_shell=
 run_lock() {
     status=0
-    env -u XDG_SESSION_ID WAYLAND_DISPLAY="$display" "$work/lock-cmd.sh" "$@" 2>>"$work/stderr" || status=$?
+    # shellcheck disable=SC2086  # deliberate: lock_shell may carry an option
+    env -u XDG_SESSION_ID WAYLAND_DISPLAY="$display" $lock_shell "$work/lock-cmd.sh" "$@" 2>>"$work/stderr" || status=$?
 }
 assert_log() {
     expected=$1
@@ -360,6 +362,45 @@ assert_log 'notify-send:-u critical -a hypr-de Lock screen crashed The session i
 rm -rf "$lockfile"
 mk_lock
 echo "with misc:allow_session_lock_restore set false a crashed lock screen goes straight to the failsafe"
+
+for lock_shell in 'bash --posix' dash; do
+    command -v "${lock_shell%% *}" >/dev/null 2>&1 || { echo "skip: no ${lock_shell%% *} to run lock-cmd.sh under"; continue; }
+    rm -f "$work/hypr-de-lock.lock"
+    mkdir "$work/hypr-de-lock.lock"
+    mk_lock 'swaylock -f'
+    rm -f "$marker" "$respawns"
+    : > "$LOCK_POLICY_LOG"
+    : > "$work/stderr"
+    LOCK_POLICY_VIGIL_STATUS=1 LOCK_POLICY_EXTRA_PATH="$fallback_fixtures" run_lock
+    assert_status 0
+    assert_log 'vigil-lock:--wait --no-warn
+vigil-lock:--wait --no-warn
+swaylock:-f
+logind-idle-control:disable
+hyprctl:dispatch hl.dsp.dpms({ action = '\''on'\'' })'
+    grep -q 'going ahead without serialising' "$work/stderr" || {
+        echo "$lock_shell: an unopenable fallback lock file must be logged, not end the run" >&2; exit 1; }
+    mk_lock
+    mkdir "$marker"
+    : > "$LOCK_POLICY_LOG"
+    LOCK_POLICY_VIGIL_STATUS=1 run_lock
+    assert_status 1
+    assert_log 'vigil-lock:--wait --no-warn
+vigil-lock:--wait --no-warn
+loginctl:terminate-session 7'
+    rmdir "$marker"
+    mkdir "$lockfile"
+    : > "$LOCK_POLICY_LOG"
+    LOCK_POLICY_LOCK_FILE=$lockfile LOCK_POLICY_VIGIL_HOLDS=1 run_lock
+    assert_status 0
+    [ "$(grep -c '^vigil-lock:' "$LOCK_POLICY_LOG")" = 1 ] || {
+        echo "$lock_shell: a crashed lock screen with an unopenable lock file was not respawned:" >&2
+        cat "$LOCK_POLICY_LOG" >&2; exit 1; }
+    stop_holders
+    rm -rf "$lockfile" "$work/hypr-de-lock.lock"
+    echo "under $lock_shell an unopenable lock file or marker still reaches the fallbacks, the failsafe and the respawn"
+done
+lock_shell=
 
 watchers() {
     pids=$("$real_pgrep" -f "$work/lock-cmd.sh --watch" || true)

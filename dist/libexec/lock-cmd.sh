@@ -220,8 +220,10 @@ fallback_lock() {
     return 1
 }
 
+# A failed redirection on a special builtin such as ":" ends a POSIX shell, so every probe that
+# may fail to open its file runs in a subshell.
 fail_closed() {
-    : > "$fail_marker" 2>/dev/null || true
+    ( : > "$fail_marker" ) 2>/dev/null || log "cannot write $fail_marker"
     case "$FAILSAFE:$crashed_at_entry" in
         warn:1|none:1)
             log "the lock screen crashed and no locker could take over; $LOCK_CONF sets failsafe=$FAILSAFE, so the session stays up, locked, with nothing to unlock it"
@@ -265,7 +267,7 @@ fallback_or_fail_closed() {
 # lock covers only the fallbacks, the respawn and the failsafe, and a Super+L never waits behind an
 # idle warning.
 serialised() {
-    if command -v flock >/dev/null 2>&1 && { : >> "$fallback_lock_file"; } 2>/dev/null; then
+    if command -v flock >/dev/null 2>&1 && ( : >> "$fallback_lock_file" ) 2>/dev/null; then
         {
             flock -w "$FALLBACK_WAIT" 9 || \
                 log "another lock attempt held $fallback_lock_file for ${FALLBACK_WAIT}s; going ahead anyway"
@@ -357,7 +359,12 @@ start_watcher() {
 }
 
 watch_lockers() {
-    { exec 8>> "$watch_lock_file"; } 2>/dev/null && flock -n 8 || exit 0
+    if ! ( : >> "$watch_lock_file" ) 2>/dev/null; then
+        log "cannot open $watch_lock_file; no lock watcher runs, so a crashed lock screen recovers only on the next lock request"
+        exit 0
+    fi
+    exec 8>> "$watch_lock_file"
+    flock -n 8 || exit 0
     while :; do
         for pid in $(live_lockers); do
             if [ "$pid" = '?' ]; then
