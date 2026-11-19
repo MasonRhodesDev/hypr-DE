@@ -1,5 +1,13 @@
 #!/bin/sh
 case "${1:-}" in
+    locked|getoption)
+        if [ -n "${LOCK_POLICY_HYPRCTL_GONE:-}" ] && [ -e "$LOCK_POLICY_HYPRCTL_GONE" ]; then
+            echo "Couldn't connect to $XDG_RUNTIME_DIR/hypr/${HYPRLAND_INSTANCE_SIGNATURE:-}/.socket.sock. (3)"
+            exit 1
+        fi
+        [ -n "${LOCK_POLICY_HYPRCTL_SLOW:-}" ] && [ -e "$LOCK_POLICY_HYPRCTL_SLOW" ] && sleep 4 ;;
+esac
+case "${1:-}" in
     -j)
         if [ "${2:-}" = clients ]; then
             [ "${LOCK_POLICY_COMPOSITOR_HANG:-0}" = 1 ] && sleep 30
@@ -12,7 +20,15 @@ case "${1:-}" in
         fi ;;
     locked)
         [ "${LOCK_POLICY_COMPOSITOR_HANG:-0}" = 1 ] && sleep 30
-        printf '%s\n' "${LOCK_POLICY_COMPOSITOR_LOCKED:-false}"
+        if [ -n "${LOCK_POLICY_LOCK_FILE:-}" ] && [ -e "$LOCK_POLICY_LOCK_FILE" ]; then
+            echo true
+        else
+            printf '%s\n' "${LOCK_POLICY_COMPOSITOR_LOCKED:-false}"
+        fi
+        exit 0 ;;
+    getoption)
+        [ "${2:-}" = misc:allow_session_lock_restore ] || { echo "no such option"; exit 0; }
+        printf 'bool: %s\nset: true\n' "${LOCK_POLICY_RESTORE:-false}"
         exit 0 ;;
 esac
 printf 'hyprctl:%s\n' "$*" >> "$LOCK_POLICY_LOG"

@@ -4,9 +4,9 @@ fedora = ["hyprland >= 0.57"]
 arch = ["hyprland>=0.57"]
 
 [lock-idle]
-reason = "vigil (vigil-lock lock_cmd / before_sleep_cmd), hypridle (idle policy in hypr/hypridle.conf); SUPER+L is loginctl lock-session which hypridle answers. Floor is vigil 0.3: lock-cmd.sh and hypridle.conf use --wait/--warn/--no-warn, which 0.2.x rejects — an unversioned dep let hypr-de 0.2.14 pair with vigil 0.2.16 and silently break idle/suspend locking. Floor is hypridle 0.1.8: the locked-screen listener needs per-listener condition_cmd/condition_retry (0.1.8) and ignore_inhibit (0.1.6); an older hypridle drops the unknown keys and would blank 30 s into any idle, locked or not."
-fedora = ["vigil >= 0.3.0", "hypridle >= 0.1.8"]
-arch = ["vigil>=0.3.0", "hypridle>=0.1.8"]
+reason = "vigil (vigil-lock lock_cmd / before_sleep_cmd), hypridle (idle policy in hypr/hypridle.conf); SUPER+L and the power menu run lock-cmd.sh directly; hypr-de-lock.service answers logind Lock and sleep without hypridle; it is a PyGObject listener (python3, python3-gobject). lock-cmd.sh serialises its fallbacks with flock (util-linux) and checks for a live locker with pgrep (procps-ng). Floor is vigil 0.3: lock-cmd.sh and hypridle.conf use --wait/--warn/--no-warn, which 0.2.x rejects. An unversioned dep let hypr-de 0.2.14 pair with vigil 0.2.16 and silently break idle/suspend locking. Floor is hypridle 0.1.8: the locked-screen listener needs per-listener condition_cmd/condition_retry (0.1.8) and ignore_inhibit (0.1.6); an older hypridle drops the unknown keys and would blank 30 s into any idle, locked or not."
+fedora = ["vigil >= 0.3.0", "hypridle >= 0.1.8", "python3", "python3-gobject", "/usr/bin/flock", "/usr/bin/pgrep"]
+arch = ["vigil>=0.3.0", "hypridle>=0.1.8", "python", "python-gobject", "util-linux", "procps-ng"]
 units = ["hypridle.service", "logind-idle-control.service", "logind-idle-control-tray.service"]
 
 [bar]

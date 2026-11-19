@@ -51,10 +51,35 @@ Waybar is the shell. Workspace buttons come from waybar-workspace-buttons.
 .TP
 .B Lock
 .B SUPER+L
-is
-.B loginctl lock-session .
-hypridle's lock_cmd answers that signal, so the key, idle timeout, and
-suspend share one lock screen (vigil-lock).
+and the power menu's Lock run
+.I @LIBEXECDIR@/lock-cmd.sh
+directly, so they lock whether or not hypridle runs.
+.B hypr-de-lock.service
+answers logind's Lock request
+.RB ( "loginctl lock-session" ,
+lid close through hyprstate) and holds a sleep delay that waits for the lock
+before any suspend. hypridle's lock_cmd, before_sleep_cmd and idle timeout run
+the same script. The session counts as locked only while the compositor
+holds the lock and a locker is alive; a request then starts no second locker.
+No answer from the compositor never reads as unlocked.
+If the lock screen crashes while the session stays locked, a watcher started
+with each lock respawns vigil-lock onto it with no grace window (Hyprland's
+.B misc:allow_session_lock_restore
+is on), and so does any later request, SUPER+L included: it is a locked bind.
+A third-party lock screen counts as a live locker only when the
+.B fallbacks
+of
+.I /etc/hypr-de/lock.conf
+list it. After 3 respawns in 30 s, or with that
+option set false, the failsafe in
+.I /etc/hypr-de/lock.conf
+runs instead.
+Every path shows one lock screen (vigil-lock), whose output
+reaches the journal as
+.BR vigil-lock ;
+lock-cmd.sh's own lines are
+.BR hypr-de-lock .
+Without hypridle nothing locks on idle.
 .TP
 .B Files
 .B SUPER+E

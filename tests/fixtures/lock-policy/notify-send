@@ -1,0 +1,2 @@
+#!/bin/sh
+printf 'notify-send:%s\n' "$*" >> "$LOCK_POLICY_LOG"

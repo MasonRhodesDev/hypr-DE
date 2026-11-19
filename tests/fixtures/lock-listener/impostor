@@ -1,0 +1,6 @@
+#!/usr/bin/python3 -I
+from gi.repository import Gio
+
+bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+bus.emit_signal(None, "/org/freedesktop/login1/session/_37", "org.freedesktop.login1.Session", "Lock", None)
+bus.flush_sync(None)

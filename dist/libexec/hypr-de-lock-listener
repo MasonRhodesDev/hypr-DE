@@ -1,0 +1,272 @@
+#!/usr/bin/python3 -I
+import os
+import shutil
+import sys
+
+from gi.repository import Gio, GLib
+
+LOCK_CMD = "@LIBEXECDIR@/lock-cmd.sh"
+# Like lock-cmd.sh, run nothing from a directory the session's environment can choose.
+SYSTEM_PATH = "/usr/local/bin:/usr/bin:/bin"
+# Above lock-cmd.sh's bounded worst case (88 s measured on a crashed screen with no answer from
+# hyprctl, a contended flock and a vigil-lock that never confirms; about 101 s computed), so only a run
+# stuck in an unbounded step, a foreground fallback or loginctl, is killed. Its failsafe then runs.
+LOCK_DEADLINE_SECONDS = 120
+BIND_RETRY_SECONDS = 2
+# The unit lists this in RestartPreventExitStatus=, so only "not Hyprland" stops the restarts.
+NOT_HYPRLAND = 78
+LOGIND = "org.freedesktop.login1"
+MANAGER_PATH = "/org/freedesktop/login1"
+MANAGER = "org.freedesktop.login1.Manager"
+SESSION = "org.freedesktop.login1.Session"
+
+
+def log(message):
+    print(f"hypr-de-lock-listener: {message}", file=sys.stderr, flush=True)
+
+
+def call(bus, path, interface, method, signature, args, reply):
+    return bus.call_sync(
+        LOGIND, path, interface, method,
+        GLib.Variant(signature, args), GLib.VariantType(reply),
+        Gio.DBusCallFlags.NONE, -1, None,
+    ).unpack()
+
+
+def hyprland(signature):
+    runtime = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
+    try:
+        with open(os.path.join(runtime, "hypr", signature, "hyprland.lock")) as lock:
+            pid = int(lock.readline())
+        if os.stat(f"/proc/{pid}").st_uid != os.getuid():
+            return None, {}
+        with open(f"/proc/{pid}/environ", "rb") as environ:
+            raw = environ.read()
+    except (OSError, ValueError):
+        return None, {}
+    pairs = (item.split(b"=", 1) for item in raw.split(b"\0") if b"=" in item)
+    return pid, {key.decode(errors="replace"): value.decode(errors="replace") for key, value in pairs}
+
+
+def candidates(bus, pid, env):
+    """Session paths to try, best first. Under uwsm Hyprland runs in a user service, outside any
+    session, so logind has no session for its pid and Hyprland's own XDG_SESSION_ID decides."""
+    if pid:
+        yield "the session logind has for Hyprland's pid", lambda: call(
+            bus, MANAGER_PATH, MANAGER, "GetSessionByPID", "(u)", (pid,), "(o)")[0]
+    for label, session_id in (
+        ("Hyprland's XDG_SESSION_ID", env.get("XDG_SESSION_ID")),
+        ("XDG_SESSION_ID", os.environ.get("XDG_SESSION_ID")),
+    ):
+        if session_id:
+            yield f"{label}={session_id}", lambda session_id=session_id: call(
+                bus, MANAGER_PATH, MANAGER, "GetSession", "(s)", (session_id,), "(o)")[0]
+
+    def display():
+        (user,) = call(bus, MANAGER_PATH, MANAGER, "GetUser", "(u)", (os.getuid(),), "(o)")
+        ((_, path),) = call(
+            bus, user, "org.freedesktop.DBus.Properties", "Get", "(ss)",
+            ("org.freedesktop.login1.User", "Display"), "(v)",
+        )
+        if path == "/":
+            raise LookupError(f"user {os.getuid()} has no graphical session")
+        return path
+    yield "the user's graphical session", display
+
+
+def unusable(bus, path, seat):
+    (props,) = call(bus, path, "org.freedesktop.DBus.Properties", "GetAll", "(s)", (SESSION,), "(a{sv})")
+    if props["Type"] != "wayland":
+        return props["Id"], f"is a {props['Type']} session, not wayland"
+    if not props["Active"]:
+        return props["Id"], "is not the active session"
+    if not props["Seat"][0] or (seat and props["Seat"][0] != seat):
+        return props["Id"], f"is on seat '{props['Seat'][0]}', not {seat or 'a seat'}"
+    return props["Id"], None
+
+
+def own_session(bus, signature):
+    pid, env = hyprland(signature)
+    seat = env.get("XDG_SEAT") or os.environ.get("XDG_SEAT")
+    reasons = []
+    for label, resolve in candidates(bus, pid, env):
+        try:
+            path = resolve()
+            session_id, reason = unusable(bus, path, seat)
+        except (GLib.Error, LookupError) as error:
+            reasons.append(f"{label}: {getattr(error, 'message', error)}")
+            continue
+        if reason is None:
+            return session_id, path
+        reasons.append(f"{label}: session {session_id} {reason}")
+    if not pid:
+        reasons.insert(0, f"no Hyprland instance found for HYPRLAND_INSTANCE_SIGNATURE={signature}")
+    raise LookupError("; ".join(reasons))
+
+
+class Locker:
+    def __init__(self):
+        self.launcher = Gio.SubprocessLauncher.new(Gio.SubprocessFlags.NONE)
+        self.launcher.unsetenv("XDG_SESSION_ID")
+        self.child = None
+        self.deadline = None
+        self.waiters = []
+
+    def bind(self, session_id):
+        self.launcher.setenv("XDG_SESSION_ID", session_id, True)
+
+    def request(self, *args, then=None):
+        if then:
+            self.waiters.append(then)
+        if self.child:
+            log("a lock is already starting; not starting another")
+            return
+        try:
+            child = self.launcher.spawnv([LOCK_CMD, *args])
+        except GLib.Error as error:
+            log(f"cannot run {LOCK_CMD}: {error.message}")
+            self.notify("Screen NOT locked", f"The lock listener could not run {LOCK_CMD}.")
+            self.notify_waiters()
+            return
+        self.child = child
+        self.deadline = GLib.timeout_add_seconds(LOCK_DEADLINE_SECONDS, self.overdue, child)
+        child.wait_async(None, self.finished)
+
+    def finished(self, child, result):
+        child.wait_finish(result)
+        if child is not self.child:
+            return
+        GLib.source_remove(self.deadline)
+        self.child = None
+        if not child.get_successful():
+            log(f"{LOCK_CMD} failed with status {child.get_status()}")
+        self.notify_waiters()
+
+    def overdue(self, child):
+        log(f"{LOCK_CMD} did not return within {LOCK_DEADLINE_SECONDS}s; killing it and running its failsafe")
+        child.force_exit()
+        self.child = None
+        try:
+            self.launcher.spawnv([LOCK_CMD, "--failsafe"])
+        except GLib.Error as error:
+            log(f"cannot run the failsafe of {LOCK_CMD}: {error.message}")
+        self.notify(
+            "Screen lock did not finish",
+            f"Locking did not finish within {LOCK_DEADLINE_SECONDS} seconds. "
+            "The session may be unlocked: lock it again.",
+        )
+        self.notify_waiters()
+        return GLib.SOURCE_REMOVE
+
+    def notify(self, title, body):
+        notify_send = shutil.which("notify-send", path=SYSTEM_PATH)
+        if not notify_send:
+            log(f"cannot post a notification: no notify-send in {SYSTEM_PATH}")
+            return
+        try:
+            self.launcher.spawnv([notify_send, "-u", "critical", "-a", "hypr-de", title, body])
+        except GLib.Error as error:
+            log(f"cannot post a notification: {error.message}")
+
+    def notify_waiters(self):
+        waiters, self.waiters = self.waiters, []
+        for waiter in waiters:
+            waiter()
+
+
+class SleepDelay:
+    def __init__(self, bus):
+        self.bus = bus
+        self.fd = None
+        self.sleeping = False
+
+    def take(self):
+        if self.fd is not None:
+            return
+        try:
+            reply, fds = self.bus.call_with_unix_fd_list_sync(
+                LOGIND, MANAGER_PATH, MANAGER, "Inhibit",
+                GLib.Variant("(ssss)", ("sleep", "hypr-de", "Lock the screen before sleep", "delay")),
+                GLib.VariantType("(h)"), Gio.DBusCallFlags.NONE, -1, None, None,
+            )
+            held = fds.steal_fds()
+            (index,) = reply.unpack()
+            self.fd = held.pop(index)
+            for extra in held:
+                os.close(extra)
+        except GLib.Error as error:
+            log(f"no sleep delay from logind, so sleep may not wait for the lock: {error.message}")
+
+    def release(self):
+        if self.fd is not None:
+            os.close(self.fd)
+            self.fd = None
+
+    def going_down(self):
+        self.sleeping = True
+
+    def resumed(self):
+        self.sleeping = False
+        self.take()
+
+    def lock_returned(self):
+        self.release()
+        if not self.sleeping:
+            self.take()
+
+
+class Binder:
+    def __init__(self, bus, signature, locker):
+        self.bus = bus
+        self.signature = signature
+        self.locker = locker
+        self.last_reason = None
+
+    def attempt(self):
+        try:
+            session_id, path = own_session(self.bus, self.signature)
+        except Exception as error:  # a retry that stopped on a surprise would leave Lock unanswered
+            if str(error) != self.last_reason:
+                self.last_reason = str(error)
+                log(f"waiting for this user's Hyprland session; Lock requests go unanswered until then: {error}")
+            return GLib.SOURCE_CONTINUE
+        self.locker.bind(session_id)
+        self.bus.signal_subscribe(
+            LOGIND, SESSION, "Lock", path, None, Gio.DBusSignalFlags.NONE,
+            lambda *_: self.locker.request(),
+        )
+        log(f"locking session {session_id} on each logind Lock request and before sleep")
+        return GLib.SOURCE_REMOVE
+
+
+def main():
+    signature = os.environ.get("HYPRLAND_INSTANCE_SIGNATURE")
+    if not signature:
+        log("HYPRLAND_INSTANCE_SIGNATURE is not set, so this is not a Hyprland session; not answering Lock requests")
+        return NOT_HYPRLAND
+    bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+    locker = Locker()
+    delay = SleepDelay(bus)
+
+    def prepare_for_sleep(_bus, _sender, _path, _iface, _member, params):
+        (going_down,) = params.unpack()
+        if going_down:
+            delay.going_down()
+            locker.request("--sleep", then=delay.lock_returned)
+        else:
+            delay.resumed()
+
+    bus.signal_subscribe(
+        LOGIND, MANAGER, "PrepareForSleep", MANAGER_PATH, None, Gio.DBusSignalFlags.NONE,
+        prepare_for_sleep,
+    )
+    delay.take()
+    binder = Binder(bus, signature, locker)
+    if binder.attempt() == GLib.SOURCE_CONTINUE:
+        GLib.timeout_add_seconds(BIND_RETRY_SECONDS, binder.attempt)
+    GLib.MainLoop().run()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
