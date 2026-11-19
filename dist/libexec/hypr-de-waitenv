@@ -36,7 +36,11 @@ now=0
 tick() {
     local up
     read -r up _ </proc/uptime
-    up=${up//[!0-9]/}
+    if [[ ! $up =~ ^[0-9]+\.[0-9]+$ ]]; then
+        echo "Could not read the clock from /proc/uptime." >&2
+        exit 1
+    fi
+    up=${up/./}
     now=$(( 10#$up ))
 }
 
@@ -109,7 +113,8 @@ while :; do
             else
                 echo "All expected variables appeared in activation environment."
             fi
-            break
+            [[ $settle =~ ^[0.]*$ ]] || sleep "$settle"
+            exit 0
         fi
 
         tick
@@ -149,6 +154,4 @@ while :; do
         sleep "$slow_interval"
     fi
 done
-
-[[ $settle =~ ^[0.]*$ ]] || sleep "$settle"
-exit 0
+exit 1
