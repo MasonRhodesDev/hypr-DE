@@ -39,7 +39,8 @@ find_file(HYPRLAND_PLUGIN_API src/plugins/PluginAPI.hpp PATHS ${headers_INCLUDE_
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${HYPRLAND_PLUGIN_API})
 file(READ ${HYPRLAND_PLUGIN_API} api)
 string(REGEX MATCH "#define HYPRLAND_API_VERSION [^\n]+" api_version "${api}")
-string(REGEX MATCH "using PLUGIN_DESCRIPTION_INFO = struct {[^}]+};" description "${api}")
+# CMake 4.3 drops a semicolon that ends a match, so the template supplies it
+string(REGEX MATCH "using PLUGIN_DESCRIPTION_INFO = struct {[^}]+}" description "${api}")
 string(FIND "${api}" "__hyprland_api_get_client_hash() {" hash_begin)
 if(NOT api_version OR NOT description OR hash_begin EQUAL -1)
     message(FATAL_ERROR "${HYPRLAND_PLUGIN_API} no longer has the API version, PLUGIN_DESCRIPTION_INFO and client hash the loader copies")
@@ -57,7 +58,7 @@ file(CONFIGURE OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/loader/PluginEntry.hpp @ONLY C
 
 @api_version@
 
-@description@
+@description@;
 
 inline const char* @hash@
 }
