@@ -74,6 +74,17 @@ else
     bad "does not install to $installs and $private: $(find "$work/stage" -name '*.so' 2>/dev/null | sed "s|^$work/stage||" | tr '\n' ' ')"
 fi
 
+units=(hypr-de-scene-ready.service graphical-session.target.d/hypr-de-scene.conf waybar.service.d/hypr-de-scene.conf swaybg.service.d/hypr-de-scene.conf)
+unlisted=()
+for unit in "${units[@]}"; do
+    [[ -f "$work/stage/usr/lib/systemd/user/$unit" ]] && grep -qxF "%{_prefix}/lib/systemd/user/$unit" "$root/packaging/hypr-de-scene.spec" || unlisted+=("$unit")
+done
+if [[ ${#unlisted[@]} -eq 0 ]]; then
+    ok "installs the session units that declare what the scene waits for, and the RPM lists each"
+else
+    bad "the session units are not installed or not listed in the RPM: ${unlisted[*]}"
+fi
+
 for module in "$loader" "$plugin"; do
     if nm -D "$module" | grep -q __hyprland_api_get_client_hash; then
         bad "${module##*/} shares the symbol that names its Hyprland build with every other plugin"

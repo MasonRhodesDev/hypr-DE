@@ -1,8 +1,10 @@
 #include "Log.hpp"
 #include "Scene.hpp"
 
+#include <hyprland/src/ipc/s1/S1.hpp>
 #include <hyprland/src/plugins/PluginAPI.hpp>
 #include <hyprland/src/state/MonitorState.hpp>
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <format>
@@ -19,17 +21,44 @@ static std::string       env(const char* name, const std::string& fallback) {
     return VALUE && *VALUE ? VALUE : fallback;
 }
 
+// seconds from the environment, kept within bounds so no setting can hold the scene for long
+static Scene::Span seconds(const char* name, double fallback, double most) {
+    const auto TEXT  = env(name, "");
+    char*      end   = nullptr;
+    double     value = std::strtod(TEXT.c_str(), &end);
+    if (TEXT.empty() || end == TEXT.c_str() || *end || !(value >= 0))
+        value = fallback;
+
+    return std::chrono::duration_cast<Scene::Span>(std::chrono::duration<double>(std::min(value, most)));
+}
+
 static Scene::SSettings settings() {
-    char*        end     = nullptr;
-    const auto   TEXT    = env("HYPR_DE_SCENE_TIMEOUT", "5");
-    const double SECONDS = std::strtod(TEXT.c_str(), &end);
+    Scene::SBounds bounds;
+    bounds.timeout = seconds("HYPR_DE_SCENE_TIMEOUT", 5, 10);
+    if (bounds.timeout.count() <= 0)
+        bounds.timeout = Scene::Span{5000};
+    bounds.quiet  = std::min(seconds("HYPR_DE_SCENE_QUIET", 1.5, 10), bounds.timeout);
+    bounds.spread = std::min(seconds("HYPR_DE_SCENE_SPREAD", 0.25, 10), bounds.timeout);
+
+    // Hyprland run by a service manager has a session that says when its components started
+    const auto AWAIT = env("HYPR_DE_SCENE_AWAIT_SESSION", "");
 
     return {
-        .dataDir          = env("HYPR_DE_SCENE_DATA", env("DESKTOP_BOOT_DATA", "/usr/share/desktop-boot")),
-        .handoffNamespace = env("HYPR_DE_SCENE_HANDOFF", "desktop-boot-splash"),
-        .timeout          = std::chrono::milliseconds(end != TEXT.c_str() && SECONDS > 0 ? sc<long>(SECONDS * 1000) : 5000),
-        .dumpDir          = env("HYPR_DE_SCENE_DUMP", ""),
+        .dataDir = env("HYPR_DE_SCENE_DATA", env("DESKTOP_BOOT_DATA", "/usr/share/desktop-boot")),
+        .bounds  = bounds,
+        .fade    = seconds("HYPR_DE_SCENE_FADE", 0.2, 1),
+        .await   = AWAIT == "1" || (AWAIT != "0" && std::getenv("MANAGERPID")),
+        .dumpDir = env("HYPR_DE_SCENE_DUMP", ""),
     };
+}
+
+static IPC::Socket1::SResponse sceneCommand(const IPC::Socket1::SRequest& request) {
+    if (!scene) {
+        const auto PARSED = Scene::parseCommand(request.command);
+        return PARSED ? R"({"state":"idle"})" : "error: " + PARSED.error();
+    }
+
+    return scene->command(request.command);
 }
 
 APICALL EXPORT std::string PLUGIN_API_VERSION() {
@@ -68,6 +97,9 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
         Scene::note("scene: no readable logo.png in {}, staying out of the way", SETTINGS.dataDir);
     else
         scene = makeUnique<Scene::CScene>(SETTINGS);
+
+    // registered even when idle, so the session's units hear an answer and not an unknown request
+    HyprlandAPI::registerHyprCtlCommand(handle, {.name = "scene", .match = IPC::Socket1::COMMAND_MATCH_PREFIX, .handler = sceneCommand});
 
     return describedAs("Keeps the boot scene on screen from Hyprland's first frame");
 }

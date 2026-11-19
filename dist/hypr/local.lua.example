@@ -19,8 +19,9 @@
 
 -- Boot scene from the first frame (hypr-de-scene package, with desktop-boot):
 -- holds the ground and logo on every output from Hyprland's first commit
--- until desktop-boot's login splash covers that output, or for five
--- seconds at most, so a login shows no empty frame.
+-- until the session's bar and wallpaper are on screen, then fades them
+-- out, so a login shows nothing but the scene until the desktop is ready.
+-- It lets go after five seconds at most; hyprctl scene shows what it waits for.
 -- It stays idle without desktop-boot's scene files, and in a Hyprland
 -- build other than the one it was compiled against, or one that removed
 -- a symbol it needs; journalctl -t hypr-de-scene says so. Rebuild the

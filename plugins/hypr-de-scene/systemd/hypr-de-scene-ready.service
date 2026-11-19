@@ -1,0 +1,9 @@
+[Unit]
+Description=Tell the boot scene that the session's components have started
+After=graphical-session.target
+PartOf=graphical-session.target
+ConditionEnvironment=HYPRLAND_INSTANCE_SIGNATURE
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/hyprctl scene ready session

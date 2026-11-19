@@ -1,7 +1,11 @@
 #include "Scene.hpp"
 #include "Log.hpp"
 
+#include <hyprland/src/config/ConfigValue.hpp>
 #include <hyprland/src/desktop/view/LayerSurface.hpp>
+#include <hyprland/src/desktop/view/window/Window.hpp>
+#include <hyprland/src/managers/SeatManager.hpp>
+#include <hyprland/src/managers/SessionLockManager.hpp>
 #include <hyprland/src/managers/eventLoop/EventLoopManager.hpp>
 #include <hyprland/src/output/Monitor.hpp>
 #include <hyprland/src/pointer/PointerManager.hpp>
@@ -9,15 +13,20 @@
 #include <hyprland/src/render/Renderer.hpp>
 #include <hyprland/src/render/pass/RectPassElement.hpp>
 #include <hyprland/src/render/pass/TexPassElement.hpp>
+#include <hyprland/src/state/MonitorState.hpp>
 #include <aquamarine/backend/DRM.hpp>
 #include <xf86drmMode.h>
+#include <algorithm>
 #include <fstream>
 #include <memory>
+#include <ranges>
 #include <sstream>
+#include <utility>
 
 using namespace Scene;
 
-static constexpr int MAX_DUMPS = 8;
+// readbacks per output while covering, during the fade, and after release
+static constexpr std::array<int, 3> DUMP_BUDGET = {8, 1, 2};
 
 struct SFramebufferID {
     uint32_t    id = 0;
@@ -54,29 +63,118 @@ static SFramebufferID committedFramebuffer(PHLMONITOR monitor, SP<Aquamarine::IB
     return {CRTC->buffer_id, "crtc"};
 }
 
+// Hyprland keeps whether its wallpaper failed to load to itself. Without it a missing asset
+// would hold every login for the full timeout.
+struct SRendererState : Render::IHyprRenderer {
+    static bool wallpaperFailed() {
+        return (*g_pHyprRenderer).*(&SRendererState::m_backgroundResourceFailed);
+    }
+};
+
+// Hyprland hands a key here only once its keybinds and VT switch have passed on it, so this
+// keeps it from every client and leaves Super+L, the other binds and Ctrl+Alt+Fn working
+class CScene::CKeyHold : public IKeyboardEventHandler {
+  public:
+    explicit CKeyHold(CScene& scene) : m_scene(scene) {}
+
+    void onKeyboardKey(const IKeyboard::SKeyEvent& event, SP<IKeyboard>) override {
+        if (event.state == WL_KEYBOARD_KEY_STATE_PRESSED)
+            m_scene.drop("key");
+    }
+
+  private:
+    CScene& m_scene;
+};
+
+// a mirror shows another output's frame, and an output that is off shows none
+static bool showsOwnFrame(const PHLMONITOR& monitor) {
+    return monitor->m_enabled && monitor->m_dpmsStatus && !monitor->isMirror();
+}
+
+static long msBetween(Time::steady_tp from, Time::steady_tp to) {
+    return static_cast<long>(std::chrono::duration_cast<Span>(to - from).count());
+}
+
+// a journal line stays short however many layers a client declared
+static std::string joined(const std::vector<std::string>& items) {
+    constexpr size_t SHOWN = 8;
+    if (items.empty())
+        return "none";
+
+    std::string out;
+    for (const auto& item : items | std::views::take(SHOWN))
+        out += (out.empty() ? "" : ", ") + item;
+    if (items.size() > SHOWN)
+        out += std::format(" and {} more", items.size() - SHOWN);
+    return out;
+}
+
 CScene::CScene(const SSettings& settings) : m_settings(settings) {
     logTo(m_settings.dumpDir);
+    m_record.await = m_settings.await;
 
     std::ifstream     file(m_settings.dataDir + "/scene.json");
     std::stringstream text;
     text << file.rdbuf();
     m_spec = parseSpec(text.str());
 
-    m_listeners.preCommit   = Event::bus()->m_events.monitor.preCommit.listen([this](PHLMONITOR monitor) { onPreCommit(monitor); });
-    m_listeners.renderPre   = Event::bus()->m_events.render.pre.listen([this](PHLMONITOR monitor) { onRenderPre(monitor); });
-    m_listeners.renderStage = Event::bus()->m_events.render.stage.listen([this](const Event::SRenderStageEvent& event) { onRenderStage(event); });
+    auto& events                    = Event::bus()->m_events;
+    m_listeners.preCommit           = events.monitor.preCommit.listen([this](PHLMONITOR monitor) { onPreCommit(monitor); });
+    m_listeners.renderPre           = events.render.pre.listen([this](PHLMONITOR monitor) { onRenderPre(monitor); });
+    m_listeners.renderStage         = events.render.stage.listen([this](const Event::SRenderStageEvent& event) { onRenderStage(event); });
+    m_listeners.layerOpened         = events.layer.opened.listen([this](PHLLS layer) { onLayer(layer, true); });
+    m_listeners.layerClosed         = events.layer.closed.listen([this](PHLLS layer) { onLayer(layer, false); });
+    m_listeners.windowOpen          = events.window.openLate.listen([this](PHLWINDOW window) { onWindowOpen(window); });
+    m_listeners.monitorRemoved      = events.monitor.removed.listen([this](PHLMONITOR monitor) { onMonitorRemoved(monitor); });
+    // the lock screen takes input from its first moment, before any frame shows it
+    m_listeners.lock                = g_pSessionLockManager->m_events.lock.listen([this] { fade(eReason::LOCK); });
 
-    note("scene: ready, ref_short_side {}, background #{:02x}{:02x}{:02x}, handoff to layer {}", m_spec.refShortSide, m_spec.background[0], m_spec.background[1],
-         m_spec.background[2], m_settings.handoffNamespace);
+    holdInput(events.input.mouse.button, "button");
+    holdInput(events.input.mouse.axis, "axis");
+    holdInput(events.input.touch.down, "touch");
+    holdInput(events.input.touch.up, "touch");
+    holdInput(events.input.touch.motion, "touch");
+    holdInput(events.input.tablet.axis, "tablet");
+    holdInput(events.input.tablet.button, "tablet");
+    holdInput(events.input.tablet.proximity, "tablet");
+    holdInput(events.input.tablet.tip, "tablet");
+    holdInput(events.gesture.swipe.begin, "gesture");
+    holdInput(events.gesture.swipe.update, "gesture");
+    holdInput(events.gesture.swipe.end, "gesture");
+    holdInput(events.gesture.pinch.begin, "gesture");
+    holdInput(events.gesture.pinch.update, "gesture");
+    holdInput(events.gesture.pinch.end, "gesture");
+
+    // armed by the first output the scene covers, and there from the start so a fade always finishes
+    m_timer = makeShared<CEventLoopTimer>(std::nullopt, [this](SP<CEventLoopTimer>, void*) { onTimer(); }, nullptr);
+    g_pEventLoopManager->addTimer(m_timer);
+
+    note("scene: armed, ref_short_side {}, background #{:02x}{:02x}{:02x}, timeout {}, quiet {}, spread {}, fade {}, await_session {}", m_spec.refShortSide,
+         m_spec.background[0], m_spec.background[1], m_spec.background[2], m_settings.bounds.timeout.count(), m_settings.bounds.quiet.count(),
+         m_settings.bounds.spread.count(), m_settings.fade.count(), m_settings.await ? "yes" : "no");
 }
 
 CScene::~CScene() {
-    for (auto& output : m_outputs) {
-        if (output->covering)
-            release(*output, "unload");
+    if (m_state != eState::RELEASED) {
+        note("scene: released at {:.3f}, unload while {}", monotonic(), m_state == eState::COVERING ? "covering" : "fading");
+        // the last frame drawn still has the scene in it
+        for (const auto& output : m_outputs) {
+            if (const auto MONITOR = output->monitor.lock())
+                g_pHyprRenderer->damageMonitor(MONITOR);
+        }
     }
 
+    releaseKeys();
+    unlockCursors();
     dropTimer();
+}
+
+template <typename TSignal>
+void CScene::holdInput(TSignal& signal, const char* kind) {
+    m_listeners.input.emplace_back(signal.listen([this, kind](const auto&, Event::SCallbackInfo& info) {
+        if (swallow(kind))
+            info.cancelled = true;
+    }));
 }
 
 // The event loop holds the timer too, and its callback is code in this module. Left there,
@@ -89,30 +187,117 @@ void CScene::dropTimer() {
     m_timer.reset();
 }
 
+// keys are held only while the scene covers an output, since a key the hold takes never reaches a client
+void CScene::holdKeys() {
+    if (m_state != eState::COVERING || m_outputs.empty()) {
+        releaseKeys();
+        return;
+    }
+    if (m_keyHold)
+        return;
+
+    m_keyHold = makeShared<CKeyHold>(*this);
+    g_pSeatManager->m_keyboardEventHandlers.push(m_keyHold);
+}
+
+void CScene::releaseKeys() {
+    if (!m_keyHold)
+        return;
+
+    g_pSeatManager->m_keyboardEventHandlers.remove(m_keyHold);
+    m_keyHold.reset();
+}
+
+void CScene::wake(Span after) {
+    if (m_timer)
+        m_timer->updateTimeout(std::max(after, Span{1}));
+}
+
+void CScene::unlockCursors() {
+    for (auto& output : m_outputs) {
+        const auto MONITOR = output->monitor.lock();
+        if (output->cursorLocked && MONITOR)
+            Pointer::mgr()->unlockSoftwareForMonitor(MONITOR);
+        output->cursorLocked = false;
+    }
+}
+
 CScene::SOutput* CScene::outputFor(PHLMONITOR monitor) {
+    for (auto& output : m_outputs) {
+        if (output->monitor.expired())
+            forget(*output);
+    }
     std::erase_if(m_outputs, [](const auto& output) { return output->monitor.expired(); });
+    holdKeys();
 
     for (auto& output : m_outputs) {
         if (output->monitor == monitor)
             return output.get();
     }
 
-    if (m_expired)
+    if (m_state != eState::COVERING)
         return nullptr;
 
-    if (!m_timer) {
-        m_timer = makeShared<CEventLoopTimer>(m_settings.timeout, [this](SP<CEventLoopTimer>, void*) { onTimeout(); }, nullptr);
-        g_pEventLoopManager->addTimer(m_timer);
+    // Hyprland's stand-in while no real output exists is on no screen
+    if (monitor->m_isUnsafeFallback) {
+        if (!std::exchange(m_fallbackNoted, true))
+            note("scene: {} is Hyprland's stand-in for a missing output, leaving it uncovered", monitor->m_name);
+        return nullptr;
     }
+
+    if (!m_record.start) {
+        m_record.start     = Time::steadyNow();
+        m_record.wallpaper = !*CConfigValue<Config::INTEGER>("misc:disable_hyprland_logo");
+        // the bound holds from the moment the scene starts covering, whatever happens to the first frame
+        wake(m_settings.bounds.timeout);
+    } else
+        note("scene: output {} added while covering at {:.3f}", monitor->m_name, monotonic());
 
     auto& output    = m_outputs.emplace_back(makeUnique<SOutput>());
     output->monitor = monitor;
+    output->name    = monitor->m_name;
     output->commit  = monitor->m_output->events.commit.listen([this, raw = output.get()] { logFirstCommit(*raw); });
+    holdKeys();
 
     // a cursor plane sits above anything drawn here
     Pointer::mgr()->lockSoftwareForMonitor(monitor);
+    output->cursorLocked = true;
 
     return output.get();
+}
+
+void CScene::forget(const SOutput& output) {
+    m_record.wallpaperReady.erase(output.name);
+}
+
+void CScene::countOutputs() {
+    const auto                     NOW = Time::steadyNow();
+    std::map<std::string, Instant> counted;
+    for (const auto& output : m_outputs) {
+        const auto MONITOR = output->monitor.lock();
+        if (!MONITOR || !showsOwnFrame(MONITOR))
+            continue;
+        const auto IT = m_record.outputs.find(output->name);
+        counted.emplace(output->name, IT == m_record.outputs.end() ? NOW : IT->second);
+    }
+    m_record.outputs = std::move(counted);
+}
+
+void CScene::onMonitorRemoved(PHLMONITOR monitor) {
+    const auto IT = std::ranges::find_if(m_outputs, [&monitor](const auto& output) { return output->monitor == monitor; });
+    if (IT == m_outputs.end())
+        return;
+
+    if ((*IT)->cursorLocked)
+        Pointer::mgr()->unlockSoftwareForMonitor(monitor);
+    forget(**IT);
+    m_outputs.erase(IT);
+    holdKeys();
+
+    if (m_state == eState::COVERING) {
+        note("scene: output {} removed while covering at {:.3f}", monitor->m_name, monotonic());
+        evaluate();
+    }
 }
 
 CScene::SLogo* CScene::logoFor(int size) {
@@ -124,7 +309,7 @@ CScene::SLogo* CScene::logoFor(int size) {
     if (!sprite->good())
         return nullptr;
 
-    return &m_logos.emplace(size, SLogo{.sprite = std::move(sprite), .texture = nullptr}).first->second;
+    return &m_logos.emplace(size, SLogo{.sprite = std::move(sprite), .texture = nullptr, .opaque = nullptr}).first->second;
 }
 
 // a new monitor renders zoomed in until five frames were presented, which would scale the scene
@@ -133,45 +318,234 @@ void CScene::holdStill(PHLMONITOR monitor) {
     monitor->m_zoomAnimProgress->setValueAndWarp(1.F);
 }
 
-bool CScene::handedOff(PHLMONITOR monitor) {
-    for (const auto& layer : monitor->m_layerSurfaceLayers) {
-        for (const auto& ref : layer) {
-            const auto SURFACE = ref.lock();
-            if (!SURFACE || !SURFACE->mapped() || SURFACE->m_namespace != m_settings.handoffNamespace)
-                continue;
+void CScene::evaluate() {
+    if (m_state != eState::COVERING)
+        return;
 
-            if (SURFACE->alpha().getTotal() >= 1.F && SURFACE->m_geometry.width >= monitor->m_size.x && SURFACE->m_geometry.height >= monitor->m_size.y)
-                return true;
-        }
+    if (g_pSessionLockManager->isSessionLocked()) {
+        fade(eReason::LOCK);
+        return;
     }
 
-    return false;
+    countOutputs();
+    const auto NOW     = Time::steadyNow();
+    const auto VERDICT = decide(m_record, m_settings.bounds, NOW);
+    if (VERDICT.reason != eReason::HOLD)
+        fade(VERDICT.reason);
+    else if (VERDICT.next)
+        wake(std::chrono::ceil<Span>(*VERDICT.next - NOW));
 }
 
-void CScene::release(SOutput& output, const std::string& reason) {
-    output.covering = false;
+void CScene::fade(eReason reason) {
+    if (m_state != eState::COVERING)
+        return;
+
+    const auto NOW = Time::steadyNow();
+    m_state        = eState::FADING;
+    m_reason       = reason;
+    m_fadeStart    = NOW;
+
+    note("scene: fading at {:.3f}, reason {}, {}, missing {}, dropped {} input events", monotonic(), reasonName(reason),
+         m_record.start ? std::format("{}ms after first frame", msBetween(*m_record.start, NOW)) : "before any frame", joined(missing(m_record, m_settings.bounds, NOW)),
+         m_dropped);
+
+    // the desktop is usable from this frame, so the cursor and keys come back with it
+    releaseKeys();
+    unlockCursors();
+    for (const auto& output : m_outputs) {
+        if (const auto MONITOR = output->monitor.lock())
+            g_pHyprRenderer->damageMonitor(MONITOR);
+    }
+
+    wake(m_settings.fade);
+}
+
+void CScene::finish() {
+    m_state = eState::RELEASED;
+    note("scene: released at {:.3f}, fade {}ms", monotonic(), msBetween(m_fadeStart, Time::steadyNow()));
+
+    for (const auto& output : m_outputs) {
+        if (const auto MONITOR = output->monitor.lock())
+            g_pHyprRenderer->damageMonitor(MONITOR);
+    }
+
+    const bool DUMPING = !m_settings.dumpDir.empty();
+    auto       stage   = std::move(m_listeners.renderStage);
+    m_listeners        = {};
+    m_logos.clear();
+
+    // a test reads back the frames after the scene is gone, and then the last listener goes
+    if (DUMPING) {
+        m_listeners.renderStage = std::move(stage);
+        wake(Span{500});
+        return;
+    }
+
+    m_outputs.clear();
+    dropTimer();
+}
+
+void CScene::onTimer() {
+    switch (m_state) {
+        case eState::COVERING: evaluate(); break;
+        case eState::FADING:
+            if (Time::steadyNow() - m_fadeStart >= m_settings.fade)
+                finish();
+            else
+                wake(std::chrono::ceil<Span>(m_settings.fade - (Time::steadyNow() - m_fadeStart)));
+            break;
+        case eState::RELEASED:
+            m_listeners = {};
+            m_outputs.clear();
+            dropTimer();
+            break;
+    }
+}
+
+// pointer events reach Hyprland's mouse binds only after this, so those binds wait for the fade too
+bool CScene::swallow(const char* kind) {
+    if (m_state != eState::COVERING || m_outputs.empty())
+        return false;
+
+    if (g_pSessionLockManager->isSessionLocked()) {
+        fade(eReason::LOCK);
+        return false;
+    }
+
+    drop(kind);
+    return true;
+}
+
+void CScene::drop(const char* kind) {
+    if (m_dropped++ == 0)
+        note("scene: holding input, first dropped {} at {:.3f}", kind, monotonic());
+}
+
+void CScene::onLayer(PHLLS layer, bool opened) {
+    if (m_state == eState::RELEASED || !layer)
+        return;
+
+    // released at rest, so nothing is still fading in when the scene lifts
+    if (opened) {
+        layer->finishAnimation();
+        layer->alpha().warp();
+    }
+
+    const auto MONITOR = layer->m_monitor.lock();
+    if (m_state != eState::COVERING || !MONITOR)
+        return;
+
+    if (!opened)
+        unmapLayer(m_record, layer->m_namespace, MONITOR->m_name);
+    else if (!layer->m_geometry.empty() && mapLayer(m_record, layer->m_namespace, MONITOR->m_name, Time::steadyNow())) {
+        const auto& MAPPED = m_record.expect.at(layer->m_namespace);
+        const auto  SHOWN  = std::ranges::count_if(m_record.outputs | std::views::keys, [&MAPPED](const auto& name) { return MAPPED.contains(name); });
+        note("scene: layer {} mapped on {} at {:.3f}, {} of {} outputs", layer->m_namespace, MONITOR->m_name, monotonic(), SHOWN, m_record.outputs.size());
+    }
+
+    evaluate();
+}
+
+void CScene::onWindowOpen(PHLWINDOW window) {
+    if (m_state == eState::RELEASED || !window)
+        return;
+
+    window->finishAnimation();
+    window->alpha().warp();
+}
+
+// a layer that mapped before its component declared it still counts
+void CScene::seed(const std::string& name) {
+    const auto NOW = Time::steadyNow();
+    for (const auto& monitor : State::monitorState()->allMonitors()) {
+        for (const auto& layers : monitor->m_layerSurfaceLayers) {
+            for (const auto& ref : layers) {
+                const auto SURFACE = ref.lock();
+                if (SURFACE && SURFACE->mapped() && SURFACE->m_namespace == name && !SURFACE->m_geometry.empty())
+                    mapLayer(m_record, name, monitor->m_name, NOW);
+            }
+        }
+    }
+}
+
+void CScene::checkWallpaper(SOutput& output) {
+    if (!m_record.wallpaper || m_record.wallpaperReady.contains(output.name))
+        return;
 
     const auto MONITOR = output.monitor.lock();
     if (!MONITOR)
         return;
 
-    Pointer::mgr()->unlockSoftwareForMonitor(MONITOR);
-    g_pHyprRenderer->damageMonitor(MONITOR);
-    note("scene: released {} on {} after {} frames at {:.3f}", MONITOR->m_name, reason, output.passes, monotonic());
+    const bool SHOWN = MONITOR->m_background != nullptr;
+    if (!SHOWN && !SRendererState::wallpaperFailed())
+        return;
+
+    if (SHOWN)
+        MONITOR->m_backgroundOpacity->warp();
+    showWallpaper(m_record, output.name, Time::steadyNow());
+    note("scene: background {} on {} at {:.3f}", SHOWN ? "ready" : "failed", output.name, monotonic());
+    evaluate();
 }
 
-void CScene::onTimeout() {
-    m_expired = true;
+std::string CScene::command(std::string_view request) {
+    const auto PARSED = parseCommand(request);
+    if (!PARSED)
+        return "error: " + PARSED.error();
 
-    for (auto& output : m_outputs) {
-        if (output->covering)
-            release(*output, "timeout");
+    if (PARSED->verb == eVerb::SHOW) {
+        if (m_state == eState::COVERING)
+            countOutputs();
+        return describe();
     }
 
-    m_listeners = {};
-    m_outputs.clear();
-    m_logos.clear();
-    dropTimer();
+    if (m_state != eState::COVERING)
+        return "ok, the scene is already released";
+
+    const auto NOW = Time::steadyNow();
+    switch (PARSED->verb) {
+        case eVerb::EXPECT:
+            if (!expectLayer(m_record, PARSED->name, NOW))
+                return std::format("error: the scene already expects {} layers", MAX_EXPECTED);
+            note("scene: expect layer {} at {:.3f}", PARSED->name, monotonic());
+            seed(PARSED->name);
+            break;
+        case eVerb::DROP:
+            dropLayer(m_record, PARSED->name);
+            note("scene: drop layer {} at {:.3f}", PARSED->name, monotonic());
+            break;
+        case eVerb::READY:
+            sessionReady(m_record, NOW);
+            note("scene: session ready at {:.3f}", monotonic());
+            break;
+        case eVerb::RELEASE:
+            note("scene: release asked by {} at {:.3f}", PARSED->name, monotonic());
+            fade(eReason::MANUAL);
+            return "ok";
+        case eVerb::SHOW: break;
+    }
+
+    evaluate();
+    return "ok";
+}
+
+std::string CScene::describe() const {
+    const auto  NOW   = Time::steadyNow();
+    const auto  STATE = m_state == eState::COVERING ? "covering" : m_state == eState::FADING ? "fading" : "released";
+    const auto  LIST  = [](const auto& names) {
+        std::string out;
+        for (const auto& name : names)
+            out += (out.empty() ? "" : ",") + jsonString(name);
+        return "[" + out + "]";
+    };
+
+    std::string expect;
+    for (const auto& [name, mapped] : m_record.expect)
+        expect += std::format("{}{}:{}", expect.empty() ? "" : ",", jsonString(name), LIST(mapped | std::views::keys));
+
+    return std::format(R"({{"state":"{}","reason":"{}","await":{},"session":{},"held_ms":{},"outputs":{},"expect":{{{}}},"wallpaper":{{"drawn":{},"ready":{}}},)"
+                       R"("missing":{},"dropped":{}}})",
+                       STATE, reasonName(m_reason), m_record.await, m_record.session, m_record.start ? msBetween(*m_record.start, NOW) : 0, LIST(m_record.outputs | std::views::keys), expect,
+                       m_record.wallpaper, LIST(m_record.wallpaperReady), LIST(missing(m_record, m_settings.bounds, NOW)), m_dropped);
 }
 
 void CScene::onPreCommit(PHLMONITOR monitor) {
@@ -181,7 +555,7 @@ void CScene::onPreCommit(PHLMONITOR monitor) {
         return;
 
     const auto OUTPUT = outputFor(monitor);
-    if (!OUTPUT || !OUTPUT->covering)
+    if (!OUTPUT || m_state != eState::COVERING)
         return;
 
     holdStill(monitor);
@@ -226,7 +600,8 @@ void CScene::drawFirstFrame(SOutput& output, SP<Aquamarine::IBuffer> buffer) {
     const auto  BOX  = logoBox(SIZE, m_spec.refShortSide);
     const auto  LOGO = logoFor(BOX.w);
     if (!LOGO) {
-        release(output, std::format("a logo.png that cannot be drawn at {}px", BOX.w));
+        note("scene: a logo.png that cannot be drawn at {}px", BOX.w);
+        fade(eReason::BROKEN);
         return;
     }
 
@@ -255,27 +630,61 @@ void CScene::logFirstCommit(SOutput& output) {
 
 void CScene::onRenderPre(PHLMONITOR monitor) {
     const auto OUTPUT = outputFor(monitor);
-    if (!OUTPUT || !OUTPUT->covering)
+    if (!OUTPUT)
         return;
 
-    if (handedOff(monitor)) {
-        release(*OUTPUT, "handoff");
-        return;
+    if (m_state == eState::COVERING) {
+        evaluate();
+        holdStill(monitor);
     }
 
-    holdStill(monitor);
+    // every frame of the fade redraws the whole output, and asks for the next
+    if (m_state == eState::FADING)
+        g_pHyprRenderer->damageMonitor(monitor);
 }
 
 void CScene::onRenderStage(const Event::SRenderStageEvent& event) {
     const auto OUTPUT = outputFor(event.monitor);
-    if (!OUTPUT || !OUTPUT->covering)
+    if (!OUTPUT)
         return;
 
-    if (event.stage == RENDER_LAST_MOMENT && event.context)
+    if (event.stage == RENDER_LAST_MOMENT && event.context && m_state != eState::RELEASED)
         drawInPass(*OUTPUT, event.context->get());
 
-    if (event.stage == RENDER_POST && event.monitor->m_output->state->state().buffer)
-        dump(*OUTPUT, event.monitor->m_output->state->state().buffer, "pass");
+    if (event.stage != RENDER_POST)
+        return;
+
+    if (m_state == eState::COVERING)
+        checkWallpaper(*OUTPUT);
+
+    const auto BUFFER = event.monitor->m_output->state->state().buffer;
+    if (!BUFFER)
+        return;
+
+    dump(*OUTPUT, BUFFER, m_state == eState::COVERING ? "pass" : m_state == eState::FADING ? "fade" : "after");
+}
+
+float CScene::alpha() const {
+    if (m_state == eState::COVERING)
+        return 1.F;
+    if (m_state == eState::RELEASED || m_settings.fade.count() <= 0)
+        return 0.F;
+
+    const std::chrono::duration<float> ELAPSED = Time::steadyNow() - m_fadeStart;
+    const std::chrono::duration<float> FADE    = m_settings.fade;
+    return std::clamp(1.F - ELAPSED / FADE, 0.F, 1.F);
+}
+
+static cairo_surface_t* overGround(const CSprite& sprite, const std::array<uint8_t, 3>& ground) {
+    const auto SURFACE = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, sprite.size(), sprite.size());
+    const auto CR      = cairo_create(SURFACE);
+    cairo_set_source_rgb(CR, ground.at(0) / 255.0, ground.at(1) / 255.0, ground.at(2) / 255.0);
+    cairo_paint(CR);
+    cairo_set_source_surface(CR, sprite.surface(), 0, 0);
+    cairo_paint(CR);
+    cairo_destroy(CR);
+    cairo_surface_flush(SURFACE);
+    return SURFACE;
 }
 
 void CScene::drawInPass(SOutput& output, Render::CRenderContext& ctx) {
@@ -283,26 +692,51 @@ void CScene::drawInPass(SOutput& output, Render::CRenderContext& ctx) {
     const SSize SIZE    = {sc<int>(MONITOR->m_transformedSize.x), sc<int>(MONITOR->m_transformedSize.y)};
     const auto  BOX     = logoBox(SIZE, m_spec.refShortSide);
     const auto  LOGO    = logoFor(BOX.w);
+    const float ALPHA   = alpha();
     if (!LOGO) {
-        release(output, std::format("a logo.png that cannot be drawn at {}px", BOX.w));
+        note("scene: a logo.png that cannot be drawn at {}px", BOX.w);
+        fade(eReason::BROKEN);
         return;
     }
-
-    if (!LOGO->texture)
-        LOGO->texture = g_pHyprRenderer->createTexture(LOGO->sprite->surface());
+    if (ALPHA <= 0.F)
+        return;
 
     // Hyprland turns blending on at the end of each frame and its texture draws rely on that,
     // so in the first frame it ever renders the logo would lose its alpha
     g_pHyprRenderer->blend(true);
 
-    CRectPassElement::SRectData ground;
-    ground.box   = CBox(0, 0, SIZE.w, SIZE.h);
-    ground.color = CHyprColor(m_spec.background[0] / 255.F, m_spec.background[1] / 255.F, m_spec.background[2] / 255.F, 1.F);
-    Render::IHyprRenderer::addPassElement(ctx, makeUnique<CRectPassElement>(ground));
+    const auto GROUND = CHyprColor(m_spec.background[0] / 255.F, m_spec.background[1] / 255.F, m_spec.background[2] / 255.F, ALPHA);
+    const auto RECT   = [&ctx, &GROUND](double x, double y, double w, double h) {
+        if (w <= 0 || h <= 0)
+            return;
+        CRectPassElement::SRectData ground;
+        ground.box   = CBox(x, y, w, h);
+        ground.color = GROUND;
+        Render::IHyprRenderer::addPassElement(ctx, makeUnique<CRectPassElement>(ground));
+    };
 
     CTexPassElement::SRenderData logo;
-    logo.tex = LOGO->texture;
     logo.box = CBox(BOX.x, BOX.y, BOX.w, BOX.h);
+
+    if (ALPHA >= 1.F) {
+        if (!LOGO->texture)
+            LOGO->texture = g_pHyprRenderer->createTexture(LOGO->sprite->surface());
+        RECT(0, 0, SIZE.w, SIZE.h);
+        logo.tex = LOGO->texture;
+    } else {
+        // the ground around the logo and the logo over its own ground, so every pixel blends once
+        if (!LOGO->opaque) {
+            const auto SURFACE = overGround(*LOGO->sprite, m_spec.background);
+            LOGO->opaque       = g_pHyprRenderer->createTexture(SURFACE);
+            cairo_surface_destroy(SURFACE);
+        }
+        RECT(0, 0, SIZE.w, BOX.y);
+        RECT(0, BOX.y + BOX.h, SIZE.w, SIZE.h - BOX.y - BOX.h);
+        RECT(0, BOX.y, BOX.x, BOX.h);
+        RECT(BOX.x + BOX.w, BOX.y, SIZE.w - BOX.x - BOX.w, BOX.h);
+        logo.tex = LOGO->opaque;
+        logo.a   = ALPHA;
+    }
     Render::IHyprRenderer::addPassElement(ctx, makeUnique<CTexPassElement>(std::move(logo)));
 
     output.drawn = ctx.m_currentBuffer;
@@ -310,7 +744,8 @@ void CScene::drawInPass(SOutput& output, Render::CRenderContext& ctx) {
 }
 
 void CScene::dump(SOutput& output, SP<Aquamarine::IBuffer> buffer, const std::string& kind) {
-    if (m_settings.dumpDir.empty() || output.dumps >= MAX_DUMPS)
+    const size_t PHASE = static_cast<size_t>(m_state);
+    if (m_settings.dumpDir.empty() || output.dumped.at(PHASE) >= DUMP_BUDGET.at(PHASE))
         return;
 
     const auto MONITOR = output.monitor.lock();
@@ -326,8 +761,18 @@ void CScene::dump(SOutput& output, SP<Aquamarine::IBuffer> buffer, const std::st
     glReadPixels(0, 0, W, H, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
     RBO->unbind();
 
-    std::ofstream file(std::format("{}/{}-{}-{}.ppm", m_settings.dumpDir, MONITOR->m_name, output.dumps++, kind), std::ios::binary);
+    const auto NAME = std::format("{}-{}-{}.ppm", MONITOR->m_name, output.dumps++, kind);
+    output.dumped.at(PHASE)++;
+
+    std::ofstream file(std::format("{}/{}", m_settings.dumpDir, NAME), std::ios::binary);
     file << "P6\n" << W << " " << H << "\n255\n";
     for (size_t i = 0; i < rgba.size(); i += 4)
         file.write(rc<const char*>(&rgba[i]), 3);
+
+    if (m_state != eState::COVERING)
+        note("scene: dumped {} at {:.3f}", NAME, monotonic());
+
+    // a second frame after release shows whether anything was still moving
+    if (m_state == eState::RELEASED)
+        g_pHyprRenderer->damageMonitor(MONITOR);
 }
