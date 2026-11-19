@@ -156,9 +156,25 @@ Every lock goes through `lock-cmd.sh`, and only the idle lock needs hypridle:
 
 `hypr-de-lock.service` is pulled in by every graphical session through a
 `graphical-session.target` drop-in, not a preset, so an upgraded install runs
-it from its next login; `systemctl --user mask hypr-de-lock.service` turns it off. Two requests
-at once are safe: `lock-cmd.sh` exits early when the compositor already holds
-the lock, and vigil-lock joins a lock that is already starting.
+it from its next login; `systemctl --user mask hypr-de-lock.service` turns it off.
+Outside Hyprland it logs that and exits. It binds to the session Hyprland runs
+in (logind's session for Hyprland's pid, else Hyprland's own `XDG_SESSION_ID`),
+and accepts only an active wayland session on Hyprland's seat. Until one
+resolves it logs why and retries every 2 s, and systemd never stops restarting
+it. A `lock-cmd.sh` that has not returned after 90 s is killed, a critical
+notification says so, and the next request runs it again.
+
+A session counts as locked only when the compositor holds the lock **and** a
+locker of yours is alive on this display. Two requests at once are safe:
+vigil-lock joins a lock that is already starting, and only one `lock-cmd.sh`
+at a time may fall back (a lock file in `$XDG_RUNTIME_DIR`), so a second run
+finds the first one's locker and stops there instead of reaching the failsafe.
+vigil-lock's wait is bounded at 10 s (plus the idle warning).
+
+Sleep waits for the lock only as long as logind's `InhibitDelayMaxSec`
+(default 5 s, see `logind.conf(5)`); after that the machine suspends anyway
+and the lock lands on resume. hypr-DE does not change that system-wide
+setting.
 
 The locker's output goes to the journal (`journalctl --user -t vigil-lock`),
 and so do `lock-cmd.sh`'s own lines (`-t hypr-de-lock`), even from a binding
@@ -172,6 +188,12 @@ user believes is locked. (Since 0.2.25 nothing blanks an unlocked session, so
 an exposed desktop at least stays visibly exposed — but it is still exposed,
 which is what the failsafe exists to prevent.)
 
+The same failsafe covers a crashed lock screen. When the locker dies, Hyprland
+keeps the session locked on its lock-dead screen and refuses a new locker
+(`misc:allow_session_lock_restore` is off). The next lock request finds no live
+locker, tries to lock again, and when that is refused terminates the session,
+so the user can log in again instead of staring at a screen nothing unlocks.
+
 To keep the session instead, create `/etc/hypr-de/lock.conf`:
 
 ```ini
@@ -181,7 +203,11 @@ failsafe = warn
 (`fallbacks` and `verify_tries` are settable there too.) A failed lock then
 posts a critical "Screen NOT locked" notification, and the screen stays
 lit: an obviously unlocked desktop, never a dark one that
-passes for locked.
+passes for locked. On a crashed lock screen it posts "Lock screen crashed"
+instead, telling the user to switch to a TTY (Ctrl+Alt+F2) to recover; the
+lock-dead screen may hide that notification. A fallback locker must
+daemonize once it holds the lock (`swaylock -f`, `gtklock -d`) or end in `&`;
+`lock-cmd.sh` never kills a locker.
 
 The file must be **owned by root and not writable by anyone else**, or it is
 ignored with a warning. That is deliberate: an environment variable or a

@@ -59,8 +59,12 @@ answers logind's Lock request
 .RB ( "loginctl lock-session" ,
 lid close through hyprstate) and holds a sleep delay that waits for the lock
 before any suspend. hypridle's lock_cmd, before_sleep_cmd and idle timeout run
-the same script. A request while the session is already locked starts no
-second locker. Every path shows one lock screen (vigil-lock), whose output
+the same script. The session counts as locked only while the compositor
+holds the lock and a locker is alive; a request then starts no second locker.
+If the lock screen crashed, a request tries to lock again and otherwise ends
+the session (the failsafe in
+.IR /etc/hypr-de/lock.conf ).
+Every path shows one lock screen (vigil-lock), whose output
 reaches the journal as
 .BR vigil-lock ;
 lock-cmd.sh's own lines are

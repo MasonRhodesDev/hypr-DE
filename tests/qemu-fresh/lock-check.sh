@@ -56,7 +56,7 @@ rm -f "$HOME/.local/bin/hypridle"
 systemctl --user restart hypridle.service 2>/dev/null
 sleep 2
 
-echo "== lock the session the way a user does (loginctl -> hypridle lock_cmd)"
+echo "== lock the session the way any tool does (loginctl lock-session -> hypr-de-lock.service, and hypridle if it runs)"
 gsid=""
 for s in $(loginctl list-sessions --no-legend | awk '{print $1}'); do
     [ -n "$(loginctl show-session "$s" -p Seat --value 2>/dev/null)" ] || continue
@@ -80,20 +80,22 @@ echo "== which cgroup did the locker land in?"
 lpid=$(pgrep -u "$USER" -x vigil-lock | head -1)
 cg=$(cat "/proc/$lpid/cgroup" 2>/dev/null | head -1)
 echo "   $cg"
-if printf '%s' "$cg" | grep -q 'hypridle.service'; then
-    bad "locker is inside hypridle.service's cgroup (a hypridle restart will kill it)"
+if printf '%s' "$cg" | grep -qE 'hypridle\.service|hypr-de-lock\.service'; then
+    bad "locker is inside a lock requester's cgroup (restarting it would kill the locker)"
 else
-    ok "locker is outside hypridle.service's cgroup"
+    ok "locker is outside hypridle.service's and hypr-de-lock.service's cgroups"
 fi
 
-echo "== restart hypridle while the session is locked"
-systemctl --user restart hypridle.service 2>/dev/null
-sleep 3
-if locker_up; then
-    ok "locker survived the hypridle restart (session stays locked)"
-else
-    bad "locker was killed by the hypridle restart -- session stranded on the compositor's lock-died screen"
-fi
+for unit in hypridle.service hypr-de-lock.service; do
+    echo "== restart $unit while the session is locked"
+    systemctl --user restart "$unit" 2>/dev/null
+    sleep 3
+    if locker_up; then
+        ok "locker survived the $unit restart (session stays locked)"
+    else
+        bad "locker was killed by the $unit restart -- session stranded on the compositor's lock-died screen"
+    fi
+done
 
 echo "== cleanup: release the lock"
 pkill -u "$USER" -x vigil-lock 2>/dev/null
