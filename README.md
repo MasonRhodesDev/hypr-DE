@@ -388,8 +388,8 @@ or the ones named on its command line:
 
 | Gate | What it refuses |
 |------|-----------------|
-| `classify` | A file the other gates cannot place that `tests/gates/classified.tsv` does not list: a file with no suffix or a suffix outside the gate's known list, a `CMakeLists.txt` other than a plugin's own, a C or C++ file outside a plugin directory. A committed object file, archive or ELF binary. A listed class that a shebang or the executable bit contradicts. Never baselined. |
-| `shell` | Anything `shellcheck` reports with every optional check on, in every shell script, `PKGBUILD`, `.install` file and RPM scriptlet (`%post` and the rest), and a `shellcheck disable` directive. A script is found by its suffix (`.sh`, `.bash`), by a shebang that names a shell, or by its class in `classified.tsv`. A shebang or scriptlet interpreter that `shellcheck` cannot read, such as `zsh`, fails and is never baselined. |
+| `classify` | A file the other gates cannot place that `tests/gates/classified.tsv` does not list: a file with no suffix or a suffix outside the gate's known list, a `CMakeLists.txt` other than a plugin's own, a C or C++ file outside a plugin directory. A `PKGBUILD` not classified `pkgbuild` and a spec not classified `spec`. A committed object file, archive or ELF binary. Opaque data (over 7 bits of entropy per byte in 1 KiB or more, or a long run of base64, hex or escaped bytes) not classified `blob` with a reason. A listed class that a shebang or the executable bit contradicts. A spec that builds C++ with anything but `%autosetup`, `%cmake`, `%cmake_build` and `%cmake_install`, whose `%cmake` options differ from its `PKGBUILD`'s `cmake` options, or that redefines a flags macro. Never baselined. |
+| `shell` | Anything `shellcheck` reports with every optional check on, in every shell script, `PKGBUILD`, `.install` file and RPM scriptlet (`%post` and the rest), and a `shellcheck disable` directive. An RPM scriptlet that writes into a program or library directory. A script is found by its suffix (`.sh`, `.bash`), by a shebang that names a shell, or by its class in `classified.tsv`. A shebang or scriptlet interpreter that `shellcheck` cannot read, such as `zsh`, fails and is never baselined. |
 | `python` | `ruff` with the bandit, bugbear and pylint rules in `ruff.toml`, and a `noqa` or `ruff:` comment. |
 | `lua` | `luacheck` findings (`.luacheckrc`) and inline `luacheck:` comments. |
 | `cpp-harden` | What the packages ship, described below. |
@@ -419,8 +419,23 @@ user. The tarball stands in for the `PKGBUILD`'s remote source, unpacked as
 `tests/gates/shim.py` stands in for the GCC drivers on `PATH` during the
 build. For each compile it keeps GCC's own job list (`-###`) and the
 preprocessor's view of the source with the compile's own arguments
-(`-E -dD -C`). For each link it keeps every file the linker read. Then, for
-every ELF file in the package:
+(`-E -dD -C`). For each link it keeps every file the linker read. When the
+call ends it sends that record to the gate over a unix socket, so the build
+can add a record but never change or delete one. A call that compiles and
+links nothing, such as `c++ --version`, sends none; a call with several
+sources sends one without a preprocessed view, so what it makes is
+unattributed if it ships.
+
+The build user owns only the build's source, build, output and home
+directories. The shim, its wrappers and the socket's directory stay the
+gate's. The whole build runs under `strace -f`, which lists every program it
+starts. A compiler, assembler or linker that no shim process started fails as
+`unshimmed`, unless it was a probe that names no input and no output, as CMake
+asks `ld -v`. A record from a process that never ran the shim fails as
+`forged-record`, and one the gate cannot read as `malformed-record`. The
+sanitizer build in `cpp-sanitize` runs the same way, as the build user.
+
+Then, for every ELF file in the package:
 
 * It is position independent, has full RELRO and immediate binding, a stack
   that is not executable, the CET note on x86-64, no `RPATH` or `RUNPATH` and
@@ -431,8 +446,18 @@ every ELF file in the package:
   nothing.
 * Its build ID matches a link the shim saw, its executable sections are the
   ones that link wrote, and every object that link read comes from a compile
-  the shim saw, or from a file the build user cannot write. Anything else is `unattributed`, which is never baselined. So is an
-  object built with LTO, since the gate cannot see what LTO makes of it.
+  the shim saw, or from a file the build user cannot write. Anything else is
+  `unattributed`, which is never baselined. So is an object built with LTO,
+  since the gate cannot see what LTO makes of it. When two records match one
+  object or one build ID, both are judged.
+* Every library it needs (`DT_NEEDED`) is one the package ships, or one that
+  a package in its declared `depends`, or their dependencies, installs. A
+  library named by a path fails.
+
+Each package archive `makepkg` wrote has no setuid, setgid, world-writable or
+non-root file, read from the archive as it installs. Its install scriptlet
+(`install=`) names a program or library directory, or a directory the package
+ships an ELF file in, only as the command it runs, never as a place it writes.
 
 For every compile behind a shipped file, and every compile of a tracked
 source:
@@ -451,9 +476,16 @@ source:
   `-isystem` or `#pragma GCC system_header`, since GCC hides its warnings.
 * In the tree's own lines of the preprocessed source, with comments and
   strings lexed out and macros expanded: an `optimize`, `target`,
-  `no_stack_protector` or `no_sanitize` attribute, a `#pragma GCC optimize`,
-  `push_options` or `target`, a diagnostic pragma that ignores a warning, and
-  a `NOLINT` comment.
+  `no_stack_protector`, `no_sanitize` or `nocf_check` attribute, a
+  `#pragma GCC optimize`, `push_options` or `target`, a diagnostic pragma that
+  ignores a warning, and a `NOLINT` comment.
+* In the whole unit, headers outside the tree included: a `#pragma GCC
+  optimize` or `target`, or a `push_options`, still in force when the unit
+  ends.
+* No `-mmanual-endbr`, which keeps `__CET__` and the CET note and drops
+  `endbr64` from every function not marked `cf_check`.
+* No object defines `__stack_chk_fail`, `__chk_fail` or `__fortify_fail`,
+  which would turn a failed check into a call that returns.
 
 Compiler warnings are read from what each compile wrote, as the shim saw it,
 so a `build()` that discards its output keeps every count. A call that only
@@ -467,15 +499,24 @@ shim and runs its tests.
 
 Every reviewed attack on these gates is a case in `tests/gates/attacks.py`,
 which makes each change on a fresh clone of `HEAD`, runs the gates and checks
-for the exact FAIL line. Run it where the C++ gates run:
+for the exact FAIL line. A gate that cannot see all the code, because a build
+failed, a tool ran outside the shim or an ELF is unattributed, prints that and
+stays silent about the counts it can no longer check. Run it where the C++ gates run:
 `python3 -I tests/gates/attacks.py [case ...]`. The self-test covers the same
 mechanisms on the fixture in every CI run.
 
 #### What still passes
 
-* The shim's records live where the build user can write. A build that forges
-  them, rather than weakening a flag, is not caught; a reviewer sees a build
-  step that writes into the gate's directory.
+* The build user can still write into its own processes' memory through
+  `/proc`, so a build step can change what a running shim sends. That is a
+  deliberate attack in the build's own code, which review sees.
+* A compiler copied under a name the trace does not know, such as `mycc`,
+  runs unseen by the trace. What it makes is still unattributed if it ships.
+* A probe as the trace defines it, a tool called with options only, is not
+  judged. `as` with no arguments reads standard input and writes `a.out`;
+  that file is unattributed if it ships.
+* The install scriptlet check reads paths as written. A scriptlet that builds
+  a path at run time, such as `"/usr/l""ib"`, is not caught.
 * A compile that ships nothing and whose source is not tracked, such as a
   CMake probe, is not judged.
 * Inline assembly, `.incbin` and linker script data are judged only as part of
@@ -490,17 +531,23 @@ mechanisms on the fixture in every CI run.
 * Arch's stock `makepkg` flags harden on their own; the gate empties them, so
   it is stricter than an Arch build, and it does not exercise stock LTO or
   debug splitting.
-* The RPM spec is not built, so its `%build` is not audited. Its scriptlets are
-  linted. Building it needs a Fedora container, which CI does not have yet.
+* The RPM spec is not built, so the plugin as Fedora compiles it is not
+  audited. Building it needs a Fedora container and its toolchain, which
+  costs more than this job does today. What the gates prove instead is that
+  the spec's `%build` configures the same CMake project with the same options
+  as the `PKGBUILD` the gates do build, apart from the build directory, build
+  type and prefix, and does nothing else. Fedora's own compiler flags come
+  first on the command line, and `Safety.cmake`'s flags after them win, as the
+  `a4` and `a5` cases show for Arch. That is not proof of a hardened RPM. Its
+  scriptlets are linted.
 * A file with a known data suffix that a script sources is linted only once
   `classified.tsv` lists it as `sh` or `bash`, as `packaging/paths.conf` is.
-* The gates are code in this repository, reviewed like any other. A pull
-  request that changes `gate.py` or `shim.py` is also judged by its base
-  branch's gates, so loosening a rule and leaning on it in the same change
-  shows up as a failing step. GitHub runs the pull request's own copy of the
-  workflow, so a change can also remove that step; the reviewer sees the
-  workflow edit. A change that renames a rule fails that step on purpose, and
-  the reviewer judges it.
+* The gates are code in this repository, reviewed like any other.
+  `.github/CODEOWNERS` names the owner for the gates, the workflows, the
+  hardening flags and the linter configurations; that binds only when branch
+  protection on `main` requires a code owner's review. GitHub runs the pull
+  request's own copy of the workflow, so a change can remove a step; the
+  owner's review sees the workflow edit.
 
 CI builds C++ with the packages of one Arch Linux Archive day, `ARCH_SNAPSHOT`
 in `.github/workflows/safety-gates.yml`, so a GCC, Clang or Hyprland release
@@ -510,23 +557,34 @@ changes no count until that line moves. To move it, pick a later day under
 how), and commit the new day with whatever `--update --allow-growth` writes.
 The pull request names what each new baseline line is, like any baseline
 growth. A local run uses whatever compiler is installed, so its counts can
-differ from CI's. Without `makepkg` a local run prints `skipped` for the C++
-gates. CI may not skip.
+differ from CI's. A local run judges only the files git tracks. Without a tool
+the C++ gates need, a run fails with `toolchain cannot-run`, locally as in CI.
 
 What already broke a rule when its gate arrived is counted in
-`tests/gates/baseline.tsv`, one line per gate, file and rule. A count may only
-fall. Finding more than the count fails, and so does finding fewer until the
-line is lowered with `tests/gates/check.sh <gate> --update`.
+`tests/gates/baseline.tsv`, one line per gate, file, rule and the text the
+finding names: the source lines for a linter or compiler finding, the rule
+for a whole compile or ELF file. The line carries the text and its hash, so
+fixing one finding and adding another of the same rule in the same file
+fails. A count may only fall. Finding more than the count fails, and so does
+finding fewer until the line is lowered with
+`tests/gates/check.sh <gate> --update`.
 
 A new or higher line in the baseline is an ordinary edit
-(`--update --allow-growth` writes it). The pull request says why it is needed,
-and the usual independent review judges that, as it judges a change to a linter
-configuration, to `plugins/cmake/Safety.cmake` or to the gates themselves.
+(`--update --allow-growth` writes it). On a pull request,
+`tests/gates/ratchet.py` compares the base commit's baseline, file classes and
+linter configurations with the pull request's. A new or higher baseline line,
+a new file in a class no gate reads, a changed class, or any change to a
+linter configuration, `plugins/cmake/Safety.cmake` or the pinned tools fails,
+unless a commit or the pull request body has a line that starts with
+`Gate-change:` and says why. The step prints each such change beside the
+reasons, for review. GitHub does not rerun a workflow when only the body
+changes, so a reason added to the body later needs a rerun of the
+`Shell, Python and Lua` job.
 
 The gates need `shellcheck`, `ruff` and `clang-tidy` at the versions pinned in
 `tests/gates/requirements.txt`, `luacheck` 1.2.0, and for C++ `makepkg`,
-`fakeroot`, `cmake`, GCC and `readelf`, with each `PKGBUILD`'s build
-dependencies installed.
+`fakeroot`, `cmake`, GCC, `readelf`, `strace` and `setpriv`, with each
+`PKGBUILD`'s build dependencies installed.
 
 ## License
 
