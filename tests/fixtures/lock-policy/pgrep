@@ -3,4 +3,8 @@ case "${2:-}" in
     gameoverlayui) [ "${LOCK_POLICY_GAME:-}" = steam ] && exit 0 ;;
     gamescope)     [ "${LOCK_POLICY_GAME:-}" = gamescope ] && exit 0 ;;
 esac
+[ "${1:-}" = -u ] || exit 1
+for real in /usr/bin/pgrep /bin/pgrep; do
+    [ -x "$real" ] && exec "$real" "$@"
+done
 exit 1

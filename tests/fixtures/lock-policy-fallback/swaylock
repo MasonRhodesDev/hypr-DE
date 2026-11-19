@@ -1,4 +1,26 @@
 #!/bin/sh
+if [ "${1:-}" = --hold ]; then
+    while :; do sleep 1; done
+fi
+if [ -n "${LOCK_POLICY_SWAYLOCK_BARRIER:-}" ]; then
+    echo x >> "$LOCK_POLICY_SWAYLOCK_BARRIER"
+    i=0
+    while [ "$(wc -l < "$LOCK_POLICY_SWAYLOCK_BARRIER")" -lt 2 ] && [ "$i" -lt 15 ]; do
+        sleep 0.1; i=$((i + 1))
+    done
+fi
+if [ -n "${LOCK_POLICY_LOCK_FILE:-}" ]; then
+    if [ -e "$LOCK_POLICY_LOCK_FILE" ] || ! mkdir "$LOCK_POLICY_LOCK_FILE.claim" 2>/dev/null; then
+        printf 'swaylock:refused\n' >> "$LOCK_POLICY_LOG"
+        exit 1
+    fi
+    sleep "${LOCK_POLICY_SWAYLOCK_LAG:-0}"
+    mkdir "$LOCK_POLICY_LOCK_FILE"
+    printf 'swaylock:locked\n' >> "$LOCK_POLICY_LOG"
+    "$0" --hold </dev/null >/dev/null 2>&1 &
+    echo $! >> "$LOCK_POLICY_HOLDERS"
+    exit 0
+fi
 printf 'swaylock:%s\n' "$*" >> "$LOCK_POLICY_LOG"
 [ -n "${LOCK_POLICY_SWAYLOCK_HOLD:-}" ] && exec sleep "$LOCK_POLICY_SWAYLOCK_HOLD"
 exit "${LOCK_POLICY_SWAYLOCK_STATUS:-0}"
