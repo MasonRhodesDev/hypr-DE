@@ -369,12 +369,13 @@ or the ones named on its command line:
 
 | Gate | What it refuses |
 |------|-----------------|
-| `shell` | Anything `shellcheck` reports with every optional check on, in every shell script in the tree, and a `shellcheck disable` directive. A script is found by its suffix (`.sh`, `.bash`), by a shebang that names a shell, or by its content when it has neither. |
+| `classify` | A file the other gates cannot place on their own and that `tests/gates/classified.tsv` does not list: every file without a suffix, every `CMakeLists.txt` other than a plugin's own, and every C or C++ file outside a plugin directory. A listed class that a shebang or the executable bit contradicts fails too. |
+| `shell` | Anything `shellcheck` reports with every optional check on, in every shell script in the tree, and a `shellcheck disable` directive. A script is found by its suffix (`.sh`, `.bash`), by a shebang that names a shell, or by its class in `tests/gates/classified.tsv`. |
 | `python` | `ruff` with the bandit, bugbear and pylint rules in `ruff.toml`, and a `noqa` or `ruff:` comment. |
 | `lua` | `luacheck` findings (`.luacheckrc`) and inline `luacheck:` comments. |
-| `cpp-harden` | In a plugin: a compiler warning under `-Wall -Wextra -Wconversion -Wshadow`, a source compiled without a hardening flag or with one that weakens them, a `CMakeLists.txt` that does not include `plugins/cmake/Safety.cmake`, a `NOLINT` or a diagnostic pragma, and a binary without full RELRO, immediate binding, a non-executable stack, PIE or CET. A build that fails always fails the gate. |
+| `cpp-harden` | In a plugin: a compiler warning under `-Wall -Wextra -Wconversion -Wshadow`, a source compiled without a hardening flag or with one that weakens them, a `NOLINT` or a diagnostic pragma, source that undoes a flag (`#undef _GLIBCXX_ASSERTIONS` or `_FORTIFY_SOURCE`, `#define NDEBUG`, an `optimize` attribute or `#pragma GCC optimize`), and a binary without full RELRO, immediate binding, a non-executable stack, PIE or CET. The text checks also read the templates that `configure_file` and `file(CONFIGURE)` turn into sources, and the headers the build writes. A C or C++ file in a plugin directory that the plugin's build does not read, and that `tests/gates/classified.tsv` does not list, fails. So does a build that fails. |
 | `cpp-sanitize` | A plugin whose tests fail under AddressSanitizer and UndefinedBehaviorSanitizer, that registers no test with `add_test`, or that turns a sanitizer off. |
-| `cpp-tidy` | `clang-tidy` findings from `plugins/.clang-tidy`, in the plugin and in every header of this repository it includes. |
+| `cpp-tidy` | `clang-tidy` findings from `plugins/.clang-tidy`, in the plugin, in every header of this repository it includes, and in every header its build writes from a template. |
 | `cpp-selftest` | The C++ gates themselves, if they stop catching the known-bad cases in `tests/gates/cpp-fixture`. |
 
 A suppression comment does not change a result. `ruff` runs with
@@ -385,15 +386,26 @@ suppression is counted, and so is the suppression. A linter configuration file
 in a subdirectory is not read. C++ has no switch for this, so each `NOLINT`,
 diagnostic pragma and `no_sanitize` attribute is counted by its whole line.
 
-The C++ gates build every `plugins/*/CMakeLists.txt` with
-`plugins/cmake/Safety.cmake` injected through `CMAKE_PROJECT_INCLUDE`, so a new
-plugin is checked without naming it anywhere. They also configure the plugin
-the way its package does, and fail when that build lacks the flags, so a plugin
-has `include(../cmake/Safety.cmake)` after its `project()` call. Include
+The C++ gates build every `plugins/*/CMakeLists.txt`, so a new plugin is
+checked without naming it anywhere. The hardening build is the one a package
+ships: nothing is injected, and it takes the `-D` options and environment of
+the `cmake -S plugins/<name>` line in a `PKGBUILD`. So a plugin has
+`include(../cmake/Safety.cmake)` after its `project()` call, and a flag that
+weakens the packaged build is caught where it is set. Include
 directories outside this repository are treated as system headers, because a
 plugin cannot fix a warning in a header the repository does not own. Without
 Hyprland's headers a local run prints `skipped: no Hyprland headers` for the
 plugins that need them and checks the rest. CI may not skip.
+
+CI builds C++ with the packages of one Arch Linux Archive day, `ARCH_SNAPSHOT`
+in `.github/workflows/safety-gates.yml`, so a GCC, Clang or Hyprland release
+changes no count until that line moves. To move it, pick a later day under
+`https://archive.archlinux.org/repos/`, run the C++ gates in
+`archlinux:latest` with that day's mirror (the workflow's install step shows
+how), and commit the new day with whatever `--update --allow-growth` writes.
+The pull request names what each new baseline line is, like any baseline
+growth. A local run uses whatever compiler is installed, so its counts can
+differ from CI's.
 
 What already broke a rule when its gate arrived is counted in
 `tests/gates/baseline.tsv`, one line per gate, file and rule. A count may only

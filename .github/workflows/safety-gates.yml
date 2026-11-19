@@ -30,7 +30,7 @@ jobs:
           chmod +x "$RUNNER_TEMP/gates/bin/luacheck"
           echo "$RUNNER_TEMP/gates/bin" >>"$GITHUB_PATH"
       - name: Gates
-        run: tests/gates/check.sh shell python lua
+        run: tests/gates/check.sh classify shell python lua
 
   cpp:
     name: C++ hardening, sanitizers and clang-tidy

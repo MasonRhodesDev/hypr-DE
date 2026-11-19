@@ -20,6 +20,19 @@ set(bad_option_WEAKSTACK -fstack-protector)
 set(bad_option_NOASSERT -U_GLIBCXX_ASSERTIONS)
 set(bad_option_NOSANITIZE -fno-sanitize=all)
 
+# a header the build writes, once composed so that no template holds the pragma and once from a template
+if(FIXTURE_BAD STREQUAL "GENERATED")
+    string(CONCAT pragma "#" "pragma GCC diagnostic ignored \"-Wconversion\"")
+    file(WRITE "${CMAKE_BINARY_DIR}/generated/generated.hpp" "#pragma once\n${pragma}\n")
+elseif(FIXTURE_BAD STREQUAL "TEMPLATE")
+    file(CONFIGURE OUTPUT "${CMAKE_BINARY_DIR}/generated/template.hpp" CONTENT "#pragma once
+
+inline const char* templateBytes(const int& value) {
+    return reinterpret_cast<const char*>(&value);
+}
+")
+endif()
+
 add_library(gate-fixture MODULE src/fixture.cpp)
 add_executable(gate-fixture-test tests/test.cpp src/fixture.cpp)
 
@@ -30,7 +43,7 @@ foreach(target gate-fixture gate-fixture-test)
         target_compile_options(${target} PRIVATE ${bad_option_${FIXTURE_BAD}})
     elseif(FIXTURE_BAD)
         target_compile_definitions(${target} PRIVATE FIXTURE_BAD_${FIXTURE_BAD})
-        target_include_directories(${target} PRIVATE ../cpp-fixture-sibling)
+        target_include_directories(${target} PRIVATE ../cpp-fixture-sibling "${CMAKE_BINARY_DIR}/generated")
     endif()
 endforeach()
 

@@ -1,5 +1,4 @@
 cpp-harden	plugins/hypr-de-scene	flag-weakens:-Wno-unused-parameter	7
-cpp-harden	plugins/hypr-de-scene	safety-not-included	1
 cpp-harden	plugins/hypr-de-scene/src/FirstFrame.cpp	-Wfloat-conversion	2
 cpp-harden	plugins/hypr-de-scene/src/Log.cpp	-Wconversion	2
 cpp-harden	plugins/hypr-de-scene/src/Scene.cpp	-Wfloat-conversion	2
