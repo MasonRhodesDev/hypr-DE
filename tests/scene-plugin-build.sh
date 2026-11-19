@@ -25,6 +25,17 @@ else
     exit 1
 fi
 
+if cmake -S "$root/plugins/hypr-de-scene" -B "$work/mismatch" -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_CXX_FLAGS='-UHYPR_DE_SCENE_LOADER_API_VERSION -DHYPR_DE_SCENE_LOADER_API_VERSION=\"0.0-another\"' >"$work/mismatch.log" 2>&1 \
+    && cmake --build "$work/mismatch" --target hypr-de-scene-impl >>"$work/mismatch.log" 2>&1; then
+    bad "the module builds when the loader's copy of the API version differs from Hyprland's"
+elif grep -q 'the loader copied another API version' "$work/mismatch.log"; then
+    ok "the module does not build when the loader's copy of the API version differs from Hyprland's"
+else
+    bad "the module with a mismatched API version copy failed for another reason"
+    tail -n 20 "$work/mismatch.log"
+fi
+
 loader=$work/build/hypr-de-scene.so
 plugin=$work/build/hypr-de-scene-impl.so
 for module in "$loader" "$plugin"; do

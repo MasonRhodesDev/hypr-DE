@@ -90,6 +90,8 @@ __attribute__((constructor)) static void load() {
     printf("syslog %s\n", logOpen ? "open" : "closed");
     if (const auto EXIT = reinterpret_cast<void (*)()>(dlsym(module, "pluginExit")))
         EXIT();
+    // Hyprland removes what the plugin registered here, between its exit and its close
+    printf("plugin exited\n");
     dlclose(module);
     printf("plugin closed\n");
     _exit(0);
