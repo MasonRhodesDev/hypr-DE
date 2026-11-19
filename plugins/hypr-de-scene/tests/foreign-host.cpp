@@ -70,6 +70,7 @@ __attribute__((constructor)) static void load() {
 
     // every way Hyprland's loadPluginInternal rejects a plugin, which puts its notification on screen
     void*      module  = open(PLUGIN, "the plugin");
+    printf("handle %p\n", module);
     const auto VERSION = reinterpret_cast<std::string (*)()>(dlsym(module, "pluginAPIVersion"));
     const auto INIT    = reinterpret_cast<SInfo (*)(void*)>(dlsym(module, "pluginInit"));
     if (!VERSION || !INIT) {
@@ -90,5 +91,6 @@ __attribute__((constructor)) static void load() {
     if (const auto EXIT = reinterpret_cast<void (*)()>(dlsym(module, "pluginExit")))
         EXIT();
     dlclose(module);
+    printf("plugin closed\n");
     _exit(0);
 }

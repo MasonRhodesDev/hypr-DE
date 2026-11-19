@@ -32,6 +32,8 @@ if ! { cmake -S "$src" -B "$work/build" -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_F
         && cmake -S "$src" -B "$work/current" -DCMAKE_BUILD_TYPE=Release \
         && cmake --build "$work/current" --target hypr-de-scene \
         && "${CXX:-c++}" -shared -fPIC -Wl,-z,lazy -o "$work/current/hypr-de-scene-impl.so" "$src/tests/renamed-symbol.cpp" \
+        && mkdir "$work/echo" && cp "$work/current/hypr-de-scene.so" "$work/echo/" \
+        && "${CXX:-c++}" -std=c++23 -shared -fPIC -fno-gnu-unique "-DHYPRLAND_API_VERSION=$api" -o "$work/echo/hypr-de-scene-impl.so" "$src/tests/echo-module.cpp" \
         && "${CXX:-c++}" -std=c++26 -shared -fPIC "${headers[@]}" -o "$work/neighbour.so" "$src/tests/neighbour-plugin.cpp" \
         && "${CXX:-c++}" -std=c++23 -Wall -Wextra -Werror -shared -fPIC "-DHYPRLAND_API_VERSION=$api" -o "$work/host.so" "$src/tests/foreign-host.cpp"; } >"$work/build.log" 2>&1; then
     echo "FAIL the plugin, built as if for Hyprland $other, the loader with a module Hyprland cannot resolve, or the test host does not build"
@@ -82,5 +84,18 @@ fi
 
 quiet "$(load "$work/current/hypr-de-scene.so")" "in the Hyprland it was built for, with a module that needs a symbol this Hyprland lacks" \
     "undefined symbol: _ZN11CCompositor18renamedByAnUpgradeEv"
+
+out=$(load "$work/echo/hypr-de-scene.so")
+handle=$(sed -n 's/^handle //p' <<<"$out")
+if grep -qx 'outcome returned' <<<"$out" && grep -qx "description handle $handle" <<<"$out"; then
+    ok "in the Hyprland it was built for: the module's init runs with the handle Hyprland gave the loader, $handle"
+else
+    bad "the module's init did not get Hyprland's handle $handle: $(grep -E '^(outcome|description) ' <<<"$out" | tr '\n' ' ')"
+fi
+if [ "$(grep -xE 'module exit|module closed|plugin closed' <<<"$out" | tr '\n' ' ')" = "module exit module closed plugin closed " ]; then
+    ok "in the Hyprland it was built for: unloading runs the module's exit, then closes the module, before Hyprland closes the loader"
+else
+    bad "unload order was: $(grep -xE 'module exit|module closed|plugin closed' <<<"$out" | tr '\n' ' ')"
+fi
 
 exit "$fail"
