@@ -551,6 +551,55 @@ until [ "$(watchers)" = 0 ] || [ "$i" -ge 100 ]; do sleep 0.1; i=$((i + 1)); don
 mk_lock
 echo "one watcher per Wayland display: a second one for the same display exits, another display gets its own"
 
+pgrep_fail="$work/pgrep-fail"
+: > "$pgrep_fail"
+rm -f "$marker" "$respawns"
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_PGREP_FAIL=$pgrep_fail LOCK_POLICY_COMPOSITOR_LOCKED=true run_lock
+assert_status 0
+assert_log ''
+rm -f "$pgrep_fail"
+echo "a pgrep that fails counts as a live locker: nothing is respawned"
+
+mk_lock '' terminate '' 1
+rm -rf "$lockfile"
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_PGREP_FAIL=$pgrep_fail LOCK_POLICY_LOCK_FILE=$lockfile LOCK_POLICY_VIGIL_LOCKS=1 LOCK_POLICY_VIGIL_HOLDS=1 run_lock
+assert_status 0
+i=0
+until [ "$(watchers)" = 1 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+: > "$LOCK_POLICY_JOURNAL"
+: > "$pgrep_fail"
+kill -9 "$(head -n1 "$LOCK_POLICY_HOLDERS")"
+sleep 2
+rm -rf "$lockfile"
+rm -f "$pgrep_fail"
+i=0
+until [ "$(watchers)" = 0 ] || [ "$i" -ge 100 ]; do sleep 0.1; i=$((i + 1)); done
+[ "$(grep -c 'cannot list screen lockers' "$LOCK_POLICY_JOURNAL")" = 1 ] || {
+    echo "a pgrep that keeps failing must be logged once, not every second:" >&2
+    cat "$LOCK_POLICY_JOURNAL" >&2; exit 1; }
+[ "$(grep -c '^vigil-lock:' "$LOCK_POLICY_LOG")" = 1 ] || {
+    echo "the watcher respawned while pgrep could not tell:" >&2; cat "$LOCK_POLICY_LOG" >&2; exit 1; }
+stop_holders
+mk_lock
+echo "a watcher whose pgrep keeps failing says so once and respawns nothing"
+
+mkdir "$lockfile"
+rm -f "$marker"
+date +%s > "$respawns"
+date +%s >> "$respawns"
+date +%s >> "$respawns"
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_LOCK_FILE=$lockfile LOCK_POLICY_VIGIL_HOLDS=1 run_lock
+assert_status 0
+assert_log 'vigil-lock:--wait --no-warn --grace 0
+logind-idle-control:disable
+hyprctl:dispatch hl.dsp.dpms({ action = '\''on'\'' })'
+stop_holders
+rm -rf "$lockfile" "$respawns"
+echo "respawns stamped by the wall clock, which can step, do not use up the budget"
+
 slow="$work/hyprctl-slow"
 mk_lock '' terminate '' 1
 rm -rf "$lockfile" "$marker" "$respawns" "$slow"

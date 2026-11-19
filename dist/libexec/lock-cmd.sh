@@ -87,33 +87,44 @@ zombie() {
     return 1
 }
 
-# Prints each live locker of this user on this Wayland display, so a lock held by another session's
-# locker never counts. Only a clean "no such process" means dead: the compositor is locked either way,
-# so a probe that cannot tell prints "?" rather than send a healthy lock to the failsafe or a respawn.
+# Sets lockers to each live locker of this user on this Wayland display, so a lock held by another
+# session's locker never counts. Only a clean "no such process" means dead: the compositor is locked
+# either way, so a probe that cannot tell gives "?" rather than send a healthy lock to the failsafe or
+# a respawn.
+pgrep_failing=0
 live_lockers() {
+    lockers=
     pids=$(timeout 2 pgrep -u "$(id -u)" -x "$(locker_names)" 2>/dev/null)
     case $? in
-        0) ;;
-        1) return 0 ;;
-        *) log "cannot list screen lockers; assuming one is alive"; echo '?'; return 0 ;;
+        0|1)
+            [ "$pgrep_failing" = 0 ] || log "can list screen lockers again"
+            pgrep_failing=0
+            ;;
+        *)
+            [ "$pgrep_failing" = 1 ] || log "cannot list screen lockers; assuming one is alive"
+            pgrep_failing=1
+            lockers='?'
+            return 0
+            ;;
     esac
     for pid in $pids; do
         zombie "$pid" && continue
         if [ -z "${WAYLAND_DISPLAY:-}" ]; then
-            echo "$pid"
+            lockers="$lockers $pid"
             continue
         fi
         if ! environ=$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null); then
-            [ -d "/proc/$pid" ] && echo "$pid"
+            [ -d "/proc/$pid" ] && lockers="$lockers $pid"
             continue
         fi
-        printf '%s\n' "$environ" | grep -qxF "WAYLAND_DISPLAY=$WAYLAND_DISPLAY" && echo "$pid"
+        printf '%s\n' "$environ" | grep -qxF "WAYLAND_DISPLAY=$WAYLAND_DISPLAY" && lockers="$lockers $pid"
     done
     return 0
 }
 
 locker_alive() {
-    [ -n "$(live_lockers)" ]
+    live_lockers
+    [ -n "$lockers" ]
 }
 
 # Hyprland keeps a session locked after its locker dies, so a locked compositor alone proves nothing.
@@ -150,10 +161,16 @@ load_policy() {
     done < "$LOCK_CONF"
 }
 
+# Seconds since boot: the respawn budget and the deadlines must not move when the wall clock steps.
+now() {
+    read -r up _ < /proc/uptime
+    echo "${up%.*}"
+}
+
 locked_within() {
     tries=$VERIFY_TRIES
-    give_up=$(( $(date +%s) + 3 ))
-    while [ "$tries" -gt 0 ] && [ "$(date +%s)" -lt "$give_up" ]; do
+    give_up=$(( $(now) + 3 ))
+    while [ "$tries" -gt 0 ] && [ "$(now)" -lt "$give_up" ]; do
         lock_held && return 0
         tries=$((tries - 1))
         if [ "$tries" -gt 0 ]; then sleep 0.1; fi
@@ -301,20 +318,21 @@ restore_off() {
 }
 
 # Counts every respawn, failed or not, across runs, so a locker that keeps crashing reaches the
-# failsafe instead of looping.
+# failsafe instead of looping. A stamp later than now is not this boot's (an older version wrote the
+# wall clock), so it is dropped.
 claim_respawn() {
-    now=$(date +%s)
+    at_now=$(now)
     kept=
     if [ -f "$respawn_log" ]; then
         while read -r at; do
             case $at in ''|*[!0-9]*) continue ;; esac
-            [ "$at" -gt $((now - RESPAWN_WINDOW)) ] && kept="$kept$at
+            [ "$at" -le "$at_now" ] && [ "$at" -gt $((at_now - RESPAWN_WINDOW)) ] && kept="$kept$at
 "
         done < "$respawn_log"
     fi
     attempt=$(( $(printf '%s' "$kept" | grep -c .) + 1 ))
     [ "$attempt" -le "$RESPAWN_MAX" ] || return 1
-    printf '%s%s\n' "$kept" "$now" > "$respawn_log" 2>/dev/null || \
+    printf '%s%s\n' "$kept" "$at_now" > "$respawn_log" 2>/dev/null || \
         log "cannot record the respawn in $respawn_log"
     return 0
 }
@@ -342,9 +360,9 @@ recover_crashed_lock() {
         fail_closed
         return 1
     fi
-    deadline=$(( $(date +%s) + RESPAWN_WINDOW ))
+    deadline=$(( $(now) + RESPAWN_WINDOW ))
     while claim_respawn; do
-        left=$(( deadline - $(date +%s) ))
+        left=$(( deadline - $(now) ))
         [ "$left" -ge 1 ] || break
         [ "$left" -lt "$LOCK_TIMEOUT" ] || left=$LOCK_TIMEOUT
         log "respawning vigil-lock to take over the crashed lock screen (attempt $attempt of $RESPAWN_MAX in ${RESPAWN_WINDOW}s)"
@@ -395,7 +413,8 @@ watch_lockers() {
     # A killed watcher's last sleep or probe holds its flock for a few seconds after it.
     flock -w 5 8 || exit 0
     while :; do
-        for pid in $(live_lockers); do
+        live_lockers
+        for pid in $lockers; do
             if [ "$pid" = '?' ]; then
                 sleep "$WATCH_INTERVAL"
                 continue

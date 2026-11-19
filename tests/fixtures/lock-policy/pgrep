@@ -4,6 +4,7 @@ case "${2:-}" in
     gamescope)     [ "${LOCK_POLICY_GAME:-}" = gamescope ] && exit 0 ;;
 esac
 [ "${1:-}" = -u ] || exit 1
+[ -n "${LOCK_POLICY_PGREP_FAIL:-}" ] && [ -e "$LOCK_POLICY_PGREP_FAIL" ] && exit 2
 for real in /usr/bin/pgrep /bin/pgrep; do
     [ -x "$real" ] || continue
     out=$("$real" "$@")
