@@ -1,5 +1,9 @@
 #!/bin/sh
 case "${1:-}" in
+    locked|getoption)
+        [ -n "${LOCK_POLICY_HYPRCTL_SLOW:-}" ] && [ -e "$LOCK_POLICY_HYPRCTL_SLOW" ] && sleep 4 ;;
+esac
+case "${1:-}" in
     -j)
         if [ "${2:-}" = clients ]; then
             [ "${LOCK_POLICY_COMPOSITOR_HANG:-0}" = 1 ] && sleep 30

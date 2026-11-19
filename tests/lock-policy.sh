@@ -475,6 +475,58 @@ until [ "$(watchers)" = 0 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
 mk_lock
 echo "with no user manager the watcher starts as a plain process, says so in the journal, and still respawns"
 
+slow="$work/hyprctl-slow"
+mk_lock '' terminate '' 1
+rm -rf "$lockfile" "$marker" "$respawns" "$slow"
+: > "$LOCK_POLICY_LOG"
+: > "$LOCK_POLICY_JOURNAL"
+LOCK_POLICY_HYPRCTL_SLOW=$slow LOCK_POLICY_LOCK_FILE=$lockfile LOCK_POLICY_VIGIL_LOCKS=1 LOCK_POLICY_VIGIL_HOLDS=1 run_lock
+assert_status 0
+i=0
+until [ "$(watchers)" = 1 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+[ "$(watchers)" = 1 ] || { echo "a lock started no watcher for its locker" >&2; exit 1; }
+: > "$slow"
+kill -9 "$(head -n1 "$LOCK_POLICY_HOLDERS")"
+i=0
+until [ "$(grep -c '^vigil-lock:' "$LOCK_POLICY_LOG")" = 2 ] || [ "$i" -ge 250 ]; do sleep 0.1; i=$((i + 1)); done
+[ "$(grep -c '^vigil-lock:' "$LOCK_POLICY_LOG")" = 2 ] || {
+    echo "a locker killed while hyprctl gave no answer was not respawned within 25 s:" >&2
+    cat "$LOCK_POLICY_LOG" >&2; cat "$LOCK_POLICY_JOURNAL" >&2; exit 1; }
+respawned=$(grep '^vigil-lock:' "$LOCK_POLICY_LOG" | sed -n 2p)
+[ "$respawned" = "vigil-lock:--wait --no-warn --grace 0" ] || {
+    echo "the watcher's respawn opened a grace window: $respawned" >&2; exit 1; }
+grep -q '^hypr-de-lock: hyprctl locked gave no answer' "$LOCK_POLICY_JOURNAL" || {
+    echo "the watcher went on with no answer from hyprctl without saying so:" >&2
+    cat "$LOCK_POLICY_JOURNAL" >&2; exit 1; }
+grep -q '^loginctl:' "$LOCK_POLICY_LOG" && { echo "the watcher ran the failsafe" >&2; exit 1; }
+rm -f "$slow"
+rm -rf "$lockfile"
+stop_holders
+i=0
+until [ "$(watchers)" = 0 ] || [ "$i" -ge 100 ]; do sleep 0.1; i=$((i + 1)); done
+[ "$(watchers)" = 0 ] || { echo "the watcher outlived an unlocked session" >&2; exit 1; }
+mk_lock
+echo "a locker killed while hyprctl gives no answer is still respawned, and the watcher says why"
+
+start_holder "$display"
+: > "$slow"
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_HYPRCTL_SLOW=$slow LOCK_POLICY_COMPOSITOR_LOCKED=true run_lock
+assert_status 0
+assert_log ''
+stop_holders
+mkdir "$lockfile"
+rm -f "$marker" "$respawns"
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_HYPRCTL_SLOW=$slow LOCK_POLICY_LOCK_FILE=$lockfile LOCK_POLICY_VIGIL_HOLDS=1 run_lock
+assert_status 0
+assert_log 'vigil-lock:--wait --no-warn --grace 0
+logind-idle-control:disable
+hyprctl:dispatch hl.dsp.dpms({ action = '\''on'\'' })'
+stop_holders
+rm -rf "$lockfile" "$slow"
+echo "with no answer from hyprctl a live locker means locked, and no locker means a respawn with no grace"
+
 start_holder wayland-other
 rm -f "$marker" "$respawns"
 : > "$LOCK_POLICY_LOG"

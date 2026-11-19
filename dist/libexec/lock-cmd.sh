@@ -16,6 +16,7 @@ RESPAWN_MAX=3
 RESPAWN_WINDOW=30
 WATCH=1
 WATCH_INTERVAL=1
+COMPOSITOR_TRIES=3
 
 runtime_dir=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
 fail_marker="$runtime_dir/hypr-de-lock-failed"
@@ -45,8 +46,21 @@ release_idle_inhibitor() {
     return 0
 }
 
+# Returns 0 when the compositor answers locked, 1 when it answers unlocked, and 2 when it gives no
+# answer, which no caller may read as unlocked: a slow compositor is likeliest just as a locker dies.
 compositor_locked() {
-    [ "$(timeout 2 hyprctl locked 2>/dev/null)" = true ]
+    asks=$COMPOSITOR_TRIES
+    while :; do
+        case $(timeout 2 hyprctl locked 2>/dev/null) in
+            true) return 0 ;;
+            false) return 1 ;;
+        esac
+        asks=$((asks - 1))
+        [ "$asks" -gt 0 ] || break
+        sleep 1
+    done
+    log "hyprctl locked gave no answer in $COMPOSITOR_TRIES tries"
+    return 2
 }
 
 locker_names() {
@@ -106,7 +120,7 @@ locker_alive() {
 # In a run that began on that crashed screen, a locker that was just denied can still be alive, so only
 # a locker's own success counts there.
 lock_held() {
-    [ "$crashed_at_entry" = 0 ] && compositor_locked && locker_alive
+    [ "$crashed_at_entry" = 0 ] && locker_alive && compositor_locked
 }
 
 locked_hint() {
@@ -316,7 +330,12 @@ recover_crashed_lock() {
         log "another lock attempt restored the lock meanwhile"
         return 0
     fi
-    compositor_locked || return 2
+    compositor_locked
+    case $? in
+        0) log "the compositor is locked but no locker is alive: the lock screen crashed" ;;
+        1) return 2 ;;
+        *) log "no locker is alive and the compositor gives no answer; recovering as if the lock screen crashed" ;;
+    esac
     crashed_at_entry=1
     if restore_off; then
         log "misc:allow_session_lock_restore is off in the Hyprland config, so no locker can take over the crashed lock screen"
@@ -375,9 +394,7 @@ watch_lockers() {
             fi
             while [ -d "/proc/$pid" ] && ! zombie "$pid"; do sleep "$WATCH_INTERVAL"; done
         done
-        compositor_locked || exit 0
         locker_alive && continue
-        log "the lock screen died while the session stayed locked"
         crashed_at_entry=0
         serialised recover_crashed_lock
         [ "$?" -eq 0 ] || exit 0
@@ -426,13 +443,14 @@ esac
 mode=$1
 shift
 
+compositor_locked
+compositor=$?
 status=2
-if compositor_locked; then
+if [ "$compositor" -ne 1 ]; then
     if locker_alive; then
-        log "the session is already locked; not starting another locker"
+        log "a locker is alive; not starting another"
         exit 0
     fi
-    log "the compositor is locked but no locker is alive: the lock screen crashed"
     serialised recover_crashed_lock
     status=$?
 fi
