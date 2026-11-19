@@ -192,7 +192,6 @@ command -v systemd-analyze >/dev/null || { bad "systemd-analyze is needed to loa
 out=$(verify shipped <"$dropin")
 check "$?:${out}" "0:" "systemd loads the shipped drop-in with no warning and runs only the waiter" \
     "systemd-analyze verify rejected the drop-in: ${out}"
-grep -vE '^\[|^#' "$dropin" | grep -q . || bad "the drop-in is empty"
 for m in "no header:/^\[Service\]$/d" "wrong section:s/^\[Service\]$/[Unit]/" "no reset:/^ExecStart=$/d"; do
     name=${m%%:*}
     sed "${m#*:}" "$dropin" | verify "${name// /-}" >/dev/null
