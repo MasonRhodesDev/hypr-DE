@@ -31,6 +31,7 @@ plugins/hypr-de-scene/tests/fixtures.inc	cpp-test
 plugins/hypr-de-scene/tests/foreign-host.cpp	cpp-test
 plugins/hypr-de-scene/tests/geometry.cpp	cpp-test
 plugins/hypr-de-scene/tests/neighbour-plugin.cpp	cpp-test
+plugins/hypr-de-scene/tests/readiness.cpp	cpp-test
 plugins/hypr-de-scene/tests/renamed-symbol.cpp	cpp-test
 tests/fixtures/hypridle-override/hypridle	sh
 tests/fixtures/installer/bin/install	sh
