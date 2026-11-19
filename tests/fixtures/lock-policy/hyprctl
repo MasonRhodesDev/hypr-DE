@@ -1,6 +1,10 @@
 #!/bin/sh
 case "${1:-}" in
     locked|getoption)
+        if [ -n "${LOCK_POLICY_HYPRCTL_GONE:-}" ] && [ -e "$LOCK_POLICY_HYPRCTL_GONE" ]; then
+            echo "Couldn't connect to $XDG_RUNTIME_DIR/hypr/${HYPRLAND_INSTANCE_SIGNATURE:-}/.socket.sock. (3)"
+            exit 1
+        fi
         [ -n "${LOCK_POLICY_HYPRCTL_SLOW:-}" ] && [ -e "$LOCK_POLICY_HYPRCTL_SLOW" ] && sleep 4 ;;
 esac
 case "${1:-}" in

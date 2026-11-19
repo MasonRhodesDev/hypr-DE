@@ -46,8 +46,18 @@ release_idle_inhibitor() {
     return 0
 }
 
-# Returns 0 when the compositor answers locked, 1 when it answers unlocked, and 2 when it gives no
-# answer, which no caller may read as unlocked: a slow compositor is likeliest just as a locker dies.
+# Hyprland removes its instance's hyprland.lock when it exits and leaves a dead pid there when it
+# crashes.
+compositor_gone() {
+    [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ] || return 1
+    hypr_pid=$(sed -n 1p "$runtime_dir/hypr/$HYPRLAND_INSTANCE_SIGNATURE/hyprland.lock" 2>/dev/null)
+    case $hypr_pid in ''|*[!0-9]*) return 0 ;; esac
+    [ ! -d "/proc/$hypr_pid" ]
+}
+
+# Returns 0 when the compositor answers locked, 1 when it answers unlocked or is gone, and 2 when a
+# live compositor gives no answer, which no caller may read as unlocked: a slow compositor is
+# likeliest just as a locker dies.
 compositor_locked() {
     asks=$COMPOSITOR_TRIES
     while :; do
@@ -55,6 +65,10 @@ compositor_locked() {
             true) return 0 ;;
             false) return 1 ;;
         esac
+        if compositor_gone; then
+            log "Hyprland instance $HYPRLAND_INSTANCE_SIGNATURE is gone, so there is no lock to hold"
+            return 1
+        fi
         asks=$((asks - 1))
         [ "$asks" -gt 0 ] || break
         sleep 1

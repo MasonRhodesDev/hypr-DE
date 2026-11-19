@@ -652,6 +652,46 @@ until [ "$(watchers)" = 0 ] || [ "$i" -ge 100 ]; do sleep 0.1; i=$((i + 1)); don
 mk_lock
 echo "a locker killed while hyprctl gives no answer is still respawned, and the watcher says why"
 
+gone="$work/hyprctl-gone"
+mkdir -p "$work/hypr/live-instance"
+sleep 300 &
+compositor_pid=$!
+printf '%s\nwayland-1\n' "$compositor_pid" > "$work/hypr/live-instance/hyprland.lock"
+for instance in gone-instance live-instance; do
+    mk_lock '' terminate '' 1
+    rm -rf "$lockfile" "$marker" "$respawns" "$gone"
+    : > "$LOCK_POLICY_LOG"
+    : > "$LOCK_POLICY_JOURNAL"
+    HYPRLAND_INSTANCE_SIGNATURE=$instance LOCK_POLICY_HYPRCTL_GONE=$gone LOCK_POLICY_LOCK_FILE=$lockfile \
+        LOCK_POLICY_VIGIL_LOCKS=1 LOCK_POLICY_VIGIL_HOLDS=1 run_lock
+    assert_status 0
+    i=0
+    until [ "$(watchers)" = 1 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+    : > "$gone"
+    kill -9 "$(head -n1 "$LOCK_POLICY_HOLDERS")"
+    if [ "$instance" = gone-instance ]; then
+        i=0
+        until [ "$(watchers)" = 0 ] || [ "$i" -ge 100 ]; do sleep 0.1; i=$((i + 1)); done
+        [ "$(watchers)" = 0 ] || { echo "the watcher kept running after Hyprland exited" >&2; exit 1; }
+        [ "$(grep -c '^vigil-lock:' "$LOCK_POLICY_LOG")" = 1 ] || {
+            echo "a watcher whose Hyprland has exited respawned a locker:" >&2; cat "$LOCK_POLICY_LOG" >&2; exit 1; }
+        grep -q '^loginctl:' "$LOCK_POLICY_LOG" && { echo "a watcher whose Hyprland has exited ran the failsafe" >&2; exit 1; }
+    else
+        i=0
+        until [ "$(grep -c '^vigil-lock:' "$LOCK_POLICY_LOG")" = 2 ] || [ "$i" -ge 150 ]; do sleep 0.1; i=$((i + 1)); done
+        [ "$(grep -c '^vigil-lock:' "$LOCK_POLICY_LOG")" = 2 ] || {
+            echo "a locker killed while a live Hyprland gave no answer was not respawned within 15 s:" >&2
+            cat "$LOCK_POLICY_LOG" >&2; cat "$LOCK_POLICY_JOURNAL" >&2; exit 1; }
+    fi
+    rm -rf "$lockfile" "$gone"
+    stop_holders
+    i=0
+    until [ "$(watchers)" = 0 ] || [ "$i" -ge 100 ]; do sleep 0.1; i=$((i + 1)); done
+done
+kill "$compositor_pid"
+mk_lock
+echo "a hyprctl that cannot connect means Hyprland is gone when its instance is, and stops the watcher; with Hyprland alive it is no answer"
+
 start_holder "$display"
 : > "$slow"
 : > "$LOCK_POLICY_LOG"
