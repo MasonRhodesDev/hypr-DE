@@ -37,6 +37,7 @@ namespace Scene {
             CHyprSignalListener     commit;
             bool                    covering = true;
             bool                    logged   = false;
+            bool                    foreign  = false;
             int                     passes   = 0;
             int                     dumps    = 0;
         };

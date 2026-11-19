@@ -190,10 +190,21 @@ void CScene::onPreCommit(PHLMONITOR monitor) {
     if (buffer && buffer == OUTPUT->drawn)
         return;
 
+    const auto SWAPCHAIN = monitor->m_output->swapchain;
+    const bool FITS      = buffer && buffer->size == MODE->pixelSize;
+
+    // a buffer that fits the mode and is not the output's own is a client's, scanned out as it is
+    if (FITS && !SWAPCHAIN->contains(buffer)) {
+        if (!OUTPUT->foreign)
+            note("scene: {} commits a buffer that is not its own, leaving it as it is", monitor->m_name);
+        OUTPUT->foreign = true;
+        return;
+    }
+
     // the backend swaps in a blank swapchain buffer when this one does not fit the mode
-    if (!buffer || buffer->size != MODE->pixelSize) {
-        buffer = monitor->m_output->swapchain->next(nullptr);
-        monitor->m_output->swapchain->rollback();
+    if (!FITS) {
+        buffer = SWAPCHAIN->next(nullptr);
+        SWAPCHAIN->rollback();
         if (!buffer)
             return;
 
