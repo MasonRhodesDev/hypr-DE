@@ -161,11 +161,15 @@ Outside Hyprland it logs that and exits. It binds to the session Hyprland runs
 in (logind's session for Hyprland's pid, else Hyprland's own `XDG_SESSION_ID`),
 and accepts only an active wayland session on Hyprland's seat. Until one
 resolves it logs why and retries every 2 s, and systemd never stops restarting
-it. A `lock-cmd.sh` that has not returned after 90 s is killed, a critical
-notification says so, and the next request runs it again.
+it. A `lock-cmd.sh` that has not returned after 120 s is killed, a critical
+notification says so, and its failsafe runs unless a locker holds the lock.
+The next request runs it again.
 
 A session counts as locked only when the compositor holds the lock **and** a
-locker of yours is alive on this display. Two requests at once are safe:
+locker of yours is alive on this display. If `hyprctl locked` gives no answer
+in three tries, that never reads as unlocked: a live locker counts as the lock,
+and with none the run recovers as on a crashed lock screen. So a compositor
+that stalls just as you unlock can lock the session again. Two requests at once are safe:
 vigil-lock joins a lock that is already starting, and only one `lock-cmd.sh`
 at a time may fall back (a lock file in `$XDG_RUNTIME_DIR`), so a second run
 finds the first one's locker and stops there instead of reaching the failsafe.
@@ -193,8 +197,12 @@ keeps the session locked on its lock-dead screen, and hypr-DE ships
 `misc:allow_session_lock_restore = true` so a new locker may take that lock
 over. A watcher that `lock-cmd.sh` starts beside each lock notices the locker
 die and respawns vigil-lock within about a second, and any lock request on
-that screen does the same. The password is still required; the session is
-never unlocked in between. Only `vigil-lock` from `/usr/local/bin:/usr/bin:/bin`
+that screen does the same. Super+L is a locked bind, so it works on the
+lock-dead screen too; while a locker is alive it starts nothing. There is one
+watcher per Wayland display, and any request on a locked session restarts one
+that was lost. The password is still required; the session is never unlocked
+in between. The respawn passes `--grace 0`, so a `lock.grace_secs` in the vigil
+config never opens a grace window after a crash. Only `vigil-lock` from `/usr/local/bin:/usr/bin:/bin`
 is respawned (lock-cmd.sh pins its `PATH`), and only once no locker of yours is
 left alive, because Hyprland also hands a healthy lock to a newcomer. One run at
 a time respawns, under the same lock file as the fallbacks. Respawns are counted
@@ -212,7 +220,12 @@ To keep the session instead, create `/etc/hypr-de/lock.conf`:
 failsafe = warn
 ```
 
-(`fallbacks` and `verify_tries` are settable there too.) A failed lock then
+(`fallbacks` and `verify_tries` are settable there too.) A third-party lock
+screen (anything but vigil-lock, swaylock, gtklock, hyprlock or waylock) counts
+as a live locker only if `fallbacks` lists it: the first word of each entry is
+matched against process names. Unlisted, it reads as a crashed lock screen and
+vigil-lock replaces it. A listed entry also runs as a fallback when vigil-lock
+fails. A failed lock then
 posts a critical "Screen NOT locked" notification, and the screen stays
 lit: an obviously unlocked desktop, never a dark one that
 passes for locked. On a crashed lock screen it posts "Lock screen crashed"

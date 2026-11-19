@@ -274,6 +274,25 @@ assert_log ''
 stop_holders
 echo "a live locker whose environment cannot be read still counts as alive"
 
+mk_lock 'qs-lockscreen --lock \&'
+WAYLAND_DISPLAY=$display python3 -I -c '
+import ctypes, time
+ctypes.CDLL(None).prctl(15, b"qs-lockscreen", 0, 0, 0)
+print("ready", flush=True)
+time.sleep(60)
+' > "$work/third-party" &
+echo $! >> "$LOCK_POLICY_HOLDERS"
+i=0
+until grep -qx ready "$work/third-party" || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+rm -f "$respawns"
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_COMPOSITOR_LOCKED=true run_lock
+assert_status 0
+assert_log ''
+stop_holders
+mk_lock
+echo "a third-party lock screen listed in fallbacks counts as a live locker"
+
 [ "$LOCK_POLICY_RESTORE" = true ] || {
     echo "main.lua must ship misc:allow_session_lock_restore = true so a crashed lock screen can be taken over" >&2
     exit 1; }

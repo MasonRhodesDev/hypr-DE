@@ -61,10 +61,16 @@ lid close through hyprstate) and holds a sleep delay that waits for the lock
 before any suspend. hypridle's lock_cmd, before_sleep_cmd and idle timeout run
 the same script. The session counts as locked only while the compositor
 holds the lock and a locker is alive; a request then starts no second locker.
+No answer from the compositor never reads as unlocked.
 If the lock screen crashes while the session stays locked, a watcher started
-with each lock respawns vigil-lock onto it (Hyprland's
+with each lock respawns vigil-lock onto it with no grace window (Hyprland's
 .B misc:allow_session_lock_restore
-is on), and so does any later request. After 3 respawns in 30 s, or with that
+is on), and so does any later request, SUPER+L included: it is a locked bind.
+A third-party lock screen counts as a live locker only when the
+.B fallbacks
+of
+.I /etc/hypr-de/lock.conf
+list it. After 3 respawns in 30 s, or with that
 option set false, the failsafe in
 .I /etc/hypr-de/lock.conf
 runs instead.
