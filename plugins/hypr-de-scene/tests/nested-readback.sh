@@ -10,6 +10,8 @@ node from the host, and writes what each output committed to OUT_DIR:
   dumps/   PPM readbacks the plugin took of committed buffers
   shots/   screenshots of the host compositor every 100 ms
   log      the plugin's own lines
+  plugins.txt  hyprctl plugin list before the unload
+PLUGIN is the loader, and its directory is shared so the module beside it loads.
 SPLASH is a client that maps the hand-off layer; without it the scene leaves
 on its timeout. The run ends by unloading the plugin and then stopping
 Hyprland, and fails if Hyprland dies or does not stop cleanly.
@@ -66,7 +68,7 @@ exec bwrap --unshare-all --die-with-parent --new-session --cap-drop ALL \
     "${system[@]}" --dev /dev --dev-bind "$node" "$node" --proc /proc --ro-bind /sys /sys \
     --tmpfs /tmp --tmpfs /run --tmpfs /var --dir /tmp/home --dir /run/rt \
     --ro-bind "$here" "$here" \
-    --ro-bind "$hyprland" "$hyprland" --ro-bind "$plugin" "$plugin" --ro-bind "$data" "$data" \
+    --ro-bind "$hyprland" "$hyprland" --ro-bind "$(dirname -- "$plugin")" "$(dirname -- "$plugin")" --ro-bind "$data" "$data" \
     --bind "$out" "$out" \
     --clearenv "${libs[@]}" \
     --setenv PATH "$(dirname -- "$hyprland"):/usr/local/bin:/usr/bin:/bin" \

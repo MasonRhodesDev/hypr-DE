@@ -19,14 +19,17 @@ esac
 same "hypr-de's Arch package names it at" "$(sed -n 's/^ *SCENE_PLUGIN=\([^ ]*\).*/\1/p' "$root/packaging/PKGBUILD")"
 same "an install from source names it at" "$(unset SCENE_PLUGIN; . "$root/packaging/paths.conf"; printf '%s' "$SCENE_PLUGIN")"
 same "the plugin's own build installs it, under /usr, at" \
-    "/usr/$(sed -n 's/^install(TARGETS hypr-de-scene LIBRARY DESTINATION \(.*\))$/\1/p' "$root/plugins/hypr-de-scene/CMakeLists.txt")/hypr-de-scene.so"
+    "/usr/$(sed -n 's/^install(TARGETS hypr-de-scene hypr-de-scene-impl LIBRARY DESTINATION \(.*\))$/\1/p' "$root/plugins/hypr-de-scene/CMakeLists.txt")/hypr-de-scene.so"
 
 scene=$(prefixed <"$root/packaging/hypr-de-scene.spec")
-if sed -n '/^%files/,/^%changelog/p' <<<"$scene" | grep -qxF "$want"; then
-    ok "the hypr-de-scene RPM lists it in %files"
-else
-    bad "the hypr-de-scene RPM does not list $want in %files: $(sed -n '/^%files/,/^%changelog/p' <<<"$scene" | grep '\.so' | tr '\n' ' ')"
-fi
+files=$(sed -n '/^%files/,/^%changelog/p' <<<"$scene")
+for path in "$want" "$(dirname -- "$want")/hypr-de-scene-impl.so"; do
+    if grep -qxF "$path" <<<"$files"; then
+        ok "the hypr-de-scene RPM lists $path in %files"
+    else
+        bad "the hypr-de-scene RPM does not list $path in %files: $(grep '\.so' <<<"$files" | tr '\n' ' ')"
+    fi
+done
 if grep -qF "hl.plugin.load(\"$want\")" <<<"$scene"; then
     ok "the hypr-de-scene RPM's description gives the same line to opt in"
 else

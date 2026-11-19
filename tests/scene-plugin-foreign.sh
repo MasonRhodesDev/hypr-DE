@@ -23,22 +23,41 @@ fi
 
 other=0123456789abcdef0123456789abcdef01234567
 read -ra headers < <(pkg-config --cflags hyprland pixman-1 libdrm)
+for dir in $(pkg-config --cflags-only-I hyprland); do
+    api=$(sed -n 's/^#define HYPRLAND_API_VERSION //p' "${dir#-I}/src/plugins/PluginAPI.hpp" 2>/dev/null)
+    [ -n "$api" ] && break
+done
+echo_module() {
+    local dir=$work/$1
+    shift
+    mkdir "$dir" && cp "$work/current/hypr-de-scene.so" "$dir/" \
+        && "${CXX:-c++}" -std=c++23 -shared -fPIC -fno-gnu-unique "-DHYPRLAND_API_VERSION=$api" "$@" -o "$dir/hypr-de-scene-impl.so" "$src/tests/echo-module.cpp"
+}
+
 if ! { cmake -S "$src" -B "$work/build" -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-include $src/tests/another-hyprland.h" \
         && cmake --build "$work/build" --parallel \
+        && cmake -S "$src" -B "$work/current" -DCMAKE_BUILD_TYPE=Release \
+        && cmake --build "$work/current" --target hypr-de-scene \
+        && "${CXX:-c++}" -shared -fPIC -Wl,-z,lazy -o "$work/current/hypr-de-scene-impl.so" "$src/tests/renamed-symbol.cpp" \
+        && echo_module echo \
+        && echo_module throwing -DECHO_INIT_THROWS \
+        && echo_module faulting -DECHO_INIT_FAULTS \
+        && echo_module another-api -UHYPRLAND_API_VERSION '-DHYPRLAND_API_VERSION="0.0-another"' \
+        && echo_module without-exit -DECHO_WITHOUT_EXIT \
+        && echo_module nameless -DECHO_VERSION_THROWS \
         && "${CXX:-c++}" -std=c++26 -shared -fPIC "${headers[@]}" -o "$work/neighbour.so" "$src/tests/neighbour-plugin.cpp" \
-        && "${CXX:-c++}" -std=c++23 -Wall -Wextra -Werror -shared -fPIC -o "$work/host.so" "$src/tests/foreign-host.cpp"; } >"$work/build.log" 2>&1; then
-    echo "FAIL the plugin, built as if for Hyprland $other, or its test host does not build"
+        && "${CXX:-c++}" -std=c++23 -Wall -Wextra -Werror -shared -fPIC "-DHYPRLAND_API_VERSION=$api" -o "$work/host.so" "$src/tests/foreign-host.cpp"; } >"$work/build.log" 2>&1; then
+    echo "FAIL the plugin, built as if for Hyprland $other, the loader with its test modules, or the test host does not build"
     tail -n 40 "$work/build.log"
     exit 1
 fi
 
 load() {
-    SCENE_PLUGIN=$work/build/hypr-de-scene.so SCENE_NEIGHBOUR=${1-} LD_PRELOAD=$work/host.so "$hyprland" --version 2>&1
+    SCENE_PLUGIN=$1 SCENE_NEIGHBOUR=${2-} LD_PRELOAD=$work/host.so "$hyprland" --version 2>&1
 }
 
 quiet() {
-    local out=$1 where=$2 running logged
-    running=$(sed -n 's/^running //p' <<<"$out")
+    local out=$1 where=$2 why=$3 logged
     logged=$(grep -c '^log ' <<<"$out")
 
     if grep -qx 'outcome returned' <<<"$out"; then
@@ -46,12 +65,12 @@ quiet() {
     else
         bad "$where: init did not return: $(grep '^outcome ' <<<"$out" || tail -n 3 <<<"$out")"
     fi
-    if grep -q "^description idle, .*built for Hyprland ${other}_.* but $running is running\. Rebuild the hypr-de-scene package" <<<"$out"; then
-        ok "$where: the description says idle, names both builds and says to rebuild"
+    if grep -q "^description idle, boot scene off: .*$why.*\. Rebuild the hypr-de-scene package" <<<"$out"; then
+        ok "$where: the description says idle, why, and to rebuild"
     else
         bad "$where: description is: $(sed -n 's/^description //p' <<<"$out")"
     fi
-    if [ "$logged" = 1 ] && grep -q "^log 3 idle, .*built for Hyprland ${other}_.* but $running is running" <<<"$out"; then
+    if [ "$logged" = 1 ] && grep -q "^log 3 idle, boot scene off: .*$why" <<<"$out"; then
         ok "$where: one error line for the journal"
     else
         bad "$where: wrote $logged journal lines: $(grep '^log ' <<<"$out")"
@@ -63,13 +82,69 @@ quiet() {
     fi
 }
 
-quiet "$(load)" "in a Hyprland it was not built for"
+out=$(load "$work/build/hypr-de-scene.so")
+running=$(sed -n 's/^running //p' <<<"$out")
+quiet "$out" "in a Hyprland it was not built for" "built for Hyprland ${other}_.* but $running is running"
 
-out=$(load "$work/neighbour.so")
-if [ "$(sed -n 's/^neighbour //p' <<<"$out")" = "$(sed -n 's/^running //p' <<<"$out")" ]; then
-    quiet "$out" "after a neighbour plugin built for the running Hyprland"
+out=$(load "$work/build/hypr-de-scene.so" "$work/neighbour.so")
+if [ "$(sed -n 's/^neighbour //p' <<<"$out")" = "$running" ]; then
+    quiet "$out" "after a neighbour plugin built for the running Hyprland" "built for Hyprland ${other}_.* but $running is running"
 else
     bad "the neighbour plugin does not name the running Hyprland: $(grep -E '^(neighbour|running) ' <<<"$out" | tr '\n' ' ')"
+fi
+
+quiet "$(load "$work/current/hypr-de-scene.so")" "in the Hyprland it was built for, with a module that needs a symbol this Hyprland lacks" \
+    "undefined symbol: _ZN11CCompositor18renamedByAnUpgradeEv"
+
+unloading() {
+    grep -xE 'module exit|plugin exited|module closed|plugin closed' <<<"$1" | tr '\n' ' '
+}
+
+out=$(load "$work/echo/hypr-de-scene.so")
+handle=$(sed -n 's/^handle //p' <<<"$out")
+if grep -qx 'outcome returned' <<<"$out" && grep -qx "description handle $handle" <<<"$out"; then
+    ok "in the Hyprland it was built for: the module's init runs with the handle Hyprland gave the loader, $handle"
+else
+    bad "the module's init did not get Hyprland's handle $handle: $(grep -E '^(outcome|description) ' <<<"$out" | tr '\n' ' ')"
+fi
+if [ "$(unloading "$out")" = "module exit plugin exited module closed plugin closed " ]; then
+    ok "in the Hyprland it was built for: unloading runs the module's exit, and closes the module only when Hyprland closes the loader, after removing what the module registered"
+else
+    bad "unload order was: $(unloading "$out")"
+fi
+
+out=$(load "$work/throwing/hypr-de-scene.so")
+quiet "$out" "with a module whose init throws" "failed to start"
+if [ "$(unloading "$out")" = "module exit plugin exited module closed plugin closed " ]; then
+    ok "with a module whose init throws: the module's exit runs at once, and the module stays open until Hyprland closes the loader"
+else
+    bad "with a module whose init throws, the order was: $(unloading "$out")"
+fi
+
+out=$(load "$work/faulting/hypr-de-scene.so")
+if grep -qx 'outcome faulted' <<<"$out" && [ "$(unloading "$out")" = "plugin closed " ]; then
+    ok "with a module that faults in init, which Hyprland unloads without its exit: the module, which never stopped, stays open"
+else
+    bad "with a module that faults in init: $(grep '^outcome ' <<<"$out"), the order was: $(unloading "$out")"
+fi
+
+declare -A unfit=([another-api]="with a module for another API version" [without-exit]="with a module that has no pluginExit")
+for variant in "${!unfit[@]}"; do
+    out=$(load "$work/$variant/hypr-de-scene.so")
+    quiet "$out" "${unfit[$variant]}" "is not the module this loader was built with"
+    if [ "$(unloading "$out")" = "plugin exited module closed plugin closed " ]; then
+        ok "${unfit[$variant]}: the module never starts, and is closed when Hyprland closes the loader"
+    else
+        bad "${unfit[$variant]}, the order was: $(unloading "$out")"
+    fi
+done
+
+out=$(load "$work/nameless/hypr-de-scene.so")
+quiet "$out" "with a module that throws naming its API version" "the loader stopped on an unexpected error"
+if [ "$(unloading "$out")" = "plugin exited module closed plugin closed " ]; then
+    ok "with a module that throws naming its API version: the module is closed when Hyprland closes the loader"
+else
+    bad "with a module that throws naming its API version, the order was: $(unloading "$out")"
 fi
 
 exit "$fail"

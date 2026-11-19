@@ -22,11 +22,9 @@
 -- until desktop-boot's login splash covers that output, or for five
 -- seconds at most, so a login shows no empty frame.
 -- It stays idle without desktop-boot's scene files, and in a Hyprland
--- build other than the one it was compiled against; journalctl -t
--- hypr-de-scene says so. If the upgrade removed a symbol the plugin
--- needs, Hyprland cannot load it at all and shows its own failed-to-load
--- notification at login instead. Either way, rebuild the package against
--- the installed Hyprland. Opt in with:
+-- build other than the one it was compiled against, or one that removed
+-- a symbol it needs; journalctl -t hypr-de-scene says so. Rebuild the
+-- package against the installed Hyprland. Opt in with:
 -- hl.plugin.load("@SCENE_PLUGIN@")
 
 -- Extra window rules (examples):

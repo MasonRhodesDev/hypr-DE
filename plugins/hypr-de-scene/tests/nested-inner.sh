@@ -73,6 +73,8 @@ for name in HEADLESS-2 HEADLESS-3 HEADLESS-4 HEADLESS-5 HEADLESS-6 HEADLESS-7 HE
 done
 sleep "$SCENE_RUN_SECONDS"
 hyprctl -i "$sig" monitors >"$out/monitors.txt" 2>&1
+# Hyprland lists a plugin only when its load succeeded, and only a failed load puts a notification on screen
+hyprctl -i "$sig" plugin list >"$out/plugins.txt" 2>&1
 
 if [ "$SCENE_UNLOAD" = 1 ]; then
     hyprctl -i "$sig" plugin unload "$plugin" >"$out/unload.txt" 2>&1

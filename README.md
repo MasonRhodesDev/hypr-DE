@@ -247,12 +247,20 @@ journalctl -b -t hypr-de-scene
 
 `hyprctl plugin list` shows the same line as the plugin's description.
 
-When the new Hyprland no longer has a symbol the module needs, Hyprland
-cannot load it at all. That journal then has no line, and Hyprland shows
-its own failed-to-load notification for a few seconds at login.
+The path above is a small loader that needs nothing from Hyprland. It
+opens the plugin itself, from `hypr-de-scene-impl.so` beside it, and only
+in the Hyprland build both were compiled for. When the plugin cannot be
+opened, for example because the new Hyprland no longer has a symbol it
+needs, the loader stays idle the same way and the journal line gives the
+dynamic linker's reason.
 
-Either way, rebuild the package on the machine, against the Hyprland now
-installed, and log in again.
+Rebuild the package on the machine, against the Hyprland now installed,
+and log in again.
+
+One upgrade the loader cannot cover is a change to Hyprland's plugin API
+version, which is `0.2` in Hyprland 0.57.2 and on its main branch. Hyprland
+checks it before any plugin code runs and shows its own failed-to-load
+notification.
 
 **Arch**, from a checkout:
 
