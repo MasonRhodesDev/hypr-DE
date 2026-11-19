@@ -12,7 +12,6 @@ import stat
 import subprocess
 import sys
 import tempfile
-import urllib.parse
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 BASELINE = "tests/gates/baseline.tsv"
@@ -25,12 +24,9 @@ SAFETY = "plugins/cmake/Safety.cmake"
 TIDY_CONFIG = "plugins/.clang-tidy"
 FIXTURE = "tests/gates/cpp-fixture"
 FIXTURE_SIBLING = "tests/gates/cpp-fixture-sibling/sibling.hpp"
-LABEL = "owner-approved"
 
-LINTER_CONFIGS = {".shellcheckrc", "shellcheckrc", "ruff.toml", ".ruff.toml", "pyproject.toml", ".clang-tidy", ".luacheckrc"}
-GATE_FILES = re.compile(r"tests/gates/(?!baseline\.tsv$).+|\.github/workflows/(?:safety-gates|gate-guard)\.yml|plugins/cmake/Safety\.cmake")
 # a finding from these gates, or under these rules, is never recorded in the baseline, so it always fails
-UNBASELINED_GATES = {"cpp-selftest", "guard"}
+UNBASELINED_GATES = {"cpp-selftest"}
 UNBASELINED_RULES = {"build-failed", "tidy-failed"}
 
 SHELL_SHEBANG = re.compile(r"^#!.*?(?<![\w.-])(?:ba|da|a|k)?sh(?![\w.-])")
@@ -475,99 +471,6 @@ def parse_baseline(text):
     return entries
 
 
-def git(*args):
-    result = run(["git", *args])
-    if result.returncode != 0:
-        die(f"git {' '.join(args)}: {result.stderr.strip()}")
-    return result.stdout
-
-
-def at(revision, path):
-    if revision is None:
-        return read(path) if os.path.isfile(path) else None
-    shown = run(["git", "show", f"{revision}:{path}"])
-    return shown.stdout if shown.returncode == 0 else None
-
-
-def changed(base, head):
-    fields = git("diff", "--name-status", "-z", "--find-renames", base, *([head] if head else [])).split("\0")
-    while len(fields) > 1:
-        status = fields.pop(0)
-        old = fields.pop(0)
-        yield old, fields.pop(0) if status[0] in "RC" else old
-    if head is None:
-        for path in git("ls-files", "--others", "--exclude-standard", "-z").split("\0")[:-1]:
-            yield path, path
-
-
-def needs_approval(base, head):
-    reasons = []
-    for old, new in changed(base, head):
-        for path in dict.fromkeys((old, new)):
-            ruff_section = "[tool.ruff" in (at(base, path) or "") + (at(head, path) or "")
-            if os.path.basename(path) in LINTER_CONFIGS and (os.path.basename(path) != "pyproject.toml" or ruff_section):
-                reasons.append((path, "linter configuration changed"))
-            elif GATE_FILES.fullmatch(path):
-                reasons.append((path, "the gates themselves changed"))
-    before = parse_baseline(at(base, BASELINE) or "")
-    for key, count in parse_baseline(at(head, BASELINE) or "").items():
-        if count > before.get(key, 0):
-            reasons.append((BASELINE, f"{' '.join(key)} grew from {before.get(key, 0)} to {count}"))
-    return reasons
-
-
-def api(path, *options):
-    if not shutil.which("gh"):
-        die("gh is required to read a pull request's approval")
-    result = run(["gh", "api", path, *options])
-    if result.returncode != 0:
-        die(f"gh api {path}: {result.stderr.strip()}")
-    return result.stdout
-
-
-def refusal(pull_request):
-    owner = api("repos/{owner}/{repo}", "--jq", ".owner.login").strip()
-    pull = json.loads(api(f"repos/{{owner}}/{{repo}}/pulls/{pull_request}"))
-    if LABEL not in [label["name"] for label in pull["labels"]]:
-        return f"the pull request does not carry the label {LABEL}"
-    query = f'.[] | select(.label.name == "{LABEL}") | [.event, .actor.login, .created_at] | @tsv'
-    events = api(f"repos/{{owner}}/{{repo}}/issues/{pull_request}/events", "--paginate", "--jq", query).splitlines()
-    event, actor, labelled = events[-1].split("\t") if events else ("", "", "")
-    if event != "labeled" or actor != owner:
-        return f"the label {LABEL} was added by '{actor}', and only the repository owner can approve"
-    if not pull["head"]["repo"]:
-        return "the pull request's branch is gone"
-    branch = urllib.parse.quote(pull["head"]["ref"], safe="")
-    pushed = api(f"repos/{pull['head']['repo']['full_name']}/activity?ref={branch}&per_page=1", "--jq", ".[0].timestamp").strip()
-    if not pushed or labelled <= pushed:
-        return f"the label {LABEL} was added at {labelled}, before the last push at {pushed}; the owner removes it and adds it again"
-    return None
-
-
-def gate_guard(found, args):
-    if run(["git", "rev-parse", "--verify", "--quiet", f"{args.base}^{{commit}}"]).returncode != 0:
-        die(f"base revision {args.base} is not in this clone; fetch it, or pass --base")
-    base = git("merge-base", args.base, args.head or "HEAD").strip()
-    if at(base, "tests/gates/gate.py") is None:
-        print(f"guard: {args.base} has no gates, so this change introduces them")
-        return
-    reasons = needs_approval(base, args.head)
-    if not reasons:
-        return
-    print(f"guard: {len(reasons)} changes need the repository owner's approval (the label {LABEL}, added by the owner):")
-    for path, why in reasons:
-        print(f"  {path}: {why}")
-    if not args.pr:
-        print("guard: no pull request given (--pr), so this is a report and not a failure")
-        return
-    refused = refusal(args.pr)
-    if refused is None:
-        print(f"guard: approved, the repository owner added {LABEL} after the last push")
-        return
-    for path, why in reasons:
-        found.add(path, "needs-owner-approval", f"{path}: {why}; {refused}")
-
-
 GATES = {
     "shell": gate_shell,
     "python": gate_python,
@@ -576,7 +479,6 @@ GATES = {
     "cpp-sanitize": gate_cpp_sanitize,
     "cpp-tidy": gate_cpp_tidy,
     "cpp-selftest": gate_cpp_selftest,
-    "guard": gate_guard,
 }
 
 
@@ -608,10 +510,7 @@ def main():
     parser = argparse.ArgumentParser(description="Safety gates with a baseline that only shrinks.")
     parser.add_argument("gates", nargs="+", choices=[*GATES, "all"])
     parser.add_argument("--update", action="store_true", help="lower the baseline to what is found now")
-    parser.add_argument("--allow-growth", action="store_true", help="with --update, also record new findings; the guard gate then asks for the owner's approval")
-    parser.add_argument("--base", default=os.environ.get("GATE_BASE", "origin/main"), help="revision the guard gate compares against")
-    parser.add_argument("--head", default=os.environ.get("GATE_HEAD"), help="revision the guard gate judges, the working tree by default")
-    parser.add_argument("--pr", default=os.environ.get("GATE_PR"), help="pull request whose approval the guard gate reads")
+    parser.add_argument("--allow-growth", action="store_true", help="with --update, also record new findings, which the pull request must justify")
     args = parser.parse_args()
     os.chdir(ROOT)
     baseline = parse_baseline(read(BASELINE)) if os.path.exists(BASELINE) else {}

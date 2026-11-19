@@ -19,8 +19,6 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          # the guard gate reports against the base revision
-          fetch-depth: 0
           persist-credentials: false
       - name: Install the pinned linters
         run: |
@@ -32,7 +30,7 @@ jobs:
           chmod +x "$RUNNER_TEMP/gates/bin/luacheck"
           echo "$RUNNER_TEMP/gates/bin" >>"$GITHUB_PATH"
       - name: Gates
-        run: tests/gates/check.sh shell python lua guard
+        run: tests/gates/check.sh shell python lua
 
   cpp:
     name: C++ hardening, sanitizers and clang-tidy

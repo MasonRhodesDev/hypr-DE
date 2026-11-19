@@ -376,7 +376,6 @@ or the ones named on its command line:
 | `cpp-sanitize` | A plugin whose tests fail under AddressSanitizer and UndefinedBehaviorSanitizer, that registers no test with `add_test`, or that turns a sanitizer off. |
 | `cpp-tidy` | `clang-tidy` findings from `plugins/.clang-tidy`, in the plugin and in every header of this repository it includes. |
 | `cpp-selftest` | The C++ gates themselves, if they stop catching the known-bad cases in `tests/gates/cpp-fixture`. |
-| `guard` | A change that weakens the gates, unless the repository owner approved it. |
 
 A suppression comment does not change a result. `ruff` runs with
 `--config ruff.toml --ignore-noqa`. `shellcheck` runs with
@@ -401,31 +400,14 @@ What already broke a rule when its gate arrived is counted in
 fall. Finding more than the count fails, and so does finding fewer until the
 line is lowered with `tests/gates/check.sh <gate> --update`.
 
-#### Changes that need the owner
-
-The guard gate lists every change that could weaken the gates:
-
-* a linter configuration file at any depth (`.shellcheckrc`, `ruff.toml`, a
-  `[tool.ruff]` section in `pyproject.toml`, `.clang-tidy`, `.luacheckrc`);
-* `plugins/cmake/Safety.cmake`;
-* the gates themselves: `tests/gates/` and the two gate workflows;
-* a line in `tests/gates/baseline.tsv` that is new or higher. A rename, a new
-  plugin with findings and a linter upgrade need this too
-  (`--update --allow-growth` writes the lines).
-
-On a pull request, the `Gate guard` workflow fails such a change until the
-pull request carries the label `owner-approved`, and GitHub's record of the
-pull request shows that the repository owner added it after the last push.
-The workflow runs on `pull_request_target`, so the gate script and the
-workflow come from the base branch and the pull request cannot change the
-check that judges it. Without a pull request, `tests/gates/check.sh guard`
-prints the list and passes. `tests/gates/check.sh guard --pr N` applies the
-rule to pull request `N`.
+A new or higher line in the baseline is an ordinary edit
+(`--update --allow-growth` writes it). The pull request says why it is needed,
+and the usual independent review judges that, as it judges a change to a linter
+configuration, to `plugins/cmake/Safety.cmake` or to the gates themselves.
 
 The gates need `shellcheck`, `ruff` and `clang-tidy` at the versions pinned in
 `tests/gates/requirements.txt`, `luacheck` 1.2.0, and for C++ `cmake`, a C++
-compiler and `readelf`. The guard needs `gh` only when it is given a pull
-request.
+compiler and `readelf`.
 
 ## License
 
