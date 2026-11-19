@@ -104,9 +104,9 @@ fedora = ["python3"]
 arch = ["python"]
 
 [scene-plugin]
-reason = "hypr-de-scene package: Hyprland plugin that draws the boot scene from a session's first frame until desktop-boot's login splash covers it. It is compiled against the Hyprland headers present at package build and stays idle, with a journal line, in any other Hyprland build until it is rebuilt. hyprland carries no version here and the main package never depends on this one: workspace-zones pinned its Hyprland, and with no port for a new release the pin held Hyprland back"
+reason = "hypr-de-scene package: Hyprland plugin that draws the boot scene from a session's first frame until desktop-boot's login splash covers it. It is compiled against the Hyprland headers present at package build and stays idle, with a journal line, in any other Hyprland build until it is rebuilt. cairo and libdrm are the libraries it links, which rpm finds on its own. hyprland carries no version here and the main package never depends on this one: workspace-zones pinned its Hyprland, and with no port for a new release the pin held Hyprland back"
 subpackage = "scene"
-fedora = ["cairo", "hyprland", "libdrm"]
+fedora = ["hyprland"]
 arch = ["cairo", "hyprland", "libdrm"]
 
 [optional-extras]

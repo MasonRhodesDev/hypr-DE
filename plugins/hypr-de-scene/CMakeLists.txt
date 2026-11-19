@@ -7,7 +7,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(deps REQUIRED IMPORTED_TARGET hyprland cairo libdrm pixman-1 glesv2)
+pkg_check_modules(headers REQUIRED hyprland pixman-1)
+pkg_check_modules(libs REQUIRED IMPORTED_TARGET cairo libdrm glesv2)
 
 add_library(hypr-de-scene SHARED
     src/main.cpp
@@ -19,9 +20,12 @@ add_library(hypr-de-scene SHARED
     src/Spec.cpp)
 
 set_target_properties(hypr-de-scene PROPERTIES PREFIX "")
+target_include_directories(hypr-de-scene PRIVATE ${headers_INCLUDE_DIRS})
 # the placement must round exactly as the Python reference does
-target_compile_options(hypr-de-scene PRIVATE -Wall -Wextra -Wno-unused-parameter -ffp-contract=off)
-target_link_libraries(hypr-de-scene PRIVATE PkgConfig::deps)
+target_compile_options(hypr-de-scene PRIVATE ${headers_CFLAGS_OTHER} -Wall -Wextra -Wno-unused-parameter -ffp-contract=off)
+# Hyprland has its own libraries loaded already. Naming them here would tie the plugin to their
+# sonames, and then a library bump stops the load before the plugin can say what is wrong.
+target_link_libraries(hypr-de-scene PRIVATE PkgConfig::libs)
 
 include(GNUInstallDirs)
 install(TARGETS hypr-de-scene LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/hypr-de)

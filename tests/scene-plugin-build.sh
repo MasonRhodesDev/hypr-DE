@@ -25,9 +25,24 @@ else
     exit 1
 fi
 
-symbols=$(nm -D --defined-only "$work/build/hypr-de-scene.so")
+plugin=$work/build/hypr-de-scene.so
+symbols=$(nm -D --defined-only "$plugin")
 for entry in pluginAPIVersion pluginInit pluginExit; do
     grep -qw "$entry" <<<"$symbols" && ok "exports $entry" || bad "does not export $entry"
 done
+
+loaded() { ldd "$1" | awk '$2 == "=>" && $3 ~ /^\// { print $3 }'; }
+if hyprland=$(command -v Hyprland); then
+    mapfile -t objects < <(printf '%s\n' "$hyprland"; loaded "$hyprland"; loaded "$plugin")
+    provided=$(nm -D --defined-only "${objects[@]}" 2>/dev/null | awk 'NF >= 3 { sub(/@.*/, "", $NF); print $NF }' | sort -u)
+    missing=$(nm -D --undefined-only "$plugin" | awk '$1 == "U" { sub(/@.*/, "", $2); print $2 }' | sort -u | comm -23 - <(printf '%s\n' "$provided"))
+    if [ -z "$missing" ]; then
+        ok "Hyprland and the libraries it loads provide every symbol the plugin needs"
+    else
+        bad "nothing Hyprland loads provides: $(tr '\n' ' ' <<<"$missing")"
+    fi
+else
+    echo "skip  no Hyprland binary in this environment, so the plugin's symbols were not resolved against it"
+fi
 
 exit "$fail"

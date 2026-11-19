@@ -16,9 +16,7 @@ BuildRequires:  pkgconfig(libdrm)
 BuildRequires:  pkgconfig(pixman-1)
 BuildRequires:  bubblewrap
 
-Requires:       cairo
 Requires:       hyprland
-Requires:       libdrm
 Recommends:     desktop-boot
 
 %description
