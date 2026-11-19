@@ -253,10 +253,15 @@ manager's environment: `WAYLAND_DISPLAY`, plus whatever `UWSM_WAIT_VARNAMES`
 names (uwsm adds `HYPRLAND_INSTANCE_SIGNATURE` for Hyprland). hypr-DE keeps
 that guard and makes it quick. A drop-in runs `wayland-session-waitenv.service`
 with hypr-DE's `hypr-de-waitenv` in place of `uwsm aux waitenv`. It reads the
-same variables, timeout and settle, but checks every 10 ms instead of every
-0.5 s, and a timeout fails the unit. uwsm then shuts the session down rather
-than start it half configured. The drop-in applies to every uwsm compositor,
-since the waiter keeps uwsm's semantics. `/etc/xdg/uwsm/env-hyprland` also sets
+same variables, timeout and settle, and logs the same lines. It checks every
+10 ms for the first 2 s, then every 100 ms, where uwsm checks every 0.5 s. On
+timeout it exits 1 as uwsm does, so the unit fails and uwsm shuts the session
+down rather than start it half configured. A failed read of the manager's
+environment is retried for up to 2 s before the waiter gives up. The drop-in
+applies to every uwsm compositor, since the waiter keeps uwsm's semantics. To
+go back to uwsm's own waiter, mask the drop-in for your user with
+`ln -s /dev/null ~/.config/systemd/user/wayland-session-waitenv.service.d/hypr-de.conf`
+(create the directory first), then log in again. `/etc/xdg/uwsm/env-hyprland` also sets
 `UWSM_WAIT_VARNAMES_SETTLETIME` to 0, because hypr-DE exports the session's
 variables in one call, and that takes uwsm's 0.2 s settle pause off every
 login. A value set earlier in the environment, or in

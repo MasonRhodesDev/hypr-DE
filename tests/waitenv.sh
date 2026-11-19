@@ -29,6 +29,10 @@ cat >"$work/bin/systemctl" <<'EOF'
 echo "systemctl $*" >>"$CASE/calls"
 [ "$*" = "--user show-environment" ] || exit 1
 [ -e "$CASE/unreachable" ] && exit 1
+if [ -s "$CASE/fail-reads" ]; then
+    n=$(cat "$CASE/fail-reads")
+    if [ "$n" -gt 0 ]; then echo $(( n - 1 )) >"$CASE/fail-reads"; exit 1; fi
+fi
 cat "$CASE/env"
 EOF
 cat >"$work/bin/busctl" <<'EOF'
@@ -82,7 +86,7 @@ took() { echo $(( $(cat "$work/$1/done") - $(cat "$work/$1/${2:-start}") )); }
 
 stock=(UWSM_WAIT_VARNAMES=HYPRLAND_INSTANCE_SIGNATURE UWSM_WAIT_VARNAMES_SETTLETIME=0)
 
-echo "== the waiter returns within about 30 ms of the variables arriving"
+echo "== the waiter returns well inside uwsm's 0.5 s check after the variables arrive"
 lat=()
 for i in 1 2 3 4 5 6 7 8 9; do
     seed "lat$i" XDG_CURRENT_DESKTOP=Hyprland
@@ -94,7 +98,7 @@ for i in 1 2 3 4 5 6 7 8 9; do
 done
 median=$(printf '%s\n' "${lat[@]}" | sort -n | sed -n 5p)
 echo "     latencies ms: ${lat[*]}"
-check "$(( median <= 30 ))" 1 "the median latency is at most 30 ms (${median} ms)" \
+check "$(( median <= 100 ))" 1 "the median latency is at most 100 ms (${median} ms)" \
     "the waiter took ${median} ms (median) to notice the variables"
 grep -q '^All expected variables appeared in activation environment\.$' "$work/lat1/out"
 check $? 0 "it logs the line the boot timeline marks as V" "the waiter no longer logs uwsm's V line"
@@ -124,6 +128,24 @@ publish args ARG_VAR=1
 check "$(finish args)" 0 "and its arrival ends the wait" "the waiter did not exit 0 once its argument arrived"
 grep -q '^Still expecting:$' "$work/stage/out"
 check $? 0 "it reports partial progress" "the waiter did not report the variables still missing"
+
+echo
+echo "== it filters the wait list as uwsm's filter_varnames does"
+seed filter WAYLAND_DISPLAY=wayland-1
+start filter "UWSM_WAIT_VARNAMES=SHELL _ PWD OLDWD 1A A-B A.B _1 B" UWSM_WAIT_VARNAMES_SETTLETIME=0 -- 'C D' X
+sleep 0.15
+check "$(running filter)" running "valid names still hold the wait" "the waiter dropped a valid name"
+publish filter _1=1 B=2 X=3
+check "$(finish filter)" 0 "the shell's own names and illegal names are never waited for" \
+    "the waiter waited for a dropped or illegal name"
+for v in 1A A-B A.B 'C D'; do
+    grep -qxF "Encountered illegal var \"$v\"." "$work/filter/out"
+    check $? 0 "an illegal name ($v) is reported in uwsm's words" "the waiter did not report the illegal name $v"
+done
+check "$(grep -c -e SHELL -e PWD -e OLDWD -e '"_"' "$work/filter/out")" 0 \
+    "the shell's own names are dropped silently" "the waiter reported a shell name it should drop silently"
+check "$(grep -A1 -x 'Still expecting:' "$work/filter/out" | sed -n 2p)" "  X, _1, B" \
+    "_1 and B pass the name pattern and are waited for" "the waiter's wait list differs from uwsm's"
 
 echo
 echo "== it honours the settle time"
@@ -159,22 +181,52 @@ done
 check "$(running to-bad)" running "an invalid timeout falls back to uwsm's 30 s" "an invalid timeout ended the wait early"
 check "$(running to-forever)" running "the unit's infinite timeout wins over the variable" \
     "an infinite TimeoutStartSec did not win over UWSM_WAIT_VARNAMES_TIMEOUT"
-grep -q 'nearing timeout' "$work/to-env/out"
-check $? 0 "it warns near the timeout" "the waiter did not warn near the timeout"
+grep -qxF 'Still waiting for variables in activation environment, nearing timeout:' "$work/to-env/out"
+check $? 0 "it warns near the timeout in uwsm's words" "the waiter did not warn near the timeout"
+grep -qxF 'Timed out waiting for variables in activation environment:' "$work/to-env/out"
+check $? 0 "it reports the timeout in uwsm's words" "the waiter did not report the timeout"
+grep -qxF 'Expected integer value from UWSM_WAIT_VARNAMES_TIMEOUT var, got: soon' "$work/to-bad/out"
+check $? 0 "an invalid timeout is reported in uwsm's words" "the waiter did not report the invalid timeout"
+check "$(grep -c -e 'Warning!' -e 'Error!' "$work"/*/out | grep -vc ':0$')" 0 \
+    "no line carries a prefix uwsm does not print" "the waiter still prefixes its lines"
 kill "$(cat "$work/to-bad/wpid")" "$(cat "$work/to-forever/wpid")" 2>/dev/null
 
 echo
-echo "== it fails when the manager cannot be read, and changes nothing"
+echo "== it rides out brief read failures, fails when the manager stays unreadable, and changes nothing"
+seed blip WAYLAND_DISPLAY=wayland-1
+echo 2 >"$work/blip/fail-reads"
+start blip UWSM_WAIT_VARNAMES_SETTLETIME=0
+check "$(finish blip)" 0 "two failed reads then a good one exit 0" "the waiter gave up on a brief read failure"
+check "$(grep -c 'show-environment' "$work/blip/calls")" 3 "it read three times" "the waiter read a different number of times"
+t=$(took blip)
+check "$(( t < 300 ))" 1 "and returned promptly (${t} ms)" "a brief read failure cost ${t} ms"
 seed down WAYLAND_DISPLAY=wayland-1
 : >"$work/down/unreachable"
 start down
-check "$(finish down)" 1 "an unreadable manager environment exits 1" "the waiter did not fail on an unreadable manager"
+check "$(finish down)" 1 "a manager that stays unreadable exits 1" "the waiter did not fail on an unreadable manager"
+t=$(took down)
+check "$(( t >= 1900 && t < 3000 ))" 1 "after 2 s of failed reads, well inside the timeout (${t} ms)" \
+    "the waiter gave up on an unreadable manager after ${t} ms, not 2 s"
 calls=$(cat "$work"/*/calls | sort -u | paste -sd'|' -)
 check "${calls}" \
     "busctl --user get-property org.freedesktop.systemd1 /org/freedesktop/systemd1/unit/wayland_2dsession_2dwaitenv_2eservice org.freedesktop.systemd1.Service TimeoutStartUSec|systemctl --user show-environment" \
     "it only reads the manager" "the waiter called something other than the two reads"
 check "$(find "$work/runtime" -mindepth 1 | wc -l)" 0 "it writes nothing to uwsm's runtime dir or cleanup list" \
     "the waiter wrote under XDG_RUNTIME_DIR"
+
+echo
+echo "== it backs off to 100 ms checks after 2 s"
+start slow
+sleep 3
+a=$(grep -c show-environment "$work/slow/calls")
+sleep 1
+b=$(grep -c show-environment "$work/slow/calls")
+check "$(( b - a >= 5 && b - a <= 12 ))" 1 "about 10 reads in the fourth second ($(( b - a )))" \
+    "the waiter read $(( b - a )) times in one second after 3 s"
+publish slow WAYLAND_DISPLAY=wayland-1
+check "$(finish slow)" 0 "and still exits 0 once the variables arrive" "the slow waiter did not exit 0"
+t=$(took slow published)
+check "$(( t < 400 ))" 1 "within one slow check plus the settle (${t} ms)" "the slow waiter took ${t} ms"
 
 echo
 echo "== the drop-in replaces waitenv's ExecStart with the waiter alone"
