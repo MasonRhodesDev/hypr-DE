@@ -22,10 +22,21 @@ done
 [[ -S "$XDG_RUNTIME_DIR/wayland-1" ]] || { echo "nested-readback: sway did not start, see $out/sway.log" >&2; exit 1; }
 
 own_wallpaper=true
-[[ "$case" = N2b ]] && own_wallpaper=false
+[[ "$case" = N2b || "$case" = N11 ]] && own_wallpaper=false
+# the host's window is the only output there could be, so without it Hyprland starts with none
+no_output=false
+[[ "$case" = N12 || "$case" = N13 ]] && no_output=true
 {
     echo "hl.config({ misc = { disable_hyprland_logo = $own_wallpaper, disable_splash_rendering = true, disable_watchdog_warning = true, background_color = \"rgb(203040)\" } })"
     echo 'hl.config({ animations = { enabled = true } })'
+    "$no_output" && echo 'hl.monitor({ output = "WAYLAND-1", disabled = true })'
+    # wtype sends a keymap of its own, so binds match its symbols and not the layout's
+    [[ "$case" = N10 || "$case" = N14 ]] && echo 'hl.config({ input = { resolve_binds_by_sym = true } })'
+    case $case in
+        N10) echo "hl.bind(\"SUPER + L\", hl.dsp.exec_cmd(\"touch $out/bound\"))" ;;
+        N14) echo 'hl.bind("SUPER + L", hl.dsp.exec_cmd("hyprlock --no-fade-in --immediate-render -c /dev/null"))' ;;
+        *) ;;
+    esac
     if [[ "$case" = readback ]]; then
         echo 'hl.monitor({ output = "HEADLESS-2", mode = "3440x1440@60", position = "auto", scale = 1 })'
         echo 'hl.monitor({ output = "HEADLESS-3", mode = "3840x2160@60", position = "auto", scale = 1.5, transform = 3 })'
@@ -38,7 +49,9 @@ own_wallpaper=true
         echo 'hl.monitor({ output = "HEADLESS-10", mode = "1280x1024@60", position = "auto", scale = 1, transform = 7 })'
     else
         for n in 2 3 4 5; do
-            echo "hl.monitor({ output = \"HEADLESS-$n\", mode = \"1280x720@60\", position = \"auto\", scale = 1 })"
+            mirror=
+            [[ "$case" = N11 && "$n" = 4 ]] && mirror=', mirror = "HEADLESS-2"'
+            echo "hl.monitor({ output = \"HEADLESS-$n\", mode = \"1280x720@60\", position = \"auto\", scale = 1$mirror })"
         done
     fi
     echo "hl.plugin.load(\"$plugin\")"
@@ -68,7 +81,7 @@ case $case in
     readback) export HYPR_DE_SCENE_TIMEOUT=$SCENE_TIMEOUT HYPR_DE_SCENE_QUIET=$SCENE_TIMEOUT ;;
     N5) export HYPR_DE_SCENE_SPREAD=3 ;;
     N9) unset MANAGERPID ;;
-    N10) export HYPR_DE_SCENE_TIMEOUT=9 HYPR_DE_SCENE_QUIET=9 ;;
+    N10 | N14) export HYPR_DE_SCENE_TIMEOUT=9 HYPR_DE_SCENE_QUIET=9 ;;
     *) ;;
 esac
 
@@ -108,7 +121,7 @@ paint() {
 }
 state() { hyprctl -i "$sig" -j scene >"$out/$1.json" 2>&1; }
 
-if [[ "$case" != readback ]]; then
+if [[ "$case" != readback ]] && ! "$no_output"; then
     for n in 2 3 4; do hc output create headless "HEADLESS-$n"; done
 fi
 
@@ -150,13 +163,43 @@ case $case in
         sleep 0.3; state typed
         WAYLAND_DISPLAY=$display wtype -k F2
         sleep 0.3; state plain
-        WAYLAND_DISPLAY=$display wtype -M ctrl -M alt -k F2 -m alt -m ctrl
-        sleep 0.3; state chord
+        WAYLAND_DISPLAY=$display wtype -k XF86Switch_VT_2
+        sleep 0.3; state vt
+        WAYLAND_DISPLAY=$display wtype -M logo -k l -m logo
+        sleep 0.3; state bound
         scene release test
         sleep 0.6
         # wtype sends its own keymap first, and a key in the same instant can be lost
         WAYLAND_DISPLAY=$display wtype -s 300 world -k Return
         sleep 0.5
+        ;;
+    N11)
+        hc dispatch 'hl.dsp.dpms({ action = "off", monitor = "HEADLESS-3" })'
+        scene ready session
+        ;;
+    N12)
+        # Hyprland puts in its stand-in output once it has waited 2 s for a real one
+        sleep 3
+        WAYLAND_DISPLAY=$display wtype hello
+        sleep 0.3; state bare
+        hc output create headless HEADLESS-2
+        sleep 0.5
+        WAYLAND_DISPLAY=$display wtype hello
+        sleep 0.3; state covered
+        scene ready session
+        ;;
+    N13)
+        scene release test
+        sleep 0.5; state early
+        hc output create headless HEADLESS-2
+        sleep 0.5
+        ;;
+    N14)
+        client foot -e sh -c "cat >'$out/typed'"
+        sleep 1.5
+        WAYLAND_DISPLAY=$display wtype hello
+        sleep 0.3; state typed
+        WAYLAND_DISPLAY=$display wtype -M logo -k l -m logo
         ;;
     *) echo "nested-readback: no case $case" >&2 ;;
 esac
@@ -167,7 +210,7 @@ for _ in $(seq 120); do
 done
 sleep 1
 state final
-hyprctl -i "$sig" monitors >"$out/monitors.txt" 2>&1
+hyprctl -i "$sig" monitors all >"$out/monitors.txt" 2>&1
 # Hyprland lists a plugin only when its load succeeded, and only a failed load puts a notification on screen
 hyprctl -i "$sig" plugin list >"$out/plugins.txt" 2>&1
 

@@ -20,7 +20,11 @@ readback-check.py. Without CASE it runs them all:
   N7   a session lock during the hold
   N8   hyprctl scene release, and commands the scene refuses
   N9   Hyprland started without a service manager
-  N10  keys typed into a window under the scene
+  N10  keys typed into a window under the scene, with a keybind and a VT key
+  N11  Hyprland's own wallpaper with a mirrored output and one turned off
+  N12  no output at load, then Hyprland's stand-in output, then a real one
+  N13  hyprctl scene release before any output exists
+  N14  Super+L bound to the lock screen and pressed during the hold
   unload  the plugin unloaded while the scene covers, as a logout during the hold
 The cases also need swaybg, foot, wtype and hyprlock.
 NESTED_LIB_DIR is passed on to nested-readback.sh.
@@ -33,7 +37,7 @@ hyprland=$1 plugin=$2 data=$3 out=$4 scene_py=$5
 shift 5
 here=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 cases=("$@")
-[[ ${#cases[@]} -gt 0 ]] || cases=(readback N1 N2 N2b N3 N4 N5 N6 N7 N8 N9 N10 unload)
+[[ ${#cases[@]} -gt 0 ]] || cases=(readback N1 N2 N2b N3 N4 N5 N6 N7 N8 N9 N10 N11 N12 N13 N14 unload)
 for tool in swaybg foot wtype hyprlock; do
     command -v "$tool" >/dev/null || { echo "nested-cases: $tool is not installed" >&2; exit 2; }
 done

@@ -14,7 +14,7 @@ node from the host, and writes what each output committed to OUT_DIR:
   hyprctl.log  each scene command and its answer, and *.json the scene's record
 PLUGIN is the loader, and its directory is shared so the module beside it loads.
 CASE is readback (the default), which holds the scene on ten outputs until its
-timeout, or one of the readiness cases N1 to N10 in nested-cases.sh. The run
+timeout, or one of the readiness cases N1 to N14 in nested-cases.sh. The run
 ends by unloading the plugin and then stopping Hyprland, and fails if Hyprland
 dies or does not stop cleanly.
 

@@ -19,7 +19,9 @@ LINE = {
     "mapped": re.compile(r"^scene: layer (\S+) mapped on (\S+) at (\S+), (\d+) of (\d+) outputs"),
     "background": re.compile(r"^scene: background (ready|failed) on (\S+) at (\S+)"),
     "dropped": re.compile(r"^scene: holding input, first dropped (\S+) at (\S+)"),
-    "fading": re.compile(r"^scene: fading at (\S+), reason (\S+), (\d+)ms after first frame, missing (.*), dropped (\d+) input events$"),
+    "fading": re.compile(r"^scene: fading at (\S+), reason (\S+), (?:(\d+)ms after first frame|before any frame), missing (.*), dropped (\d+) input events$"),
+    "fallback": re.compile(r"^scene: (\S+) is Hyprland's stand-in for a missing output, leaving it uncovered"),
+    "drew": re.compile(r"^scene: drew (\S+) before its commit"),
     "released": re.compile(r"^scene: released at (\S+), fade (\d+)ms"),
     "dumped": re.compile(r"^scene: dumped (\S+) at (\S+)"),
 }
@@ -84,15 +86,39 @@ def main():
     if failures:
         sys.exit(1)
     fading_at, reason, after_first, missing, dropped = fadings[0]
-    fading_at, after_first, dropped = float(fading_at), int(after_first), int(dropped)
+    fading_at, dropped = float(fading_at), int(dropped)
+    after_first = int(after_first) if after_first is not None else None
     released_at = float(released[0][0])
+    final = record(out, "final")
+
+    # the host's window is disabled, so no screenshot shows Hyprland and the record speaks for it
+    if case in ("N12", "N13"):
+        check(final is not None and final["state"] == "released" and final["reason"] == reason,
+              f"{case}: hyprctl scene reports the scene released by {reason}")
+        drawn = sorted({g[0] for g in all_of("drew")} | {g[0] for g in all_of("first")})
+        if case == "N12":
+            bare, covered = record(out, "bare"), record(out, "covered")
+            stand_in = [g[0] for g in all_of("fallback")]
+            check(stand_in == ["FALLBACK"], f"N12: Hyprland's stand-in output came and was left uncovered ({' '.join(stand_in) or 'never seen'})")
+            check(drawn == ["HEADLESS-2"], f"N12: the scene drew only the real output ({' '.join(drawn) or 'none'})")
+            check(bare is not None and bare["state"] == "covering" and bare["outputs"] == [] and bare["held_ms"] == 0 and bare["dropped"] == 0,
+                  f"N12: keys typed while no real output exists pass, and no bound has started ({bare})")
+            check(covered is not None and covered["outputs"] == ["HEADLESS-2"] and covered["dropped"] >= 5,
+                  f"N12: once a real output is covered the same keys are held ({covered['dropped'] if covered else 'no record'})")
+            check(reason == "ready" and after_first is not None, f"N12: fading reason ready, timed from the real output's first frame ({reason}, {after_first} ms)")
+        else:
+            early = record(out, "early")
+            check(reason == "manual" and after_first is None, f"N13: a release before any output fades at once ({reason}, {after_first})")
+            check(early is not None and early["state"] == "released", f"N13: the scene reaches released within the fade ({early['state'] if early else 'no record'})")
+            check(0.18 <= released_at - fading_at <= 0.3, f"N13: the fade still takes 200 ms, {1000 * (released_at - fading_at):.0f} ms")
+            check(not drawn and final is not None and final["outputs"] == [], f"N13: an output created after the release is not covered ({' '.join(drawn) or 'none'})")
+        sys.exit(1 if failures else 0)
     # reading back ten outputs, some at 4K, holds up Hyprland's loop during the readback case's fade
     longest = 0.6 if case == "readback" else 0.3
     check(0.18 <= released_at - fading_at <= longest, f"{case}: the fade takes 200 ms, {1000 * (released_at - fading_at):.0f} ms")
 
     first = [float(g[1]) for g in all_of("first")]
     first_at = min(first) if first else None
-    final = record(out, "final")
     outputs = final["outputs"] if final else []
     check(final is not None and final["state"] == "released" and final["reason"] == reason,
           f"{case}: hyprctl scene reports the scene released by {reason}")
@@ -189,7 +215,7 @@ def main():
     elif case == "N9":
         check(reason == "ready" and after_first <= 100, f"N9: without a service manager the scene fades on its first frames ({reason}, {after_first} ms)")
     elif case == "N10":
-        typed, plain, chord = record(out, "typed"), record(out, "plain"), record(out, "chord")
+        typed, plain, vt, bound = record(out, "typed"), record(out, "plain"), record(out, "vt"), record(out, "bound")
         try:
             with open(os.path.join(out, "typed")) as f:
                 text = f.read()
@@ -198,12 +224,32 @@ def main():
         check(typed is not None and typed["dropped"] >= 5, f"N10: the five keys typed under the scene were dropped ({typed['dropped'] if typed else 'no record'})")
         check(typed is not None and plain is not None and plain["dropped"] - typed["dropped"] == 1,
               f"N10: F2 alone was dropped ({plain['dropped'] - typed['dropped'] if typed and plain else '?'})")
-        check(plain is not None and chord is not None and chord["dropped"] == plain["dropped"],
-              f"N10: Ctrl+Alt+F2 was not dropped, so it reaches Hyprland's VT switch ({chord['dropped'] - plain['dropped'] if plain and chord else '?'})")
-        # foot writes Ctrl+Alt+F2 as an escape sequence, since nested Hyprland has no VT to switch to
-        check(text == "\x1b[1;7Qworld\n",
-              f"N10: the window under the scene received only Ctrl+Alt+F2, and after release it received what was typed ({text!r})")
-        check(dropped == (chord["dropped"] if chord else -1), f"N10: the fade reports the dropped count ({dropped})")
+        check(plain is not None and vt is not None and vt["dropped"] == plain["dropped"],
+              f"N10: a VT switch key went to Hyprland's VT switch, not the hold ({vt['dropped'] - plain['dropped'] if plain and vt else '?'})")
+        check(os.path.exists(os.path.join(out, "bound")) and bound is not None and bound["state"] == "covering",
+              f"N10: Super+L ran its bound command while the scene still covered ({bound['state'] if bound else 'no record'})")
+        check(text == "world\n", f"N10: the window under the scene received nothing during the hold, and after release it received what was typed ({text!r})")
+        check(dropped == (bound["dropped"] if bound else -1), f"N10: the fade reports the dropped count ({dropped})")
+    elif case == "N11":
+        with open(os.path.join(out, "monitors.txt")) as f:
+            blocks = {b.split()[0]: b for b in f.read().split("Monitor ")[1:]}
+        ready = {g[1] for g in all_of("background") if g[0] == "ready"}
+        check("mirrorOf: none" not in blocks.get("HEADLESS-4", "mirrorOf: none") and "dpmsStatus: 0" in blocks.get("HEADLESS-3", ""),
+              "N11: HEADLESS-4 mirrors another output and HEADLESS-3 is off")
+        check(sorted(outputs) == ["HEADLESS-2", "WAYLAND-1"], f"N11: the rule counts only the outputs that show a frame of their own ({' '.join(outputs)})")
+        check("HEADLESS-4" not in ready, "N11: the mirror never drew a wallpaper of its own")
+        check(reason == "ready" and {"HEADLESS-2", "WAYLAND-1"} <= ready and after_first < 4000,
+              f"N11: fading reason ready once the wallpaper shows on the counted outputs, well before the timeout ({reason}, {after_first} ms)")
+    elif case == "N14":
+        typed = record(out, "typed")
+        try:
+            with open(os.path.join(out, "typed")) as f:
+                text = f.read()
+        except OSError:
+            text = None
+        check(typed is not None and typed["state"] == "covering" and typed["dropped"] >= 5, f"N14: the keys typed under the scene were dropped ({typed['dropped'] if typed else 'no record'})")
+        check(reason == "lock" and after_first < 4900, f"N14: Super+L during the hold locked the session, and the lock released the scene ({reason}, {after_first} ms)")
+        check(text == "", f"N14: the window under the scene received nothing ({text!r})")
     elif case == "readback":
         pass
     else:
