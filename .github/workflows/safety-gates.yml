@@ -20,6 +20,8 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           persist-credentials: false
+          # the ratchet reads the base commit and the pull request's commit messages
+          fetch-depth: 0
       - name: Install the pinned linters
         run: |
           python3 -m venv "$RUNNER_TEMP/gates"
@@ -32,28 +34,14 @@ jobs:
       - name: Gates
         run: tests/gates/check.sh classify shell python lua
 
-      # A pull request that changes the gates is also judged by the gates it would replace, so it cannot
-      # loosen a rule in the same change that relies on it. Not run when the gate code is unchanged.
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      # What the gates allow only shrinks: a grown baseline row, a class no gate reads or a changed linter
+      # configuration needs a "Gate-change:" line with its reason in a commit or the pull request body.
+      - name: The baseline only shrinks
         if: github.event_name == 'pull_request'
-        with:
-          ref: ${{ github.event.pull_request.base.sha }}
-          path: base-gates
-          sparse-checkout: tests/gates
-          persist-credentials: false
-      - name: Gates from the base branch
-        if: github.event_name == 'pull_request'
-        shell: bash
-        run: |
-          mv base-gates "$RUNNER_TEMP/base-gates"
-          base=$RUNNER_TEMP/base-gates/tests/gates
-          if [[ ! -f $base/gate.py ]] || ! grep -q -- '--tree' "$base/gate.py"; then
-            echo "the base branch has no gate that can judge another tree"
-          elif cmp -s "$base/gate.py" tests/gates/gate.py && cmp -s "$base/shim.py" tests/gates/shim.py; then
-            echo "the gate code is unchanged, so the gates above already judged it"
-          else
-            python3 -I "$base/gate.py" --tree "$GITHUB_WORKSPACE" classify shell python lua
-          fi
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          GATE_CHANGE_REASONS: ${{ github.event.pull_request.body }}
+        run: python3 -I tests/gates/ratchet.py "$BASE"
 
   cpp:
     name: C++ packages, sanitizers and clang-tidy
@@ -67,7 +55,7 @@ jobs:
         run: |
           echo "Server = https://archive.archlinux.org/repos/$ARCH_SNAPSHOT/\$repo/os/\$arch" >/etc/pacman.d/mirrorlist
           pacman -Syy --noconfirm archlinux-keyring
-          pacman -Suu --noconfirm --needed base-devel cmake git python
+          pacman -Suu --noconfirm --needed base-devel cmake git python strace
 
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
@@ -91,26 +79,3 @@ jobs:
 
       - name: C++ gates
         run: tests/gates/check.sh cpp-harden cpp-sanitize cpp-tidy cpp-selftest
-
-      # A pull request that changes the gates is also judged by the gates it would replace, so it cannot
-      # loosen a rule in the same change that relies on it. Not run when the gate code is unchanged.
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        if: github.event_name == 'pull_request'
-        with:
-          ref: ${{ github.event.pull_request.base.sha }}
-          path: base-gates
-          sparse-checkout: tests/gates
-          persist-credentials: false
-      - name: Gates from the base branch
-        if: github.event_name == 'pull_request'
-        shell: bash
-        run: |
-          mv base-gates "$RUNNER_TEMP/base-gates"
-          base=$RUNNER_TEMP/base-gates/tests/gates
-          if [[ ! -f $base/gate.py ]] || ! grep -q -- '--tree' "$base/gate.py"; then
-            echo "the base branch has no gate that can judge another tree"
-          elif cmp -s "$base/gate.py" tests/gates/gate.py && cmp -s "$base/shim.py" tests/gates/shim.py; then
-            echo "the gate code is unchanged, so the gates above already judged it"
-          else
-            python3 -I "$base/gate.py" --tree "$GITHUB_WORKSPACE" cpp-harden cpp-sanitize cpp-tidy
-          fi
