@@ -248,11 +248,24 @@ frame in which every declared layer is mapped on every output, and Hyprland's
 own wallpaper has loaded when it draws one. Every output fades together over
 0.2 s, and input and the cursor come back on the first faded frame.
 
-`graphical-session.target` waits for uwsm to see the Wayland environment.
-hypr-DE's `/etc/xdg/uwsm/env-hyprland` sets `UWSM_WAIT_VARNAMES_SETTLETIME`
-to 0, because hypr-DE exports the session's variables in one call, and that
-takes uwsm's 0.2 s settle pause off every login. A value set earlier in the environment,
-or in `~/.config/uwsm/env-hyprland`, wins.
+`graphical-session.target` waits until uwsm's wait list is in the user
+manager's environment: `WAYLAND_DISPLAY`, plus whatever `UWSM_WAIT_VARNAMES`
+names (uwsm adds `HYPRLAND_INSTANCE_SIGNATURE` for Hyprland). hypr-DE keeps
+that guard and makes it quick. A drop-in runs `wayland-session-waitenv.service`
+with hypr-DE's `hypr-de-waitenv` in place of `uwsm aux waitenv`. It reads the
+same variables, timeout and settle, and logs the same lines. It checks every
+10 ms for the first 2 s, then every 100 ms, where uwsm checks every 0.5 s. On
+timeout it exits 1 as uwsm does, so the unit fails and uwsm shuts the session
+down rather than start it half configured. A failed read of the manager's
+environment is retried for up to 2 s before the waiter gives up. The drop-in
+applies to every uwsm compositor, since the waiter keeps uwsm's semantics. To
+go back to uwsm's own waiter, mask the drop-in for your user with
+`ln -s /dev/null ~/.config/systemd/user/wayland-session-waitenv.service.d/hypr-de.conf`
+(create the directory first), then log in again.
+`/etc/xdg/uwsm/env-hyprland` also sets `UWSM_WAIT_VARNAMES_SETTLETIME` to 0,
+because hypr-DE exports the session's variables in one call, and that takes
+uwsm's 0.2 s settle pause off every login. A value set earlier in the
+environment, or in `~/.config/uwsm/env-hyprland`, wins.
 
 Every output there means each output that shows a frame of its own. A mirror,
 an output that is off or disabled, and the `FALLBACK` output Hyprland puts in
