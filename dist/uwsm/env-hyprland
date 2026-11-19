@@ -1,5 +1,11 @@
 export LIBSEAT_BACKEND=logind
 
+# uwsm waits for WAYLAND_DISPLAY and HYPRLAND_INSTANCE_SIGNATURE, and main.lua
+# exports them with the rest of the session's variables in one call, so the
+# default 0.2 s settle after they appear only delays graphical-session.target
+# and the boot scene's release.
+export UWSM_WAIT_VARNAMES_SETTLETIME="${UWSM_WAIT_VARNAMES_SETTLETIME:-0}"
+
 if [ -d /sys/module/nvidia ]; then
     export LIBVA_DRIVER_NAME=nvidia
     export __GLX_VENDOR_LIBRARY_NAME=nvidia
