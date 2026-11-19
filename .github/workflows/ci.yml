@@ -56,6 +56,8 @@ jobs:
 
       - name: Installer trust behaviour
         run: ./tests/installer-trust.sh
+      - name: Scene plugin places the logo where scene.py does
+        run: ./tests/scene-geometry.sh
       - name: Steam launch-option validation
         run: ./tests/steam-launch-options.sh
 
