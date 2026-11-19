@@ -1,0 +1,35 @@
+# Maintainer: Mason Rhodes <mrhodesdev@gmail.com>
+pkgname=hypr-de-scene
+pkgver=0.2.39
+pkgrel=1
+pkgdesc="Hyprland plugin that keeps the boot scene on screen from a session's first frame"
+arch=('x86_64')
+url="https://github.com/MasonRhodesDev/hypr-DE"
+license=('MIT')
+makedepends=('cmake' 'hyprland')
+checkdepends=('bubblewrap')
+optdepends=('desktop-boot: the scene and the login splash this plugin hands over to; without it the plugin stays idle')
+source=("$pkgname-$pkgver.tar.gz::https://github.com/MasonRhodesDev/hypr-DE/archive/v$pkgver.tar.gz")
+sha256sums=('0000000000000000000000000000000000000000000000000000000000000000')
+
+_depends_scene=(cairo hyprland libdrm)
+depends=("${_depends_scene[@]}")
+
+build() {
+  cd "$srcdir"; cd "hypr-DE-$pkgver" 2>/dev/null || cd "$pkgname-$pkgver"
+  cmake -S plugins/hypr-de-scene -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+  cmake --build build
+}
+
+check() {
+  cd "$srcdir"; cd "hypr-DE-$pkgver" 2>/dev/null || cd "$pkgname-$pkgver"
+  export HYPR_DE_ALLOW_UNSEALED=1
+  ./tests/scene-geometry.sh
+  ./tests/scene-plugin-build.sh
+}
+
+package() {
+  cd "$srcdir"; cd "hypr-DE-$pkgver" 2>/dev/null || cd "$pkgname-$pkgver"
+  DESTDIR="$pkgdir" cmake --install build
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

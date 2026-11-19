@@ -119,6 +119,7 @@ steam-clean-shutdown user units.
 cp -a dist dist-build
 LIBEXECDIR=%{_libexecdir}/hypr-de \
 WAYBAR_CFFI=%{_libdir}/waybar/workspace_buttons.so \
+SCENE_PLUGIN=%{_libdir}/hypr-de/hypr-de-scene.so \
     ./packaging/substitute.sh dist-build
 mkdir -p dist-build/lmtt-system-modules
 mv dist-build/lmtt/modules/* dist-build/lmtt-system-modules/
