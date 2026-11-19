@@ -36,9 +36,15 @@ jobs:
     name: C++ hardening, sanitizers and clang-tidy
     runs-on: ubuntu-24.04
     container: archlinux:latest@sha256:b0deabeb3d283da2c7f7dbf0eea051b7b2cd0554e0b737cc457fd21683bdcdd1
+    env:
+      # GCC, Hyprland and the rest come from this Arch Linux Archive day, so the baseline's counts move only when it does
+      ARCH_SNAPSHOT: 2026/11/18
     steps:
       - name: Install the toolchain
-        run: pacman -Syu --noconfirm --needed base-devel cmake git python
+        run: |
+          echo "Server = https://archive.archlinux.org/repos/$ARCH_SNAPSHOT/\$repo/os/\$arch" >/etc/pacman.d/mirrorlist
+          pacman -Syy --noconfirm archlinux-keyring
+          pacman -Suu --noconfirm --needed base-devel cmake git python
 
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
