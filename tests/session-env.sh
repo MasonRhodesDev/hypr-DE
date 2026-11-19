@@ -29,8 +29,9 @@ check "${common}" 0 "other compositors keep uwsm's settle" \
 echo
 echo "== the session's variables arrive with the ones uwsm waits for"
 exports=$(grep -E '^\s*hl\.exec_cmd\("dbus-update-activation-environment --systemd ' "$root/dist/hypr/main.lua")
-together=$(grep -w WAYLAND_DISPLAY <<<"${exports}" | grep -w HYPRLAND_INSTANCE_SIGNATURE | grep -cw XDG_CURRENT_DESKTOP)
-check "$(( together > 0 ))" 1 "one export carries WAYLAND_DISPLAY, HYPRLAND_INSTANCE_SIGNATURE and XDG_CURRENT_DESKTOP" \
+together=$(grep -w WAYLAND_DISPLAY <<<"${exports}" | grep -w HYPRLAND_INSTANCE_SIGNATURE | grep -w XDG_CURRENT_DESKTOP |
+    grep -w XDG_SESSION_TYPE | grep -w XDG_SESSION_ID | grep -cw XDG_SESSION_DESKTOP)
+check "$(( together > 0 ))" 1 "one export carries every session variable uwsm hands on" \
     "main.lua exports the session's variables in separate calls, so with no settle one can land after uwsm stops waiting"
 
 exit "$fail"
