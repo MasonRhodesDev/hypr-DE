@@ -65,6 +65,9 @@ __attribute__((constructor)) static void load() {
     setvbuf(stdout, nullptr, _IONBF, 0);
     printf("running %s\n", __hyprland_api_get_hash());
 
+    if (const char* NEIGHBOUR = getenv("SCENE_NEIGHBOUR"); NEIGHBOUR && *NEIGHBOUR)
+        printf("neighbour %s\n", reinterpret_cast<const char* (*)()>(dlsym(open(NEIGHBOUR, "the neighbour"), "builtFor"))());
+
     void* module = open(PLUGIN, "the plugin");
 
     try {

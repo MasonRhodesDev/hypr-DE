@@ -31,6 +31,12 @@ for entry in pluginAPIVersion pluginInit pluginExit; do
     grep -qw "$entry" <<<"$symbols" && ok "exports $entry" || bad "does not export $entry"
 done
 
+if nm -D "$plugin" | grep -q __hyprland_api_get_client_hash; then
+    bad "shares the symbol that names its Hyprland build with every other plugin"
+else
+    ok "keeps the name of its Hyprland build to itself"
+fi
+
 loaded() { ldd "$1" | awk '$2 == "=>" && $3 ~ /^\// { print $3 }'; }
 if hyprland=$(command -v Hyprland); then
     mapfile -t objects < <(printf '%s\n' "$hyprland"; loaded "$hyprland"; loaded "$plugin")

@@ -1,0 +1,4 @@
+{
+    local:
+        *__hyprland_api_get_client_hash*;
+};

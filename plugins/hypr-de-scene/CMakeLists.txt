@@ -26,6 +26,10 @@ target_compile_options(hypr-de-scene PRIVATE ${headers_CFLAGS_OTHER} -Wall -Wext
 # Hyprland has its own libraries loaded already. Naming them here would tie the plugin to their
 # sonames, and then a library bump stops the load before the plugin can say what is wrong.
 target_link_libraries(hypr-de-scene PRIVATE PkgConfig::libs)
+# Hyprland's header keeps the build a plugin was compiled for in a symbol the whole process
+# shares, so whichever plugin asks first would answer for this one too.
+target_link_options(hypr-de-scene PRIVATE -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/src/private.map)
+set_property(TARGET hypr-de-scene APPEND PROPERTY LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/private.map)
 
 include(GNUInstallDirs)
 install(TARGETS hypr-de-scene LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/hypr-de)
