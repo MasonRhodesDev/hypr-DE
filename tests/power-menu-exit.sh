@@ -37,6 +37,9 @@ if [ -n "$bind" ]; then
     LOG="$work/log" PATH="$work/sys" /bin/sh -c "$(printf '%s' "$bind" | sed "s|@LIBEXECDIR@|$work/libexec|g")"
 fi
 [ "$(cat "$work/log")" = "lock-cmd.sh " ] && ok "Super+L runs lock-cmd.sh itself" || bad "Super+L does not reach lock-cmd.sh: '$bind'"
+grep -qE '^hl\.bind\(mainMod \.\. " \+ L", .*\{ locked = true,' "$root/dist/hypr/main.lua" \
+    && ok "Super+L also works on a locked screen, so a crashed lock screen can be recovered from the keyboard" \
+    || bad "Super+L is not a locked bind; a lock-dead screen has no keyboard way back"
 
 if grep -rn 'lock-session' "$root/dist/hypr" "$root/dist/libexec" "$root/dist/bin"; then
     bad "a lock path still goes through loginctl lock-session, which nothing answers without a listener"

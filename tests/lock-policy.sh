@@ -475,6 +475,52 @@ until [ "$(watchers)" = 0 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
 mk_lock
 echo "with no user manager the watcher starts as a plain process, says so in the journal, and still respawns"
 
+mk_lock '' terminate '' 1
+rm -rf "$lockfile" "$marker" "$respawns"
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_LOCK_FILE=$lockfile LOCK_POLICY_VIGIL_LOCKS=1 LOCK_POLICY_VIGIL_HOLDS=1 run_lock
+assert_status 0
+i=0
+until [ "$(watchers)" = 1 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+stop_watchers
+i=0
+until [ "$(watchers)" = 0 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_LOCK_FILE=$lockfile run_lock
+assert_status 0
+assert_log ''
+i=0
+until [ "$(watchers)" = 1 ] || [ "$i" -ge 100 ]; do sleep 0.1; i=$((i + 1)); done
+[ "$(watchers)" = 1 ] || { echo "a request on a locked session did not restart a lost watcher" >&2; exit 1; }
+rm -rf "$lockfile"
+stop_holders
+i=0
+until [ "$(watchers)" = 0 ] || [ "$i" -ge 100 ]; do sleep 0.1; i=$((i + 1)); done
+echo "a request while the lock is held restarts a lost watcher and starts no locker"
+
+: > "$LOCK_POLICY_LOG"
+: > "$LOCK_POLICY_JOURNAL"
+LOCK_POLICY_WATCH_SCOPE_STATUS=1 LOCK_POLICY_LOCK_FILE=$lockfile LOCK_POLICY_VIGIL_LOCKS=1 LOCK_POLICY_VIGIL_HOLDS=1 run_lock
+assert_status 0
+i=0
+until [ "$(watchers)" = 1 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+[ "$(watchers)" = 1 ] || { echo "a scoped watcher launch that failed left no watcher" >&2; exit 1; }
+grep -q '^hypr-de-lock: systemd-run could not start the lock watcher in a scope (exit 1)' "$LOCK_POLICY_JOURNAL" || {
+    echo "the watcher was relaunched outside a scope without saying so:" >&2
+    cat "$LOCK_POLICY_JOURNAL" >&2; exit 1; }
+kill -9 "$(head -n1 "$LOCK_POLICY_HOLDERS")"
+i=0
+until [ "$(grep -c '^vigil-lock:' "$LOCK_POLICY_LOG")" = 2 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+[ "$(grep -c '^vigil-lock:' "$LOCK_POLICY_LOG")" = 2 ] || {
+    echo "the relaunched watcher did not respawn a killed locker within 5 s:" >&2
+    cat "$LOCK_POLICY_LOG" >&2; exit 1; }
+rm -rf "$lockfile"
+stop_holders
+i=0
+until [ "$(watchers)" = 0 ] || [ "$i" -ge 100 ]; do sleep 0.1; i=$((i + 1)); done
+mk_lock
+echo "a scoped watcher launch that fails is relaunched as a plain process and says so"
+
 slow="$work/hyprctl-slow"
 mk_lock '' terminate '' 1
 rm -rf "$lockfile" "$marker" "$respawns" "$slow"

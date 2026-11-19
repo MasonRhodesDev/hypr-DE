@@ -11,6 +11,12 @@ while [ $# -gt 0 ]; do
     esac
 done
 case " $* " in
+    *" --watch "*)
+        if [ "${LOCK_POLICY_WATCH_SCOPE_STATUS:-0}" -ne 0 ]; then
+            echo 'Failed to start transient scope unit: Unit already exists' >&2
+            exit "$LOCK_POLICY_WATCH_SCOPE_STATUS"
+        fi
+        ;;
     *" vigil-lock "*)
         if [ "${LOCK_POLICY_SCOPE_STATUS:-0}" -ne 0 ]; then
             printf 'systemd-run:scope-failed\n' >> "$LOCK_POLICY_LOG"

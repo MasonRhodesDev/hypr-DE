@@ -366,17 +366,24 @@ recover_crashed_lock() {
 
 # Outlives the run that started it, in its own scope like the locker, so a crashed lock screen
 # recovers at once instead of waiting for a lock request nobody at the keyboard can make.
+# The scoped launch runs the watcher in the foreground, so its status is the watcher's own: only a
+# failure that is not a signal (the watcher itself always exits 0) means the scope never started.
 start_watcher() {
     [ "$WATCH" = 1 ] || return 0
-    set -- "$0" --watch
-    if command -v systemd-run >/dev/null 2>&1 \
-        && systemd-run --user --scope --quiet --collect true >/dev/null 2>&1
+    if ! command -v systemd-run >/dev/null 2>&1 \
+        || ! systemd-run --user --scope --quiet --collect true >/dev/null 2>&1
     then
-        set -- systemd-run --user --scope --quiet --collect -- "$@"
-    else
         log "systemd-run cannot start a user scope; starting the lock watcher as a plain process in this caller's cgroup"
+        setsid "$0" --watch </dev/null >/dev/null 2>&1 8>&- 9>&- &
+        return 0
     fi
-    setsid "$@" </dev/null >/dev/null 2>&1 8>&- 9>&- &
+    (
+        setsid systemd-run --user --scope --quiet --collect -- "$0" --watch </dev/null >/dev/null 2>&1
+        scoped=$?
+        [ "$scoped" -ge 1 ] && [ "$scoped" -le 125 ] || exit 0
+        log "systemd-run could not start the lock watcher in a scope (exit $scoped); starting it as a plain process in this caller's cgroup"
+        exec setsid "$0" --watch </dev/null >/dev/null 2>&1
+    ) </dev/null >/dev/null 8>&- 9>&- &
 }
 
 watch_lockers() {
@@ -385,7 +392,8 @@ watch_lockers() {
         exit 0
     fi
     exec 8>> "$watch_lock_file"
-    flock -n 8 || exit 0
+    # A killed watcher's last sleep or probe holds its flock for a few seconds after it.
+    flock -w 5 8 || exit 0
     while :; do
         for pid in $(live_lockers); do
             if [ "$pid" = '?' ]; then
@@ -449,6 +457,7 @@ status=2
 if [ "$compositor" -ne 1 ]; then
     if locker_alive; then
         log "a locker is alive; not starting another"
+        start_watcher
         exit 0
     fi
     serialised recover_crashed_lock
