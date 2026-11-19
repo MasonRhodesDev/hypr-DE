@@ -117,10 +117,14 @@ CScene::SOutput* CScene::outputFor(PHLMONITOR monitor) {
 
 CScene::SLogo* CScene::logoFor(int size) {
     auto it = m_logos.find(size);
-    if (it == m_logos.end())
-        it = m_logos.emplace(size, SLogo{.sprite = makeUnique<CSprite>(m_settings.dataDir + "/logo.png", size), .texture = nullptr}).first;
+    if (it != m_logos.end())
+        return &it->second;
 
-    return &it->second;
+    auto sprite = makeUnique<CSprite>(m_settings.dataDir + "/logo.png", size);
+    if (!sprite->good())
+        return nullptr;
+
+    return &m_logos.emplace(size, SLogo{.sprite = std::move(sprite), .texture = nullptr}).first->second;
 }
 
 // a new monitor renders zoomed in until five frames were presented, which would scale the scene
@@ -210,6 +214,10 @@ void CScene::drawFirstFrame(SOutput& output, SP<Aquamarine::IBuffer> buffer) {
     const SSize SIZE = transformedSize({sc<int>(buffer->size.x), sc<int>(buffer->size.y)}, MONITOR->m_transform);
     const auto  BOX  = logoBox(SIZE, m_spec.refShortSide);
     const auto  LOGO = logoFor(BOX.w);
+    if (!LOGO) {
+        release(output, std::format("a logo.png that cannot be drawn at {}px", BOX.w));
+        return;
+    }
 
     if (!m_firstFrame.draw(RBO, MONITOR->m_transform, m_spec.background, *LOGO->sprite, CBox(BOX.x, BOX.y, BOX.w, BOX.h))) {
         note("scene: could not draw the first frame for {}", MONITOR->m_name);
@@ -264,6 +272,10 @@ void CScene::drawInPass(SOutput& output, Render::CRenderContext& ctx) {
     const SSize SIZE    = {sc<int>(MONITOR->m_transformedSize.x), sc<int>(MONITOR->m_transformedSize.y)};
     const auto  BOX     = logoBox(SIZE, m_spec.refShortSide);
     const auto  LOGO    = logoFor(BOX.w);
+    if (!LOGO) {
+        release(output, std::format("a logo.png that cannot be drawn at {}px", BOX.w));
+        return;
+    }
 
     if (!LOGO->texture)
         LOGO->texture = g_pHyprRenderer->createTexture(LOGO->sprite->surface());
