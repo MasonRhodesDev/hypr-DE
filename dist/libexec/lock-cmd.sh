@@ -5,17 +5,34 @@ LOCK_CONF=/etc/hypr-de/lock.conf
 FAILSAFE=terminate
 FALLBACKS='swaylock -f|gtklock -d|hyprlock &'
 VERIFY_TRIES=20
+JOURNAL_SOCKET=/run/systemd/journal/stdout
 
 runtime_dir=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
 fail_marker="$runtime_dir/hypr-de-lock-failed"
 
-log() { printf 'hypr-de lock: %s\n' "$*" >&2; }
+journal_ok() { [ -S "$JOURNAL_SOCKET" ] && command -v systemd-cat >/dev/null 2>&1; }
+
+# Hyprland points a bind's stderr at /dev/null; a service's already reaches the journal.
+log_to_journal=0
+if journal_ok && [ "$(stat -L -c '%d:%i' "/proc/$$/fd/2" 2>/dev/null)" != "${JOURNAL_STREAM:-}" ]; then
+    log_to_journal=1
+fi
+
+log() {
+    printf 'hypr-de lock: %s\n' "$*" >&2
+    [ "$log_to_journal" = 1 ] || return 0
+    printf '%s\n' "$*" | systemd-cat -t hypr-de-lock -p warning >/dev/null 2>&1 || true
+}
 
 release_idle_inhibitor() {
     command -v logind-idle-control >/dev/null 2>&1 || return 0
     timeout 2 logind-idle-control disable >/dev/null 2>&1 || \
         log "could not release the idle inhibitor; the locked screen may stay lit"
     return 0
+}
+
+compositor_locked() {
+    [ "$(timeout 2 hyprctl locked 2>/dev/null)" = true ]
 }
 
 locked_hint() {
@@ -56,18 +73,27 @@ locked_within() {
 }
 
 lock() {
+    wrapped=0
+    if journal_ok; then
+        set -- systemd-cat -t vigil-lock vigil-lock "$@"
+        wrapped=1
+    else
+        set -- vigil-lock "$@"
+    fi
     if command -v systemd-run >/dev/null 2>&1 \
         && systemd-run --user --scope --quiet --collect true >/dev/null 2>&1
     then
-        systemd-run --user --scope --quiet --collect -- vigil-lock "$@"
+        systemd-run --user --scope --quiet --collect -- "$@"
         status=$?
-        if [ "$status" -ne 0 ] && [ "$status" -ne 3 ] && ! locked_hint; then
-            log "scoped locker exited $status; retrying without the transient scope"
-            vigil-lock "$@"
-            status=$?
-        fi
+        wrapped=1
     else
-        vigil-lock "$@"
+        "$@"
+        status=$?
+    fi
+    if [ "$wrapped" = 1 ] && [ "$status" -ne 0 ] && [ "$status" -ne 3 ] && ! locked_hint; then
+        [ "$1" = systemd-cat ] && shift 3
+        log "locker exited $status; retrying it bare, outside the transient scope and the journal"
+        "$@"
         status=$?
     fi
     return "$status"
@@ -83,7 +109,11 @@ fallback_lock() {
                 # shellcheck disable=SC2086  # deliberate: entry is a command line
                 set -- ${entry%&}
                 [ "$#" -gt 0 ] && command -v "$1" >/dev/null 2>&1 || continue
-                "$@" >/dev/null 2>&1 &
+                if journal_ok; then
+                    systemd-cat -t "$1" "$@" &
+                else
+                    "$@" >/dev/null 2>&1 &
+                fi
                 pid=$!
                 sleep 1
                 if kill -0 "$pid" 2>/dev/null; then
@@ -95,7 +125,7 @@ fallback_lock() {
                 # shellcheck disable=SC2086  # deliberate: entry is a command line
                 set -- $entry
                 [ "$#" -gt 0 ] && command -v "$1" >/dev/null 2>&1 || continue
-                if "$@"; then
+                if { journal_ok && systemd-cat -t "$1" "$@"; } || "$@"; then
                     log "locked with $1 (fallback)"
                     return 0
                 fi
@@ -111,6 +141,8 @@ fail_closed() {
     case "$FAILSAFE" in
         warn|none)
             log "no locker succeeded; $LOCK_CONF sets failsafe=$FAILSAFE, so the session stays up and UNLOCKED. Outputs are kept lit so it cannot pass for a locked screen."
+            timeout 5 notify-send -u critical -a hypr-de "Screen NOT locked" \
+                "No screen locker could start. This session is unlocked." >/dev/null 2>&1 || true
             ;;
         *)
             log "no locker succeeded; terminating the session rather than leaving it exposed (an operator can set failsafe=warn in $LOCK_CONF to keep it)"
@@ -129,7 +161,7 @@ lock_or_fail_closed() {
     lock "$@"
     status=$?
     [ "$status" -eq 3 ] && return 3
-    if [ "$status" -eq 0 ] || locked_within; then
+    if [ "$status" -eq 0 ] || locked_within || compositor_locked; then
         rm -f "$fail_marker" 2>/dev/null || true
         return 0
     fi
@@ -143,6 +175,11 @@ lock_or_fail_closed() {
 }
 
 load_policy
+
+if compositor_locked; then
+    log "the session is already locked; not starting another locker"
+    exit 0
+fi
 
 case "${1:-}" in
     --idle)

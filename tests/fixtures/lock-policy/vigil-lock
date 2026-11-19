@@ -1,3 +1,6 @@
 #!/bin/sh
 printf 'vigil-lock:%s\n' "$*" >> "$LOCK_POLICY_LOG"
+if [ -n "${LOCK_POLICY_LOCK_FILE:-}" ] && [ "${LOCK_POLICY_VIGIL_LOCKS:-0}" = 1 ]; then
+    : > "$LOCK_POLICY_LOCK_FILE"
+fi
 exit "${LOCK_POLICY_VIGIL_STATUS:-0}"

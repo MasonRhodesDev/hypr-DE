@@ -6,8 +6,8 @@ while [ $# -gt 0 ]; do
         *) break ;;
     esac
 done
-case "${1:-}" in
-    vigil-lock)
+case " $* " in
+    *" vigil-lock "*)
         if [ "${LOCK_POLICY_SCOPE_STATUS:-0}" -ne 0 ]; then
             printf 'systemd-run:scope-failed\n' >> "$LOCK_POLICY_LOG"
             exit "$LOCK_POLICY_SCOPE_STATUS"

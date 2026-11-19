@@ -237,7 +237,7 @@ hl.bind(mainMod .. " + mouse_up",   hl.dsp.focus({ workspace = "e-1" }), { desc 
 hl.bind("Print",         hl.dsp.exec_cmd("@BINDIR@/hypr-de-snip"),   { desc = "Screenshots: Region screenshot + annotate" })
 hl.bind("SHIFT + Print", hl.dsp.exec_cmd("@BINDIR@/hypr-de-record"), { desc = "Screenshots: Screen recording" })
 
-hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("loginctl lock-session"), { desc = "System: Lock screen" })
+hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("@LIBEXECDIR@/lock-cmd.sh"), { desc = "System: Lock screen" })
 hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("@LIBEXECDIR@/power-menu.sh"), { desc = "System: Power menu" })
 hl.bind(mainMod .. " + T", hl.dsp.exec_cmd("lmtt switch"),                { desc = "System: Toggle light/dark theme" })
 hl.bind(mainMod .. " + N", hl.dsp.exec_cmd("swaync-client -t -sw"),       { desc = "System: Notification center" })

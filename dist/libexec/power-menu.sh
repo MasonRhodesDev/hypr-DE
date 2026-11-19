@@ -11,5 +11,5 @@ case "$selection" in
     Logout)   "$exit_cmd" ;;
     Reboot)   "$exit_cmd" -p 'systemctl reboot' ;;
     Shutdown) "$exit_cmd" -p 'systemctl poweroff -i' ;;
-    Lock)     loginctl lock-session ;;
+    Lock)     @LIBEXECDIR@/lock-cmd.sh ;;
 esac

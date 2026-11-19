@@ -12,7 +12,11 @@ case "${1:-}" in
         fi ;;
     locked)
         [ "${LOCK_POLICY_COMPOSITOR_HANG:-0}" = 1 ] && sleep 30
-        printf '%s\n' "${LOCK_POLICY_COMPOSITOR_LOCKED:-false}"
+        if [ -n "${LOCK_POLICY_LOCK_FILE:-}" ] && [ -e "$LOCK_POLICY_LOCK_FILE" ]; then
+            echo true
+        else
+            printf '%s\n' "${LOCK_POLICY_COMPOSITOR_LOCKED:-false}"
+        fi
         exit 0 ;;
 esac
 printf 'hyprctl:%s\n' "$*" >> "$LOCK_POLICY_LOG"

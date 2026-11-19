@@ -8,13 +8,17 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
 export LOCK_POLICY_LOG="$work/log"
+export LOCK_POLICY_JOURNAL="$work/journal"
 export PATH="$fixtures:$PATH"
 export XDG_RUNTIME_DIR="$work"
 marker="$work/hypr-de-lock-failed"
 lock_conf="$work/lock.conf"
+journal_socket="$work/journal.sock"
+python3 -c 'import socket, sys; socket.socket(socket.AF_UNIX).bind(sys.argv[1])' "$journal_socket"
 
 mk_lock() {
     sed -e "s|^LOCK_CONF=.*|LOCK_CONF=$lock_conf|" \
+        -e "s|^JOURNAL_SOCKET=.*|JOURNAL_SOCKET=${3:-$journal_socket}|" \
         -e "s|^FAILSAFE=.*|FAILSAFE=${2:-terminate}|" \
         -e "s|^FALLBACKS=.*|FALLBACKS='${1:-}'|" \
         -e "s|^VERIFY_TRIES=.*|VERIFY_TRIES=1|" \
@@ -108,7 +112,8 @@ rm -f "$marker"
 LOCK_POLICY_VIGIL_STATUS=1 run_lock
 assert_status 1
 assert_log 'vigil-lock:--wait --no-warn
-vigil-lock:--wait --no-warn'
+vigil-lock:--wait --no-warn
+notify-send:-u critical -a hypr-de Screen NOT locked No screen locker could start. This session is unlocked.'
 assert_marker yes
 
 : > "$LOCK_POLICY_LOG"
@@ -159,7 +164,8 @@ if [ "$(id -u)" -eq 0 ] || sudo -n true 2>/dev/null; then
     cp "$work/stderr" "$work/stderr.tail"
     assert_status 1
     assert_log 'vigil-lock:--wait --no-warn
-vigil-lock:--wait --no-warn'
+vigil-lock:--wait --no-warn
+notify-send:-u critical -a hypr-de Screen NOT locked No screen locker could start. This session is unlocked.'
     grep -q "must be owned by root" "$work/stderr.tail" 2>/dev/null && {
         echo "root-owned policy file was still rejected" >&2; exit 1; }
     echo "operator policy honoured when root owns it (spaced syntax parsed)"
@@ -193,6 +199,98 @@ elapsed=$(( $(date +%s) - started ))
 [ "$elapsed" -lt 15 ] || {
     echo "a wedged toggle daemon delayed the lock by ${elapsed}s; the release must be bounded" >&2
     exit 1; }
+
+mk_lock
+for mode in '' --idle --sleep; do
+    : > "$LOCK_POLICY_LOG"
+    LOCK_POLICY_COMPOSITOR_LOCKED=true run_lock $mode
+    assert_status 0
+    assert_log ''
+done
+echo "a request while the compositor holds the lock starts no second locker"
+
+mk_lock 'swaylock -f'
+lockfile="$work/compositor-locked"
+rm -f "$lockfile" "$marker"
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_LOCK_FILE=$lockfile LOCK_POLICY_VIGIL_LOCKS=1 LOCK_POLICY_VIGIL_STATUS=2 \
+    PATH="$root/tests/fixtures/lock-policy-fallback:$PATH" run_lock
+assert_status 0
+assert_log 'vigil-lock:--wait --no-warn
+vigil-lock:--wait --no-warn
+logind-idle-control:disable
+hyprctl:dispatch hl.dsp.dpms({ action = '\''on'\'' })'
+assert_marker no
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_LOCK_FILE=$lockfile run_lock
+assert_status 0
+assert_log ''
+rm -f "$lockfile"
+echo "a locker that exits non-zero after the compositor locked is not a failure: no fallback, no failsafe"
+
+mk_lock
+: > "$LOCK_POLICY_LOG"
+: > "$LOCK_POLICY_JOURNAL"
+run_lock
+assert_status 0
+grep -qx 'vigil-lock: exec vigil-lock --wait --no-warn' "$LOCK_POLICY_JOURNAL" || {
+    echo "vigil-lock was not started with its output on the journal as vigil-lock" >&2
+    cat "$LOCK_POLICY_JOURNAL" >&2; exit 1; }
+
+: > "$LOCK_POLICY_LOG"
+: > "$LOCK_POLICY_JOURNAL"
+LOCK_POLICY_SCOPE_STATUS=1 run_lock
+assert_status 0
+grep -q '^hypr-de-lock: locker exited 1; retrying it bare' "$LOCK_POLICY_JOURNAL" || {
+    echo "lock-cmd.sh's own log lines did not reach the journal from a bind's /dev/null stderr" >&2
+    cat "$LOCK_POLICY_JOURNAL" >&2; exit 1; }
+
+: > "$LOCK_POLICY_LOG"
+: > "$LOCK_POLICY_JOURNAL"
+LOCK_POLICY_JOURNAL_STATUS=1 run_lock
+assert_status 0
+assert_log 'vigil-lock:--wait --no-warn
+logind-idle-control:disable
+hyprctl:dispatch hl.dsp.dpms({ action = '\''on'\'' })'
+assert_marker no
+echo "a journal wrapper that cannot start does not count as a lock failure"
+
+mk_lock 'swaylock -f'
+: > "$LOCK_POLICY_LOG"
+: > "$LOCK_POLICY_JOURNAL"
+LOCK_POLICY_VIGIL_STATUS=1 \
+    PATH="$root/tests/fixtures/lock-policy-fallback:$PATH" run_lock
+assert_status 0
+grep -qx 'swaylock: exec swaylock -f' "$LOCK_POLICY_JOURNAL" || {
+    echo "a fallback locker was not started with its output on the journal" >&2; exit 1; }
+
+mk_lock 'swaylock \&'
+: > "$LOCK_POLICY_LOG"
+: > "$LOCK_POLICY_JOURNAL"
+LOCK_POLICY_VIGIL_STATUS=1 LOCK_POLICY_SWAYLOCK_HOLD=3 \
+    PATH="$root/tests/fixtures/lock-policy-fallback:$PATH" run_lock
+assert_status 0
+grep -qx 'swaylock: exec swaylock' "$LOCK_POLICY_JOURNAL" || {
+    echo "a backgrounded fallback locker was not started with its output on the journal" >&2; exit 1; }
+
+mk_lock '' terminate "$work/no-journal.sock"
+: > "$LOCK_POLICY_LOG"
+: > "$LOCK_POLICY_JOURNAL"
+run_lock
+assert_status 0
+assert_log 'vigil-lock:--wait --no-warn
+logind-idle-control:disable
+hyprctl:dispatch hl.dsp.dpms({ action = '\''on'\'' })'
+[ ! -s "$LOCK_POLICY_JOURNAL" ] || {
+    echo "with no journal socket the locker must run directly" >&2; exit 1; }
+
+mk_lock
+: > "$LOCK_POLICY_JOURNAL"
+JOURNAL_STREAM=$(stat -L -c '%d:%i' "$work/stderr") LOCK_POLICY_SCOPE_STATUS=1 run_lock
+if grep -q '^hypr-de-lock:' "$LOCK_POLICY_JOURNAL"; then
+    echo "stderr already on the journal: log lines must not be written twice" >&2; exit 1
+fi
+echo "the locker's output and lock-cmd.sh's own lines reach the journal on every launch path"
 
 mk_libexec session-locked.sh
 mk_libexec dpms-off-if-locked.sh

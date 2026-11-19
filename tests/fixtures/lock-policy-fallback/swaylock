@@ -1,3 +1,4 @@
 #!/bin/sh
 printf 'swaylock:%s\n' "$*" >> "$LOCK_POLICY_LOG"
+[ -n "${LOCK_POLICY_SWAYLOCK_HOLD:-}" ] && exec sleep "$LOCK_POLICY_SWAYLOCK_HOLD"
 exit "${LOCK_POLICY_SWAYLOCK_STATUS:-0}"
