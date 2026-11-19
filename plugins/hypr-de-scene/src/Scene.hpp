@@ -15,7 +15,6 @@
 #include <aquamarine/buffer/Buffer.hpp>
 #include <array>
 #include <map>
-#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -73,12 +72,15 @@ namespace Scene {
         void                     onLayer(PHLLS layer, bool opened);
         void                     onWindowOpen(PHLWINDOW window);
         void                     onMonitorRemoved(PHLMONITOR monitor);
-        void                     onKey(const IKeyboard::SKeyEvent& event, Event::SCallbackInfo& info);
         void                     onTimer();
 
+        class CKeyHold;
         template <typename TSignal>
         void                     holdInput(TSignal& signal, const char* kind);
         bool                     swallow(const char* kind);
+        void                     drop(const char* kind);
+        void                     holdKeys();
+        void                     releaseKeys();
 
         void                     evaluate();
         void                     fade(eReason reason);
@@ -89,6 +91,7 @@ namespace Scene {
 
         SOutput*                 outputFor(PHLMONITOR monitor);
         void                     forget(const SOutput& output);
+        void                     countOutputs();
         SLogo*                   logoFor(int size);
         void                     holdStill(PHLMONITOR monitor);
         void                     seed(const std::string& name);
@@ -106,8 +109,9 @@ namespace Scene {
         eReason                  m_reason = eReason::HOLD;
         SRecord                  m_record;
         Time::steady_tp          m_fadeStart;
-        int                      m_dropped = 0;
-        std::set<uint32_t>       m_swallowedKeys;
+        int                      m_dropped       = 0;
+        bool                     m_fallbackNoted = false;
+        SP<CKeyHold>             m_keyHold;
 
         std::vector<UP<SOutput>> m_outputs;
         std::map<int, SLogo>     m_logos;
@@ -122,7 +126,7 @@ namespace Scene {
             CHyprSignalListener              layerClosed;
             CHyprSignalListener              windowOpen;
             CHyprSignalListener              monitorRemoved;
-            CHyprSignalListener              key;
+            CHyprSignalListener              lock;
             std::vector<CHyprSignalListener> input;
         } m_listeners;
     };

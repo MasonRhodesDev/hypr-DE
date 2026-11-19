@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <format>
+#include <functional>
 #include <ranges>
 
 using namespace Scene;
@@ -21,9 +22,8 @@ bool Scene::expectLayer(SRecord& record, const std::string& name, Instant now) {
     return true;
 }
 
-void Scene::dropLayer(SRecord& record, const std::string& name, Instant now) {
+void Scene::dropLayer(SRecord& record, const std::string& name) {
     record.expect.erase(name);
-    heard(record, now);
 }
 
 void Scene::sessionReady(SRecord& record, Instant now) {
@@ -45,36 +45,50 @@ void Scene::unmapLayer(SRecord& record, const std::string& name, const std::stri
         IT->second.erase(output);
 }
 
+void Scene::showWallpaper(SRecord& record, const std::string& output, Instant now) {
+    record.wallpaperReady.insert(output);
+    record.lastWallpaper = now;
+}
+
 namespace {
-    struct SLayerState {
-        bool                   satisfied = false;
-        // when the spread clause would satisfy a layer shown on only some outputs
-        std::optional<Instant> spreadAt;
+    struct SWait {
+        bool                   satisfied = true;
+        std::optional<Instant> at;
     };
 
-    SLayerState layerState(const SRecord& record, const std::map<std::string, Instant>& mapped, const SBounds& bounds, Instant now) {
-        std::optional<Instant> last;
-        bool                   everywhere = true;
-        for (const auto& output : record.outputs) {
-            const auto IT = mapped.find(output);
-            if (IT == mapped.end()) {
-                everywhere = false;
+    // an output still without it is excused a bound after the later of its cover and the last progress,
+    // and with no progress at all nothing is excused
+    SWait waitFor(const SRecord& record, const std::function<bool(const std::string&)>& shown, std::optional<Instant> progress, Span bound, Instant now) {
+        SWait wait;
+        for (const auto& [output, since] : record.outputs) {
+            if (shown(output))
+                continue;
+            if (!progress) {
+                wait.satisfied = false;
                 continue;
             }
-            last = last ? std::max(*last, IT->second) : IT->second;
+            const Instant AT = std::max(*progress, since) + bound;
+            wait.at          = wait.at ? std::max(*wait.at, AT) : AT;
         }
-
-        if (everywhere)
-            return {.satisfied = true, .spreadAt = std::nullopt};
-        if (!last)
-            return {.satisfied = false, .spreadAt = std::nullopt};
-
-        const auto AT = *last + bounds.spread;
-        return {.satisfied = now >= AT, .spreadAt = AT};
+        wait.satisfied = wait.satisfied && (!wait.at || now >= *wait.at);
+        return wait;
     }
 
-    bool wallpaperShown(const SRecord& record) {
-        return !record.wallpaper || std::ranges::includes(record.wallpaperReady, record.outputs);
+    // a layer shown on some outputs waits the spread for the rest, from its last map or the later cover
+    SWait layerWait(const SRecord& record, const std::map<std::string, Instant>& mapped, const SBounds& bounds, Instant now) {
+        std::optional<Instant> last;
+        for (const auto& output : record.outputs | std::views::keys) {
+            if (const auto IT = mapped.find(output); IT != mapped.end())
+                last = last ? std::max(*last, IT->second) : IT->second;
+        }
+        return waitFor(record, [&mapped](const std::string& output) { return mapped.contains(output); }, last, bounds.spread, now);
+    }
+
+    SWait wallpaperWait(const SRecord& record, const SBounds& bounds, Instant now) {
+        if (!record.wallpaper)
+            return {};
+        const auto PROGRESS = record.lastWallpaper.value_or(*record.start);
+        return waitFor(record, [&record](const std::string& output) { return record.wallpaperReady.contains(output); }, PROGRESS, bounds.background, now);
     }
 
     Instant quietAt(const SRecord& record, Instant start, const SBounds& bounds) {
@@ -87,19 +101,17 @@ SVerdict Scene::decide(const SRecord& record, const SBounds& bounds, Instant now
         return {};
 
     const Instant START     = *record.start;
-    bool          satisfied = wallpaperShown(record);
+    bool          satisfied = true;
     Instant       next      = START + bounds.timeout;
-    const auto    sooner    = [&next, now](Instant at) {
-        if (at > now)
-            next = std::min(next, at);
+    const auto    include   = [&satisfied, &next, now](const SWait& wait) {
+        satisfied = satisfied && wait.satisfied;
+        if (wait.at && *wait.at > now)
+            next = std::min(next, *wait.at);
     };
 
-    for (const auto& [name, mapped] : record.expect) {
-        const auto STATE = layerState(record, mapped, bounds, now);
-        satisfied        = satisfied && STATE.satisfied;
-        if (STATE.spreadAt)
-            sooner(*STATE.spreadAt);
-    }
+    include(wallpaperWait(record, bounds, now));
+    for (const auto& mapped : record.expect | std::views::values)
+        include(layerWait(record, mapped, bounds, now));
 
     const bool WAITING = record.await && !record.session;
     if (satisfied && !WAITING)
@@ -109,7 +121,8 @@ SVerdict Scene::decide(const SRecord& record, const SBounds& bounds, Instant now
         const auto QUIET = quietAt(record, START, bounds);
         if (satisfied && now >= QUIET)
             return {.reason = eReason::QUIET, .next = std::nullopt};
-        sooner(QUIET);
+        if (QUIET > now)
+            next = std::min(next, QUIET);
     }
 
     if (now >= START + bounds.timeout)
@@ -121,16 +134,16 @@ SVerdict Scene::decide(const SRecord& record, const SBounds& bounds, Instant now
 std::vector<std::string> Scene::missing(const SRecord& record, const SBounds& bounds, Instant now) {
     std::vector<std::string> result;
     for (const auto& [name, mapped] : record.expect) {
-        if (layerState(record, mapped, bounds, now).satisfied)
+        if (layerWait(record, mapped, bounds, now).satisfied)
             continue;
-        for (const auto& output : record.outputs) {
+        for (const auto& output : record.outputs | std::views::keys) {
             if (!mapped.contains(output))
                 result.push_back(std::format("{} on {}", name, output));
         }
     }
 
     if (record.wallpaper) {
-        for (const auto& output : record.outputs) {
+        for (const auto& output : record.outputs | std::views::keys) {
             if (!record.wallpaperReady.contains(output))
                 result.push_back(std::format("background on {}", output));
         }

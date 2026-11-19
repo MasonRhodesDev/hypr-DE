@@ -32,6 +32,8 @@ namespace Scene {
         Span timeout = Span{5000};
         Span quiet   = Span{1500};
         Span spread  = Span{250};
+        // Hyprland loads its wallpaper again for each output, one after another
+        Span background = Span{2000};
     };
 
     struct SRecord {
@@ -42,10 +44,12 @@ namespace Scene {
         std::optional<Instant> lastMessage;
         // namespace, then each output it is mapped on and when it last mapped there
         std::map<std::string, std::map<std::string, Instant>> expect;
-        std::set<std::string>                                 outputs;
+        // each output that shows a frame of its own, and since when the scene covers it
+        std::map<std::string, Instant> outputs;
         // Hyprland draws its own wallpaper, which loads on its own and fades in
-        bool                  wallpaper = false;
-        std::set<std::string> wallpaperReady;
+        bool                   wallpaper = false;
+        std::set<std::string>  wallpaperReady;
+        std::optional<Instant> lastWallpaper;
     };
 
     struct SVerdict {
@@ -55,11 +59,12 @@ namespace Scene {
 
     // false when the cap on expectations is reached, and then the record is unchanged
     bool                     expectLayer(SRecord& record, const std::string& name, Instant now);
-    void                     dropLayer(SRecord& record, const std::string& name, Instant now);
+    void                     dropLayer(SRecord& record, const std::string& name);
     void                     sessionReady(SRecord& record, Instant now);
     // true when the namespace is expected, so the map counts
     bool                     mapLayer(SRecord& record, const std::string& name, const std::string& output, Instant now);
     void                     unmapLayer(SRecord& record, const std::string& name, const std::string& output);
+    void                     showWallpaper(SRecord& record, const std::string& output, Instant now);
 
     SVerdict                 decide(const SRecord& record, const SBounds& bounds, Instant now);
     std::vector<std::string> missing(const SRecord& record, const SBounds& bounds, Instant now);
