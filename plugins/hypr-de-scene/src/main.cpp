@@ -5,6 +5,7 @@
 #include <hyprland/src/state/MonitorState.hpp>
 #include <chrono>
 #include <cstdlib>
+#include <format>
 #include <stdexcept>
 #include <syslog.h>
 
@@ -25,7 +26,6 @@ static Scene::SSettings settings() {
         .handoffNamespace = env("HYPR_DE_SCENE_HANDOFF", "desktop-boot-splash"),
         .timeout          = std::chrono::milliseconds(end != TEXT.c_str() && SECONDS > 0 ? sc<long>(SECONDS * 1000) : 5000),
         .dumpDir          = env("HYPR_DE_SCENE_DUMP", ""),
-        .probeOnly        = env("HYPR_DE_SCENE_MODE", "") == "probe",
     };
 }
 
@@ -34,6 +34,7 @@ APICALL EXPORT std::string PLUGIN_API_VERSION() {
 }
 
 APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
+    // syslog keeps this pointer, so the module has to closelog before it is unloaded
     openlog("hypr-de-scene", LOG_PID, LOG_USER);
 
     const std::string RUNNING = __hyprland_api_get_hash();
@@ -41,8 +42,11 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
 
     // Hyprland hands plugins its C++ objects, so any other build has a different layout
     if (RUNNING != BUILT) {
-        syslog(LOG_WARNING, "built for Hyprland %s but %s is running, not loading", BUILT.c_str(), RUNNING.c_str());
-        throw std::runtime_error("hypr-de-scene was built for another Hyprland");
+        const auto REASON =
+            std::format("idle, boot scene off: built for Hyprland {} but {} is running. Rebuild the hypr-de-scene package against the installed Hyprland", BUILT, RUNNING);
+        syslog(LOG_ERR, "%s", REASON.c_str());
+        closelog();
+        throw std::runtime_error("hypr-de-scene " + REASON);
     }
 
     const auto SETTINGS = settings();
@@ -62,4 +66,5 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
 
 APICALL EXPORT void PLUGIN_EXIT() {
     scene.reset();
+    closelog();
 }

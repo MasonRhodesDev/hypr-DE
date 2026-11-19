@@ -66,8 +66,8 @@ CScene::CScene(const SSettings& settings) : m_settings(settings) {
     m_listeners.renderPre   = Event::bus()->m_events.render.pre.listen([this](PHLMONITOR monitor) { onRenderPre(monitor); });
     m_listeners.renderStage = Event::bus()->m_events.render.stage.listen([this](const Event::SRenderStageEvent& event) { onRenderStage(event); });
 
-    note("scene: ready, ref_short_side {}, background #{:02x}{:02x}{:02x}, handoff to layer {}{}", m_spec.refShortSide, m_spec.background[0], m_spec.background[1],
-         m_spec.background[2], m_settings.handoffNamespace, m_settings.probeOnly ? ", probe only" : "");
+    note("scene: ready, ref_short_side {}, background #{:02x}{:02x}{:02x}, handoff to layer {}", m_spec.refShortSide, m_spec.background[0], m_spec.background[1],
+         m_spec.background[2], m_settings.handoffNamespace);
 }
 
 CScene::~CScene() {
@@ -101,8 +101,7 @@ CScene::SOutput* CScene::outputFor(PHLMONITOR monitor) {
     output->commit  = monitor->m_output->events.commit.listen([this, raw = output.get()] { logFirstCommit(*raw); });
 
     // a cursor plane sits above anything drawn here
-    if (!m_settings.probeOnly)
-        Pointer::mgr()->lockSoftwareForMonitor(monitor);
+    Pointer::mgr()->lockSoftwareForMonitor(monitor);
 
     return output.get();
 }
@@ -143,9 +142,7 @@ void CScene::release(SOutput& output, const std::string& reason) {
     if (!MONITOR)
         return;
 
-    if (!m_settings.probeOnly)
-        Pointer::mgr()->unlockSoftwareForMonitor(MONITOR);
-
+    Pointer::mgr()->unlockSoftwareForMonitor(MONITOR);
     g_pHyprRenderer->damageMonitor(MONITOR);
     note("scene: released {} on {} after {} frames at {:.3f}", MONITOR->m_name, reason, output.passes, monotonic());
 }
@@ -172,14 +169,6 @@ void CScene::onPreCommit(PHLMONITOR monitor) {
     const auto OUTPUT = outputFor(monitor);
     if (!OUTPUT || !OUTPUT->covering)
         return;
-
-    if (m_settings.probeOnly) {
-        if (STATE.buffer && OUTPUT->dumps < MAX_DUMPS) {
-            note("scene: commit on {} carries buffer {:x} at {:.3f}", monitor->m_name, rc<uintptr_t>(STATE.buffer.get()), monotonic());
-            dump(*OUTPUT, STATE.buffer, "pending");
-        }
-        return;
-    }
 
     holdStill(monitor);
 
@@ -237,7 +226,7 @@ void CScene::logFirstCommit(SOutput& output) {
 
 void CScene::onRenderPre(PHLMONITOR monitor) {
     const auto OUTPUT = outputFor(monitor);
-    if (!OUTPUT || !OUTPUT->covering || m_settings.probeOnly)
+    if (!OUTPUT || !OUTPUT->covering)
         return;
 
     if (handedOff(monitor)) {
@@ -253,7 +242,7 @@ void CScene::onRenderStage(const Event::SRenderStageEvent& event) {
     if (!OUTPUT || !OUTPUT->covering)
         return;
 
-    if (event.stage == RENDER_LAST_MOMENT && event.context && !m_settings.probeOnly)
+    if (event.stage == RENDER_LAST_MOMENT && event.context)
         drawInPass(*OUTPUT, event.context->get());
 
     if (event.stage == RENDER_POST && event.monitor->m_output->state->state().buffer)

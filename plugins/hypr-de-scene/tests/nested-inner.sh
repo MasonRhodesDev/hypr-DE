@@ -1,6 +1,6 @@
 #!/bin/bash
 set -uo pipefail
-hyprland=$1 plugin=$2 data=$3 out=$4 mode=$5 splash=$6
+hyprland=$1 plugin=$2 data=$3 out=$4 splash=$5
 chmod 700 "$XDG_RUNTIME_DIR"
 ulimit -c 0
 
@@ -26,7 +26,7 @@ done
     echo 'hl.monitor({ output = "HEADLESS-3", mode = "3840x2160@60", position = "auto", scale = 1.5, transform = 3 })'
     echo 'hl.monitor({ output = "HEADLESS-4", mode = "1920x1080@60", position = "auto", scale = 1 })'
     echo 'hl.monitor({ output = "HEADLESS-5", mode = "3840x2160@60", position = "auto", scale = 1.5, transform = 1 })'
-    [ "$mode" != none ] && echo "hl.plugin.load(\"$plugin\")"
+    echo "hl.plugin.load(\"$plugin\")"
     if [ -n "$splash" ]; then
         echo 'hl.layer_rule({ name = "handoff", match = { namespace = "desktop-boot-splash" }, no_anim = true })'
         echo "hl.on(\"hyprland.start\", function() hl.exec_cmd(\"$splash\") end)"
@@ -45,7 +45,6 @@ done
 shots_pid=$!
 
 export HYPR_DE_SCENE_DUMP="$out/dumps" HYPR_DE_SCENE_DATA="$data" HYPR_DE_SCENE_TIMEOUT="$SCENE_TIMEOUT"
-[ "$mode" = probe ] && export HYPR_DE_SCENE_MODE=probe
 export DESKTOP_BOOT_DATA="$data" DESKTOP_BOOT_MAX_SECONDS=4 DESKTOP_BOOT_MIN_SECONDS=1
 
 WAYLAND_DISPLAY=wayland-1 "$hyprland" -c "$out/hyprland.lua" >"$out/hyprland.log" 2>&1 &

@@ -22,7 +22,6 @@ namespace Scene {
         std::string      handoffNamespace;
         Time::steady_dur timeout;
         std::string      dumpDir;
-        bool             probeOnly = false;
     };
 
     class CScene {

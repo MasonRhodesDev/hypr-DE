@@ -3,7 +3,7 @@ set -uo pipefail
 
 usage() {
     cat >&2 <<'USAGE'
-usage: nested-readback.sh HYPRLAND PLUGIN DATA_DIR OUT_DIR [cover|probe|none] [SPLASH]
+usage: nested-readback.sh HYPRLAND PLUGIN DATA_DIR OUT_DIR [SPLASH]
 
 Runs HYPRLAND nested in a headless sway inside bubblewrap, with only a render
 node from the host, and writes what each output committed to OUT_DIR:
@@ -28,8 +28,7 @@ hyprland=$(readlink -f -- "$1")
 plugin=$(readlink -f -- "$2")
 data=$(readlink -f -- "$3")
 out=$(readlink -f -- "$4")
-mode=${5:-cover}
-splash=${6:-}
+splash=${5:-}
 here=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 
 node=${RENDER_NODE:-}
@@ -75,4 +74,4 @@ exec bwrap --unshare-all --die-with-parent --new-session --cap-drop ALL \
     --setenv SCENE_TIMEOUT "${SCENE_TIMEOUT:-6}" \
     --setenv SCENE_RUN_SECONDS "${SCENE_RUN_SECONDS:-8}" \
     --chdir "$out" \
-    /bin/bash "$here/nested-inner.sh" "$hyprland" "$plugin" "$data" "$out" "$mode" "$splash"
+    /bin/bash "$here/nested-inner.sh" "$hyprland" "$plugin" "$data" "$out" "$splash"
