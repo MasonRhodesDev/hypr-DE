@@ -227,10 +227,13 @@ there, and any other line is reported in the journal and dropped. Values run
 
 `hypr-de-scene` is a separate package that holds a Hyprland plugin. With
 [desktop-boot](https://github.com/MasonRhodesDev/desktop-boot) installed it
-draws the boot scene into every output from Hyprland's first frame and
-holds it until the login splash covers the screen, so a login shows no
-black or empty frame. `hypr-de` does not depend on it. Load it with the
-`hl.plugin.load` line in `local.lua.example`.
+draws the boot scene's ground and logo into every output from Hyprland's
+first frame, so a login shows no black or empty frame. It holds each output
+until desktop-boot's login splash is mapped there at full size and fully
+opaque, or until five seconds have passed, whichever comes first. Until
+then it draws over everything else on that output. `hypr-de` does not
+depend on it. Load it with the `hl.plugin.load` line in
+`local.lua.example`.
 
 A Hyprland plugin is compiled against one Hyprland build and cannot run in
 another. The package does not pin a Hyprland version, so Hyprland upgrades

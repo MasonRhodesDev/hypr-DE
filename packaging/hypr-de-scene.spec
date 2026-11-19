@@ -20,9 +20,10 @@ Requires:       hyprland
 Recommends:     desktop-boot
 
 %description
-Draws the boot scene into every output from Hyprland's first commit and
-keeps it there until desktop-boot's login splash covers the screen, so a
-login never shows an unrendered or empty frame. Opt in by adding
+Draws the boot scene's ground and logo into every output from Hyprland's
+first commit and keeps them there until desktop-boot's login splash covers
+that output, or for five seconds at most, so a login never shows an
+unrendered or empty frame. Opt in by adding
   hl.plugin.load("%{_prefix}/lib/hypr-de/hypr-de-scene.so")
 to ~/.config/hypr/local.lua. Without desktop-boot's scene files the plugin
 stays idle. It works only in the Hyprland build it was compiled against.

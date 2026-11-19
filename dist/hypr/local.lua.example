@@ -18,8 +18,9 @@
 -- dofile("@DATADIR@/gaming/game-rules.lua")
 
 -- Boot scene from the first frame (hypr-de-scene package, with desktop-boot):
--- holds the logo on every output from Hyprland's first commit until
--- desktop-boot's login splash covers it, so a login shows no empty frame.
+-- holds the ground and logo on every output from Hyprland's first commit
+-- until desktop-boot's login splash covers that output, or for five
+-- seconds at most, so a login shows no empty frame.
 -- It stays idle without desktop-boot's scene files, and in any Hyprland
 -- build other than the one it was compiled against. After a Hyprland
 -- upgrade, journalctl -t hypr-de-scene says so until the package is
