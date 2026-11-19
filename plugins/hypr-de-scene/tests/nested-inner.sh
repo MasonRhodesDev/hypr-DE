@@ -74,20 +74,27 @@ done
 sleep "$SCENE_RUN_SECONDS"
 hyprctl -i "$sig" monitors >"$out/monitors.txt" 2>&1
 
-hyprctl -i "$sig" plugin unload "$plugin" >"$out/unload.txt" 2>&1
-sleep "$SCENE_AFTER_UNLOAD"
-hyprctl -i "$sig" plugin list >>"$out/unload.txt" 2>&1
+if [ "$SCENE_UNLOAD" = 1 ]; then
+    hyprctl -i "$sig" plugin unload "$plugin" >"$out/unload.txt" 2>&1
+    sleep "$SCENE_AFTER_UNLOAD"
+    hyprctl -i "$sig" plugin list >>"$out/unload.txt" 2>&1
+fi
 cp "$XDG_RUNTIME_DIR/hypr/$sig/hyprland.log" "$out/hyprland-full.log" 2>/dev/null
 
 alive=0
 kill -0 "$hypr_pid" 2>/dev/null && alive=1
 kill "$hypr_pid" 2>/dev/null
 wait "$hypr_pid" 2>/dev/null
+stopped=$?
 kill "$shots_pid" "$sway_pid" 2>/dev/null
 wait 2>/dev/null
 
 if [ "$alive" != 1 ]; then
     echo "nested-readback: Hyprland exited on its own, see $out/hyprland.log and $out/unload.txt" >&2
+    exit 1
+fi
+if [ "$stopped" != 0 ]; then
+    echo "nested-readback: Hyprland ended with status $stopped when told to stop, see $out/hyprland.log" >&2
     exit 1
 fi
 echo "nested-readback: done, $(ls "$out/dumps" | wc -l) dumps and $(ls "$out/shots" | wc -l) shots in $out"
