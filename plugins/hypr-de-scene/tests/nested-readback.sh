@@ -3,7 +3,7 @@ set -uo pipefail
 
 usage() {
     cat >&2 <<'USAGE'
-usage: nested-readback.sh HYPRLAND PLUGIN DATA_DIR OUT_DIR [SPLASH]
+usage: nested-readback.sh HYPRLAND PLUGIN DATA_DIR OUT_DIR [CASE]
 
 Runs HYPRLAND nested in a headless sway inside bubblewrap, with only a render
 node from the host, and writes what each output committed to OUT_DIR:
@@ -11,19 +11,21 @@ node from the host, and writes what each output committed to OUT_DIR:
   shots/   screenshots of the host compositor every 100 ms
   log      the plugin's own lines
   plugins.txt  hyprctl plugin list before the unload
+  hyprctl.log  each scene command and its answer, and *.json the scene's record
 PLUGIN is the loader, and its directory is shared so the module beside it loads.
-SPLASH is a client that maps the hand-off layer; without it the scene leaves
-on its timeout. The run ends by unloading the plugin and then stopping
-Hyprland, and fails if Hyprland dies or does not stop cleanly.
+CASE is readback (the default), which holds the scene on ten outputs until its
+timeout, or one of the readiness cases N1 to N10 in nested-cases.sh. The run
+ends by unloading the plugin and then stopping Hyprland, and fails if Hyprland
+dies or does not stop cleanly.
 
 NESTED_LIB_DIR     libraries to prefer over the system's, for a host compositor
                    Hyprland's nested backend does not accept as is
-SCENE_TIMEOUT      seconds before the scene leaves on its own (6)
-SCENE_RUN_SECONDS  seconds to keep the session up after its outputs exist (8)
+SCENE_TIMEOUT      seconds before the readback scene leaves on its own (6)
+SCENE_RUN_SECONDS  seconds to keep the readback session up after its outputs exist (8)
 SCENE_UNLOAD       0 leaves the plugin loaded until Hyprland stops, as a logout does (1)
 SCENE_AFTER_UNLOAD seconds to keep it up after the plugin is unloaded (12)
 
-Check the result with readback-check.py.
+Check the result with readback-check.py and nested-check.py.
 USAGE
     exit 2
 }
@@ -33,7 +35,7 @@ hyprland=$(readlink -f -- "$1")
 plugin=$(readlink -f -- "$2")
 data=$(readlink -f -- "$3")
 out=$(readlink -f -- "$4")
-splash=${5:-}
+case=${5:-readback}
 here=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 
 node=${RENDER_NODE:-}
@@ -43,7 +45,7 @@ if [ -z "$node" ]; then
     done
 fi
 [ -n "$node" ] || { echo "nested-readback: no DRM render node" >&2; exit 2; }
-for tool in bwrap sway grim; do
+for tool in bwrap sway grim python3; do
     command -v "$tool" >/dev/null || { echo "nested-readback: $tool is not installed" >&2; exit 2; }
 done
 
@@ -81,4 +83,4 @@ exec bwrap --unshare-all --die-with-parent --new-session --cap-drop ALL \
     --setenv SCENE_UNLOAD "${SCENE_UNLOAD:-1}" \
     --setenv SCENE_AFTER_UNLOAD "${SCENE_AFTER_UNLOAD:-12}" \
     --chdir "$out" \
-    /bin/bash "$here/nested-inner.sh" "$hyprland" "$plugin" "$data" "$out" "$splash"
+    /bin/bash "$here/nested-inner.sh" "$hyprland" "$plugin" "$data" "$out" "$case"
