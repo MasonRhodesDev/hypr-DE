@@ -1,4 +1,8 @@
 #!/bin/sh
+if [ "${LOCK_POLICY_NO_USER_MANAGER:-0}" = 1 ]; then
+    echo 'Failed to connect to user scope bus via local transport: No such file or directory' >&2
+    exit 1
+fi
 while [ $# -gt 0 ]; do
     case "$1" in
         --) shift; break ;;

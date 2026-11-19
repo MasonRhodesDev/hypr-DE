@@ -31,6 +31,8 @@ display=wayland-test
 start_holder() {
     WAYLAND_DISPLAY=$1 "$fixtures/vigil-lock" --hold </dev/null >/dev/null 2>&1 &
     echo $! >> "$LOCK_POLICY_HOLDERS"
+    i=0
+    until [ "$(cat "/proc/$!/comm" 2>/dev/null || true)" = vigil-lock ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
 }
 
 export LOCK_POLICY_LOG="$work/log"
@@ -256,10 +258,13 @@ import ctypes, time
 libc = ctypes.CDLL(None)
 libc.prctl(15, b"vigil-lock", 0, 0, 0)
 libc.prctl(4, 0, 0, 0, 0)
+print("ready", flush=True)
 time.sleep(60)
-' &
+' > "$work/undumpable" &
 echo $! >> "$LOCK_POLICY_HOLDERS"
-sleep 0.3
+i=0
+until grep -qx ready "$work/undumpable" || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+grep -qx ready "$work/undumpable" || { echo "the non-dumpable locker never started" >&2; exit 1; }
 : > "$LOCK_POLICY_LOG"
 LOCK_POLICY_COMPOSITOR_LOCKED=true run_lock
 assert_status 0
@@ -360,20 +365,25 @@ watchers() {
     pids=$("$real_pgrep" -f "$work/lock-cmd.sh --watch" || true)
     n=0
     for pid in $pids; do
-        parent=$(sed -n 's/^PPid:[[:space:]]*//p' "/proc/$pid/status" 2>/dev/null)
+        parent=$(sed -n 's/^PPid:[[:space:]]*//p' "/proc/$pid/status" 2>/dev/null || true)
         [ -n "$parent" ] || continue
         printf '%s\n' "$pids" | grep -qx "$parent" || n=$((n + 1))
     done
     echo "$n"
 }
+no_scope='^hypr-de-lock: systemd-run cannot start a user scope; starting the lock watcher as a plain process'
 mk_lock '' terminate '' 1
 rm -rf "$lockfile" "$marker" "$respawns"
 : > "$LOCK_POLICY_LOG"
+: > "$LOCK_POLICY_JOURNAL"
 LOCK_POLICY_LOCK_FILE=$lockfile LOCK_POLICY_VIGIL_LOCKS=1 LOCK_POLICY_VIGIL_HOLDS=1 run_lock
 assert_status 0
 i=0
 until [ "$(watchers)" = 1 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
 [ "$(watchers)" = 1 ] || { echo "a lock started no watcher for its locker" >&2; exit 1; }
+if grep -q "$no_scope" "$LOCK_POLICY_JOURNAL"; then
+    echo "a watcher started in its scope logged the plain-process fallback" >&2; exit 1
+fi
 first=$(head -n1 "$LOCK_POLICY_HOLDERS")
 kill -9 "$first"
 i=0
@@ -396,6 +406,33 @@ until [ "$(watchers)" = 0 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
     echo "the watcher locked a session that had been unlocked" >&2; cat "$LOCK_POLICY_LOG" >&2; exit 1; }
 mk_lock
 echo "a locker killed while the session stays locked is respawned within seconds with no lock request"
+
+mk_lock '' terminate '' 1
+rm -rf "$lockfile" "$marker" "$respawns"
+: > "$LOCK_POLICY_LOG"
+: > "$LOCK_POLICY_JOURNAL"
+LOCK_POLICY_NO_USER_MANAGER=1 LOCK_POLICY_LOCK_FILE=$lockfile LOCK_POLICY_VIGIL_LOCKS=1 LOCK_POLICY_VIGIL_HOLDS=1 run_lock
+assert_status 0
+i=0
+until [ "$(watchers)" = 1 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+[ "$(watchers)" = 1 ] || { echo "with no user manager a lock started no watcher for its locker" >&2; exit 1; }
+grep -q "$no_scope" "$LOCK_POLICY_JOURNAL" || {
+    echo "the watcher started outside a scope without saying so in the journal:" >&2
+    cat "$LOCK_POLICY_JOURNAL" >&2; exit 1; }
+kill -9 "$(head -n1 "$LOCK_POLICY_HOLDERS")"
+i=0
+until [ "$(grep -c '^vigil-lock:' "$LOCK_POLICY_LOG")" = 2 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+[ "$(grep -c '^vigil-lock:' "$LOCK_POLICY_LOG")" = 2 ] || {
+    echo "a watcher started with no user manager did not respawn a killed locker within 5 s:" >&2
+    cat "$LOCK_POLICY_LOG" >&2; exit 1; }
+[ "$(watchers)" = 1 ] || { echo "expected exactly one plain-process watcher, got $(watchers)" >&2; exit 1; }
+rm -rf "$lockfile"
+stop_holders
+i=0
+until [ "$(watchers)" = 0 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+[ "$(watchers)" = 0 ] || { echo "the plain-process watcher outlived an unlocked session" >&2; exit 1; }
+mk_lock
+echo "with no user manager the watcher starts as a plain process, says so in the journal, and still respawns"
 
 start_holder wayland-other
 rm -f "$marker" "$respawns"

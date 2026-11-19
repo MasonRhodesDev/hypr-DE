@@ -350,6 +350,8 @@ start_watcher() {
         && systemd-run --user --scope --quiet --collect true >/dev/null 2>&1
     then
         set -- systemd-run --user --scope --quiet --collect -- "$@"
+    else
+        log "systemd-run cannot start a user scope; starting the lock watcher as a plain process in this caller's cgroup"
     fi
     setsid "$@" </dev/null >/dev/null 2>&1 8>&- 9>&- &
 }
