@@ -21,7 +21,8 @@ jobs:
             for f in packaging/*.sh dist/bin/hypr-de-* dist/libexec/*.sh \
                      dist/libexec/osd/*.sh dist/libexec/waybar-updates-check \
                      dist/libexec/hypr-de-prime-theme dist/libexec/hypridle-launch \
-                     get-hypr-de.sh tests/run tests/tripwire \
+                     dist/libexec/hypr-de-waitenv dist/libexec/wayland-env-guard \
+                     get-hypr-de.sh tests/run tests/tripwire tests/waitenv.sh tests/env-guard.sh \
                      tests/qemu-fresh/*.sh; do
               [ -f "$f" ] || continue
               head -n1 "$f" | grep -qE '^#!/((usr/)?bin/(env )?)?(ba)?sh' && printf '%s\n' "$f"
@@ -62,8 +63,10 @@ jobs:
         run: ./tests/scene-readiness.sh
       - name: uwsm's settle pause stays off the Hyprland login
         run: ./tests/session-env.sh
-      - name: waitenv's replacement keeps uwsm's guard and checks every 10 ms
+      - name: waitenv's replacement keeps uwsm's guard and checks every 10 ms, then 100 ms
         run: ./tests/waitenv.sh
+      - name: wayland-env-guard repoints the session in one export, D-Bus first
+        run: ./tests/env-guard.sh
       - name: Every package names the scene plugin at the path it is installed to
         run: ./tests/scene-plugin-path.sh
       - name: Steam launch-option validation
