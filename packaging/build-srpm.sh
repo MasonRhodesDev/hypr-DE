@@ -2,19 +2,21 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-NAME=hypr-de
+NAME="${SPEC_NAME:-hypr-de}"
 TARPREFIX=hypr-DE
 SPEC="$REPO/packaging/$NAME.spec"
 SOURCES="${HOME}/rpmbuild/SOURCES"
-COPR_PROJECT="${COPR_PROJECT:-$NAME}"
+COPR_PROJECT="${COPR_PROJECT:-hypr-de}"
 
 VER=$(sed -n 's/^Version:[[:space:]]*//p' "$SPEC")
-PKGBUILD_VER=$(sed -n 's/^pkgver=//p' "$REPO/packaging/PKGBUILD")
-if [ "$PKGBUILD_VER" != "$VER" ]; then
-    echo "ERROR: version mismatch: spec Version=$VER, PKGBUILD pkgver=$PKGBUILD_VER" >&2
-    echo "Bump both together (deps drift is gated separately by gen-deps.sh check)." >&2
-    exit 1
-fi
+for PKGBUILD in "$REPO/packaging/PKGBUILD" "$REPO/packaging/hypr-de-scene/PKGBUILD"; do
+    PKGBUILD_VER=$(sed -n 's/^pkgver=//p' "$PKGBUILD")
+    if [ "$PKGBUILD_VER" != "$VER" ]; then
+        echo "ERROR: version mismatch: $NAME.spec Version=$VER, ${PKGBUILD#"$REPO"/} pkgver=$PKGBUILD_VER" >&2
+        echo "Every package is cut from one tarball, so bump them together (deps drift is gated separately by gen-deps.sh check)." >&2
+        exit 1
+    fi
+done
 
 "$REPO/packaging/gen-deps.sh" check
 

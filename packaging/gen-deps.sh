@@ -5,6 +5,8 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 TOML="$REPO/deps.toml"
 SPEC="$REPO/packaging/hypr-de.spec"
 PKGBUILD="$REPO/packaging/PKGBUILD"
+SCENE_SPEC="$REPO/packaging/hypr-de-scene.spec"
+SCENE_PKGBUILD="$REPO/packaging/hypr-de-scene/PKGBUILD"
 
 deps() {
     python3 - "$1" "$2" "$TOML" <<'EOF'
@@ -53,6 +55,20 @@ check() {
             fail=1
         fi
     done
+    want=$(deps fedora scene)
+    have=$(sed -n 's/^Requires:[[:space:]]*//p' "$SCENE_SPEC" | LC_ALL=C sort -u)
+    if ! diff <(echo "$want") <(echo "$have") >/dev/null; then
+        echo "DRIFT (spec, scene): deps.toml vs spec Requires:" >&2
+        diff <(echo "$want") <(echo "$have") >&2 || true
+        fail=1
+    fi
+    want=$(deps arch scene)
+    have=$(bash -c "source '$SCENE_PKGBUILD' >/dev/null 2>&1; printf '%s\n' \"\${_depends_scene[@]}\"" | LC_ALL=C sort -u)
+    if ! diff <(echo "$want") <(echo "$have") >/dev/null; then
+        echo "DRIFT (PKGBUILD, scene): deps.toml vs _depends_scene:" >&2
+        diff <(echo "$want") <(echo "$have") >&2 || true
+        fail=1
+    fi
     [ "$fail" = 0 ] && echo "deps in sync"
     return "$fail"
 }
@@ -60,5 +76,5 @@ check() {
 case "${1:-}" in
     print) deps "${2:?distro}" "${3:?part}" ;;
     check) check ;;
-    *) echo "usage: gen-deps.sh print {fedora|arch} {main|gaming} | check" >&2; exit 2 ;;
+    *) echo "usage: gen-deps.sh print {fedora|arch} {main|gaming|scene} | check" >&2; exit 2 ;;
 esac

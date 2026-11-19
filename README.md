@@ -223,15 +223,68 @@ policy itself (what each listener does, what gates it) is not overridable
 there, and any other line is reported in the journal and dropped. Values run
 1 to 4294967; a stage a host never wants can be set to the ceiling.
 
+## Boot scene plugin
+
+`hypr-de-scene` is a separate package that holds a Hyprland plugin. With
+[desktop-boot](https://github.com/MasonRhodesDev/desktop-boot) installed it
+draws the boot scene's ground and logo into every output from Hyprland's
+first frame, so a login shows no black or empty frame. It holds each output
+until desktop-boot's login splash is mapped there at full size and fully
+opaque, or until five seconds have passed, whichever comes first. Until
+then it draws over everything else on that output. `hypr-de` does not
+depend on it. Load it with the `hl.plugin.load` line in
+`local.lua.example`.
+
+A Hyprland plugin is compiled against one Hyprland build and cannot run in
+another. The package does not pin a Hyprland version, so Hyprland upgrades
+are never held back. After an upgrade the plugin loads and stays idle
+instead: the frames it covered come back, nothing is shown on screen, and
+the journal says why and names both builds:
+
+```bash
+journalctl -b -t hypr-de-scene
+```
+
+`hyprctl plugin list` shows the same line as the plugin's description.
+
+When the new Hyprland no longer has a symbol the module needs, Hyprland
+cannot load it at all. That journal then has no line, and Hyprland shows
+its own failed-to-load notification for a few seconds at login.
+
+Either way, rebuild the package on the machine, against the Hyprland now
+installed, and log in again.
+
+**Arch**, from a checkout:
+
+```bash
+cd packaging/hypr-de-scene
+ver=$(sed -n 's/^pkgver=//p' PKGBUILD)
+git archive --prefix "hypr-de-scene-$ver/" -o "hypr-de-scene-$ver.tar.gz" HEAD
+makepkg -si --skipchecksums
+```
+
+**Fedora**, from a checkout:
+
+```bash
+SPEC_NAME=hypr-de-scene ./packaging/build-srpm.sh --head
+sudo dnf builddep ~/rpmbuild/SRPMS/hypr-de-scene-*.src.rpm
+rpmbuild --rebuild ~/rpmbuild/SRPMS/hypr-de-scene-*.src.rpm
+sudo dnf install ~/rpmbuild/RPMS/*/hypr-de-scene-[0-9]*.rpm
+```
+
 ## Development
 
 - All install paths in `dist/` are `@TOKENS@` substituted at build time from
   `packaging/paths.conf` — never hardcode a path (CI rejects it).
 - Runtime dependencies are declared in `deps.toml`; `packaging/gen-deps.sh
   check` gates spec/PKGBUILD drift.
-- Release: bump `packaging/hypr-de.spec` Version + `packaging/PKGBUILD`
-  pkgver in one commit, `git tag vX.Y.Z && git push --tags` — CI publishes
-  COPR + GitHub release; the `[mason]` repo picks it up.
+- Release: bump Version in `packaging/hypr-de.spec` and
+  `packaging/hypr-de-scene.spec`, and pkgver in `packaging/PKGBUILD` and
+  `packaging/hypr-de-scene/PKGBUILD`, in one commit, then
+  `git tag vX.Y.Z && git push --tags`. CI publishes `hypr-de` to COPR and
+  a GitHub release; the `[mason]` repo picks it up.
+- `hypr-de-scene` is built and checked by the Scene plugin workflow on
+  every push. The release workflow does not publish it yet.
 
 ## License
 

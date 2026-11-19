@@ -34,6 +34,7 @@ build() {
   cp -a dist dist-build
   LIBEXECDIR=/usr/lib/hypr-de \
   WAYBAR_CFFI=/usr/lib/waybar/workspace_buttons.so \
+  SCENE_PLUGIN=/usr/lib/hypr-de/hypr-de-scene.so \
     ./packaging/substitute.sh dist-build
 }
 

@@ -17,6 +17,18 @@
 -- workspace 7 with idle inhibit. Opt in with:
 -- dofile("@DATADIR@/gaming/game-rules.lua")
 
+-- Boot scene from the first frame (hypr-de-scene package, with desktop-boot):
+-- holds the ground and logo on every output from Hyprland's first commit
+-- until desktop-boot's login splash covers that output, or for five
+-- seconds at most, so a login shows no empty frame.
+-- It stays idle without desktop-boot's scene files, and in a Hyprland
+-- build other than the one it was compiled against; journalctl -t
+-- hypr-de-scene says so. If the upgrade removed a symbol the plugin
+-- needs, Hyprland cannot load it at all and shows its own failed-to-load
+-- notification at login instead. Either way, rebuild the package against
+-- the installed Hyprland. Opt in with:
+-- hl.plugin.load("@SCENE_PLUGIN@")
+
 -- Extra window rules (examples):
 -- hl.window_rule({ name = "keep-tile", match = { title = "^(keep.google.com_/)$" }, tile = true })
 -- hl.window_rule({ name = "android-emulator", match = { class = "^(Emulator)$" }, float = true })
