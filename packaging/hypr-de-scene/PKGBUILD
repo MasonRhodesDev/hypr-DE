@@ -8,7 +8,7 @@ url="https://github.com/MasonRhodesDev/hypr-DE"
 license=('MIT')
 makedepends=('cmake' 'hyprland')
 checkdepends=('bubblewrap')
-optdepends=('desktop-boot: the scene and the login splash this plugin hands over to; without it the plugin stays idle')
+optdepends=('desktop-boot: the scene files this plugin draws; without them the plugin stays idle')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/MasonRhodesDev/hypr-DE/archive/v$pkgver.tar.gz")
 sha256sums=('0000000000000000000000000000000000000000000000000000000000000000')
 

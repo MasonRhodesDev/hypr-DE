@@ -21,9 +21,12 @@ Recommends:     desktop-boot
 
 %description
 Draws the boot scene's ground and logo into every output from Hyprland's
-first commit and keeps them there until desktop-boot's login splash covers
-that output, or for five seconds at most, so a login never shows an
-unrendered or empty frame. Opt in by adding
+first commit and keeps them there until the session's components have
+mapped the layers they declared through hyprctl scene, then fades every
+output together. It lets go after five seconds at most, at once on a
+session lock, and on hyprctl scene release. The package ships the user
+units that make waybar and swaybg declare their layers and that tell the
+scene when the session's components have started. Opt in by adding
   hl.plugin.load("%{_prefix}/lib/hypr-de/hypr-de-scene.so")
 to ~/.config/hypr/local.lua. Without desktop-boot's scene files the plugin
 stays idle. It works only in the Hyprland build it was compiled against.
@@ -54,6 +57,13 @@ export HYPR_DE_ALLOW_UNSEALED=1
 %dir %{_prefix}/lib/hypr-de
 %{_prefix}/lib/hypr-de/hypr-de-scene.so
 %{_prefix}/lib/hypr-de/hypr-de-scene-impl.so
+%{_prefix}/lib/systemd/user/hypr-de-scene-ready.service
+%dir %{_prefix}/lib/systemd/user/graphical-session.target.d
+%{_prefix}/lib/systemd/user/graphical-session.target.d/hypr-de-scene.conf
+%dir %{_prefix}/lib/systemd/user/swaybg.service.d
+%{_prefix}/lib/systemd/user/swaybg.service.d/hypr-de-scene.conf
+%dir %{_prefix}/lib/systemd/user/waybar.service.d
+%{_prefix}/lib/systemd/user/waybar.service.d/hypr-de-scene.conf
 
 %changelog
 * Thu Nov 19 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.39-1
