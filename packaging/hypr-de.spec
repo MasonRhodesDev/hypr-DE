@@ -43,6 +43,8 @@ Requires:       kitty
 Requires:       neovim
 Requires:       libadwaita
 Requires:       /usr/bin/notify-send
+Requires:       /usr/bin/flock
+Requires:       /usr/bin/pgrep
 Requires:       lmtt
 Requires:       logind-idle-control >= 0.2.4
 Requires:       man-db
