@@ -37,7 +37,17 @@ EOF
 cat >"$work/bin/dbus-update-activation-environment" <<'EOF'
 #!/bin/sh
 echo "dbus-update-activation-environment $*" >>"$CASE/calls"
-[ ! -e "$CASE/export-fails" ]
+[ -e "$CASE/export-fails" ] && exit 1
+if [ -e "$CASE/manager-unreached" ]; then
+    echo "dbus-update-activation-environment: warning: error sending to systemd: org.freedesktop.DBus.Error.NoReply" >&2
+    exit 0
+fi
+[ "$1" = --systemd ] && shift
+for kv in "$@"; do
+    grep -v "^${kv%%=*}=" "$CASE/env" >"$CASE/env.new"
+    printf '%s\n' "$kv" >>"$CASE/env.new"
+    mv "$CASE/env.new" "$CASE/env"
+done
 EOF
 cat >"$work/bin/hyprctl" <<EOF
 #!/bin/sh
@@ -88,6 +98,17 @@ grep -q 'repointed' "$work/broken/out"
 check $? 1 "it does not claim a repoint" "the guard reported a repoint it did not make"
 check "$(writes broken | grep -vc '^dbus-update-activation-environment --systemd WAYLAND_DISPLAY=')" 0 \
     "it restarts no portal" "the guard restarted the portal after a failed export"
+
+echo
+echo "== an export that exits 0 without reaching the manager fails the guard"
+mkdir -p "$work/unreached"
+: >"$work/unreached/manager-unreached"
+run unreached WAYLAND_DISPLAY=wayland-0 XDG_CURRENT_DESKTOP=Hyprland
+check "$(cat "$work/unreached/rc")" 1 "the guard exits 1" "the guard trusted an export the manager never got"
+grep -q 'repointed' "$work/unreached/out"
+check $? 1 "it does not claim a repoint" "the guard reported a repoint the manager never got"
+check "$(writes unreached | grep -vc '^dbus-update-activation-environment --systemd WAYLAND_DISPLAY=')" 0 \
+    "it restarts no portal" "the guard restarted the portal against a stale manager"
 
 echo
 echo "== a live WAYLAND_DISPLAY is left alone"

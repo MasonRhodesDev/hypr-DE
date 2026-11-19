@@ -83,6 +83,11 @@ if ! dbus-update-activation-environment --systemd "${vars[@]}"; then
     echo "wayland-env-guard: could not export ${vars[*]}" >&2
     exit 1
 fi
+# The tool exits 0 when its write to the systemd manager fails, and only warns.
+if [ "$(env_get WAYLAND_DISPLAY)" != "$sock" ]; then
+    echo "wayland-env-guard: the systemd manager did not take WAYLAND_DISPLAY=$sock" >&2
+    exit 1
+fi
 
 echo "wayland-env-guard: repointed WAYLAND_DISPLAY '${cur:-unset}' -> '$sock'"
 
