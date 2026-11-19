@@ -1,8 +1,7 @@
-cpp-harden	plugins/hypr-de-scene	flag-weakens:-Wno-unused-parameter	8
+cpp-harden	packaging/hypr-de-scene/PKGBUILD	warning-off:-Wno-unused-parameter	1
 cpp-harden	plugins/hypr-de-scene/src/FirstFrame.cpp	-Wfloat-conversion	2
 cpp-harden	plugins/hypr-de-scene/src/Log.cpp	-Wconversion	2
 cpp-harden	plugins/hypr-de-scene/src/Scene.cpp	-Wfloat-conversion	2
-cpp-sanitize	plugins/hypr-de-scene	flag-weakens:-Wno-unused-parameter	8
 cpp-sanitize	plugins/hypr-de-scene	no-tests	1
 cpp-tidy	plugins/hypr-de-scene/src/FirstFrame.cpp	bugprone-narrowing-conversions	5
 cpp-tidy	plugins/hypr-de-scene/src/FirstFrame.cpp	cppcoreguidelines-pro-bounds-avoid-unchecked-container-access	3
@@ -229,6 +228,7 @@ shell	tests/scene-plugin-path.sh	SC2154	1
 shell	tests/scene-plugin-path.sh	SC2292	4
 shell	tests/scene-plugin-path.sh	SC2312	7
 shell	tests/scene-readiness.sh	SC2292	3
+shell	tests/session-env.sh	SC2292	3
 shell	tests/share-consent.sh	SC2015	12
 shell	tests/share-consent.sh	SC2292	13
 shell	tests/share-consent.sh	SC2312	9

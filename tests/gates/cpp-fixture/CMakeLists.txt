@@ -11,14 +11,14 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# The stand-in for a header this repository does not own has to be included from outside it.
-cmake_path(SET vendor NORMALIZE "${CMAKE_BINARY_DIR}/../vendor")
-file(COPY ../cpp-fixture-vendor/vendor.hpp DESTINATION "${vendor}")
-
 set(bad_option_NOWARN -Wno-conversion)
-set(bad_option_WEAKSTACK -fstack-protector)
+set(bad_option_NOWARNINGS -w)
+set(bad_option_WEAKSTACK -fno-stack-protector)
 set(bad_option_NOASSERT -U_GLIBCXX_ASSERTIONS)
 set(bad_option_NOSANITIZE -fno-sanitize=all)
+set(bad_option_RESPONSEFILE @${CMAKE_CURRENT_SOURCE_DIR}/weak.rsp)
+set(bad_option_WP -Wp,-U_FORTIFY_SOURCE)
+set(bad_link_RPATH -Wl,-rpath,/tmp/gate-fixture)
 
 # a header the build writes, once composed so that no template holds the pragma and once from a template
 if(FIXTURE_BAD STREQUAL "GENERATED")
@@ -42,21 +42,50 @@ add_library(gate-fixture MODULE src/fixture.cpp)
 add_executable(gate-fixture-test tests/test.cpp src/fixture.cpp)
 
 foreach(target gate-fixture gate-fixture-test)
-    # not SYSTEM on purpose, because a plugin adds Hyprland's headers the same way
-    target_include_directories(${target} PRIVATE src "${vendor}")
+    target_include_directories(${target} PRIVATE src)
     if(DEFINED bad_option_${FIXTURE_BAD})
         target_compile_options(${target} PRIVATE ${bad_option_${FIXTURE_BAD}})
+    elseif(DEFINED bad_link_${FIXTURE_BAD})
+        target_link_options(${target} PRIVATE ${bad_link_${FIXTURE_BAD}})
     elseif(FIXTURE_BAD)
         target_compile_definitions(${target} PRIVATE FIXTURE_BAD_${FIXTURE_BAD})
         target_include_directories(${target} PRIVATE ../cpp-fixture-sibling "${CMAKE_BINARY_DIR}/generated")
     endif()
 endforeach()
 
-# a source the build writes is compiled with its own flags, which are checked like any other
 if(FIXTURE_BAD STREQUAL "GENSOURCE")
     target_sources(gate-fixture PRIVATE "${CMAKE_BINARY_DIR}/generated/gensource.cpp")
     set_source_files_properties("${CMAKE_BINARY_DIR}/generated/gensource.cpp" PROPERTIES COMPILE_OPTIONS -fno-stack-protector)
+elseif(FIXTURE_BAD STREQUAL "UNITY")
+    set_target_properties(gate-fixture PROPERTIES UNITY_BUILD ON)
+    target_compile_options(gate-fixture PRIVATE -fno-stack-protector)
+elseif(FIXTURE_BAD STREQUAL "SYSTEM")
+    target_include_directories(gate-fixture SYSTEM PRIVATE ../cpp-fixture-sibling)
+elseif(FIXTURE_BAD STREQUAL "LAUNCHER")
+    set_property(TARGET gate-fixture PROPERTY RULE_LAUNCH_COMPILE "python3 ${CMAKE_CURRENT_SOURCE_DIR}/strip-hardening.py")
+elseif(FIXTURE_BAD STREQUAL "NORELRO")
+    target_link_options(gate-fixture PRIVATE -Wl,-z,norelro -Wl,-z,lazy -Wl,-z,execstack)
+    set_target_properties(gate-fixture PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/CMakeFiles/out)
+elseif(FIXTURE_BAD STREQUAL "ENVCI")
+    if(NOT DEFINED ENV{CI})
+        target_compile_options(gate-fixture PRIVATE -fno-stack-protector)
+    endif()
+elseif(FIXTURE_BAD STREQUAL "CUSTOM" OR FIXTURE_BAD STREQUAL "BYPASS")
+    # CUSTOM goes through the compiler on PATH; BYPASS names the compiler by its full path, past the gate's stand-in
+    set(compiler c++)
+    if(FIXTURE_BAD STREQUAL "BYPASS")
+        set(compiler /usr/bin/c++)
+    endif()
+    string(TOLOWER ${FIXTURE_BAD} name)
+    add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/${name}.so
+        COMMAND ${compiler} -x c++ -shared -fPIC -O0 -fno-stack-protector -fcf-protection
+            -Wl,-z,relro,-z,now,-z,noexecstack -o ${CMAKE_BINARY_DIR}/${name}.so ${CMAKE_CURRENT_SOURCE_DIR}/src/custom.cpp.txt
+        DEPENDS src/custom.cpp.txt)
+    add_custom_target(${name} ALL DEPENDS ${CMAKE_BINARY_DIR}/${name}.so)
+    install(FILES ${CMAKE_BINARY_DIR}/${name}.so DESTINATION lib/gate-fixture)
 endif()
+
+install(TARGETS gate-fixture LIBRARY DESTINATION lib/gate-fixture)
 
 enable_testing()
 add_test(NAME fixture COMMAND gate-fixture-test)

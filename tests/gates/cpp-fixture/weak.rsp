@@ -1,0 +1,3 @@
+-fno-stack-protector
+-O0
+-U_FORTIFY_SOURCE

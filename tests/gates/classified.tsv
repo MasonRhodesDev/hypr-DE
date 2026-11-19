@@ -7,6 +7,7 @@ dist/bin/hypr-de-setup	bash
 dist/bin/hypr-de-snip	bash
 dist/bin/hypr-de-theme	python
 dist/gaming/steam-set-launch-options	bash
+dist/hypr/local.lua.example	lua
 dist/libexec/hypr-de-bt-power	bash
 dist/libexec/hypr-de-cheatsheet	bash
 dist/libexec/hypr-de-prime-theme	bash
@@ -25,6 +26,7 @@ dist/uwsm/env	sh
 dist/uwsm/env-hyprland	sh
 packaging/PKGBUILD	pkgbuild
 packaging/hypr-de-scene/PKGBUILD	pkgbuild
+packaging/paths.conf	sh
 plugins/hypr-de-scene/tests/another-hyprland.h	cpp-test
 plugins/hypr-de-scene/tests/echo-module.cpp	cpp-test
 plugins/hypr-de-scene/tests/fixtures.inc	cpp-test
@@ -46,11 +48,13 @@ tests/fixtures/lock-policy/systemd-inhibit	sh
 tests/fixtures/lock-policy/systemd-run	sh
 tests/fixtures/lock-policy/vigil-lock	sh
 tests/fixtures/media-stream/playerctl	bash
+tests/gates/cpp-fixture-sibling/evasion.hpp	cpp-fixture
 tests/gates/cpp-fixture-sibling/sibling.hpp	cpp-fixture
-tests/gates/cpp-fixture-vendor/vendor.hpp	cpp-fixture
 tests/gates/cpp-fixture/CMakeLists.txt	cpp-fixture
+tests/gates/cpp-fixture/PKGBUILD	cpp-fixture
 tests/gates/cpp-fixture/src/fixture.cpp	cpp-fixture
 tests/gates/cpp-fixture/src/fixture.hpp	cpp-fixture
 tests/gates/cpp-fixture/tests/test.cpp	cpp-fixture
+tests/gates/cpp-fixture/weak.rsp	cpp-fixture
 tests/run	bash
 tests/tripwire	sh
