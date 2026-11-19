@@ -25,6 +25,7 @@ check() {
   cd "$srcdir"; cd "hypr-DE-$pkgver" 2>/dev/null || cd "$pkgname-$pkgver"
   export HYPR_DE_ALLOW_UNSEALED=1
   ./tests/scene-geometry.sh
+  ./tests/scene-readiness.sh
   ./tests/scene-plugin-build.sh
 }
 

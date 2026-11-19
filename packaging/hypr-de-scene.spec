@@ -43,6 +43,7 @@ also leaves it idle rather than failing the load.
 %check
 export HYPR_DE_ALLOW_UNSEALED=1
 ./tests/scene-geometry.sh
+./tests/scene-readiness.sh
 ./tests/scene-plugin-build.sh
 
 %install
