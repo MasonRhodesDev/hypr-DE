@@ -693,6 +693,20 @@ loginctl:terminate-session 7"
 stop_holders
 echo "a denied locker still alive in a crashed-lock run does not count as the lock"
 
+mk_lock 'swaylock'
+rm -f "$marker" "$respawns"
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_COMPOSITOR_LOCKED=true LOCK_POLICY_VIGIL_STATUS=1 LOCK_POLICY_VIGIL_HOLDS=1 LOCK_POLICY_SWAYLOCK_STATUS=1 \
+    LOCK_POLICY_EXTRA_PATH="$fallback_fixtures" run_lock
+assert_status 1
+assert_log "$three_respawns
+swaylock:
+swaylock:
+loginctl:terminate-session 7"
+stop_holders
+mk_lock
+echo "after a failed fallback on a crashed lock screen, a denied locker still alive is not the lock"
+
 mk_lock 'swaylock \&'
 rm -f "$marker" "$respawns"
 : > "$LOCK_POLICY_LOG"
