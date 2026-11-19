@@ -232,6 +232,11 @@ first frame, so a login shows no black or empty frame and nothing of the
 desktop while it assembles. `hypr-de` does not depend on it. Load it with
 the `hl.plugin.load` line in `local.lua.example`.
 
+This readiness rule and desktop-boot's removal of its own login splash
+([desktop-boot#32](https://github.com/MasonRhodesDev/desktop-boot/pull/32))
+go together. This change merges first, then that one, and the two packages
+must be installed in the same upgrade.
+
 The session says what to wait for, and the plugin decides when it has
 arrived. Each component that draws at rest declares the layer it maps from
 its own user unit, and the package ships the declarations for waybar
@@ -243,15 +248,26 @@ frame in which every declared layer is mapped on every output, and Hyprland's
 own wallpaper has loaded when it draws one. Every output fades together over
 0.2 s, and input and the cursor come back on the first faded frame.
 
-While the scene covers, layers and windows that map under it skip their open
-animation, and key presses, clicks, scrolls, touches and gestures are
-dropped, so nothing typed lands in a window nobody can see. A key pressed
-with Ctrl and Alt held passes, so Ctrl+Alt+F2 still reaches a text console.
+Every output there means each output that shows a frame of its own. A mirror,
+an output that is off or disabled, and the `FALLBACK` output Hyprland puts in
+while no real one exists do not count, and the scene never covers `FALLBACK`.
+Hyprland loads its wallpaper once per output, one after another, so the scene
+waits up to 2 s for each next one before it counts that wallpaper as failed.
 
-It never holds for long. It lets go 1.5 s after the last scene message when
-the session never says it is ready, after 5 s whatever else is true, at once
-on a session lock, and on `hyprctl scene release`. A Hyprland that no
-service manager started (no `MANAGERPID`) waits only for declared layers.
+While the scene covers an output, layers and windows that map under it skip
+their open animation, and nothing typed lands in a window nobody can see.
+Hyprland's keybinds and its VT switch still run first, so Super+L locks the
+session and Ctrl+Alt+F2 reaches a text console; a key no bind takes is kept
+from every client. Clicks, scrolls, touches and gestures are dropped before
+Hyprland's binds see them, so a mouse bind such as Super+scroll waits for the
+fade. While no output is covered, nothing is held.
+
+It never holds for long. It lets go 1.5 s after the last `scene expect` or
+`scene ready` when the session never says it is ready, after 5 s whatever
+else is true, at once on a session lock, and on `hyprctl scene release`. The
+5 s count from the first output it covers, and a release or lock before then
+ends the scene at once. A Hyprland that no service manager started (no
+`MANAGERPID`) waits only for declared layers.
 
 A bar other than waybar declares itself with a drop-in on its own unit:
 
@@ -274,8 +290,8 @@ and `scene: released` the scene gone. A name is 1 to 64 letters, digits,
 | Setting | Default | Meaning |
 |---|---|---|
 | `HYPR_DE_SCENE_TIMEOUT` | 5 | seconds before it lets go whatever else is true, 10 at most |
-| `HYPR_DE_SCENE_QUIET` | 1.5 | seconds after the last scene message when the session never says it is ready |
-| `HYPR_DE_SCENE_SPREAD` | 0.25 | seconds a layer shown on only some outputs waits for the rest |
+| `HYPR_DE_SCENE_QUIET` | 1.5 | seconds after the last `expect` or `ready` when the session never says it is ready |
+| `HYPR_DE_SCENE_SPREAD` | 0.25 | seconds a layer shown on only some outputs waits for the rest, from its last map or from when the scene covered that output, whichever is later |
 | `HYPR_DE_SCENE_FADE` | 0.2 | seconds the fade takes, 0 to cut, 1 at most |
 | `HYPR_DE_SCENE_AWAIT_SESSION` | auto | 1 waits for `hyprctl scene ready session`, 0 does not; auto waits when `MANAGERPID` is set |
 
