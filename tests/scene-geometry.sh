@@ -14,7 +14,7 @@ command -v "$cxx" >/dev/null || { echo "FAIL no C++ compiler ($cxx) to build the
     || { echo "FAIL the scene geometry test does not compile"; exit 1; }
 "$work/geometry" || exit 1
 
-scene_py=${DESKTOP_BOOT_LIB:-/usr/lib/desktop-boot/lib}/scene.py
+scene_py=/usr/lib/desktop-boot/lib/scene.py
 if [ -r "$scene_py" ] && command -v python3 >/dev/null; then
     if python3 "$src/tests/gen-fixtures.py" "$scene_py" | diff -u "$src/tests/fixtures.inc" - >"$work/drift"; then
         echo "ok   fixtures match the installed scene.py"

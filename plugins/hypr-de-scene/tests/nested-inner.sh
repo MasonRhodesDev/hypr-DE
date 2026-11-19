@@ -26,6 +26,11 @@ done
     echo 'hl.monitor({ output = "HEADLESS-3", mode = "3840x2160@60", position = "auto", scale = 1.5, transform = 3 })'
     echo 'hl.monitor({ output = "HEADLESS-4", mode = "1920x1080@60", position = "auto", scale = 1 })'
     echo 'hl.monitor({ output = "HEADLESS-5", mode = "3840x2160@60", position = "auto", scale = 1.5, transform = 1 })'
+    echo 'hl.monitor({ output = "HEADLESS-6", mode = "1600x900@60", position = "auto", scale = 1, transform = 2 })'
+    echo 'hl.monitor({ output = "HEADLESS-7", mode = "1366x768@60", position = "auto", scale = 1, transform = 4 })'
+    echo 'hl.monitor({ output = "HEADLESS-8", mode = "1680x1050@60", position = "auto", scale = 1, transform = 5 })'
+    echo 'hl.monitor({ output = "HEADLESS-9", mode = "1440x900@60", position = "auto", scale = 1, transform = 6 })'
+    echo 'hl.monitor({ output = "HEADLESS-10", mode = "1280x1024@60", position = "auto", scale = 1, transform = 7 })'
     echo "hl.plugin.load(\"$plugin\")"
     if [ -n "$splash" ]; then
         echo 'hl.layer_rule({ name = "handoff", match = { namespace = "desktop-boot-splash" }, no_anim = true })'
@@ -63,7 +68,7 @@ if [ -z "$sig" ]; then
 fi
 
 sleep 1.5
-for name in HEADLESS-2 HEADLESS-3 HEADLESS-4 HEADLESS-5; do
+for name in HEADLESS-2 HEADLESS-3 HEADLESS-4 HEADLESS-5 HEADLESS-6 HEADLESS-7 HEADLESS-8 HEADLESS-9 HEADLESS-10; do
     hyprctl -i "$sig" output create headless "$name" >>"$out/hyprctl.log" 2>&1
 done
 sleep "$SCENE_RUN_SECONDS"

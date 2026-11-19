@@ -6,9 +6,21 @@ import os
 import re
 import sys
 
+import cairo
 from PIL import Image, ImageChops
 
 DREW = re.compile(r"scene: drew (\S+) before its commit, mode (\d+)x(\d+) transform (\d+) ")
+
+TO_BUFFER = {
+    0: None,
+    1: Image.Transpose.ROTATE_90,
+    2: Image.Transpose.ROTATE_180,
+    3: Image.Transpose.ROTATE_270,
+    4: Image.Transpose.FLIP_LEFT_RIGHT,
+    5: Image.Transpose.TRANSPOSE,
+    6: Image.Transpose.FLIP_TOP_BOTTOM,
+    7: Image.Transpose.TRANSVERSE,
+}
 
 
 def load(path):
@@ -18,17 +30,42 @@ def load(path):
     return scene
 
 
-def to_buffer(box, transform, mode_w, mode_h):
-    x0, y0, x1, y1 = box
-    if transform == 0:
-        return box
-    if transform == 1:
-        return (y0, mode_h - x1, y1, mode_h - x0)
-    if transform == 2:
-        return (mode_w - x1, mode_h - y1, mode_w - x0, mode_h - y0)
-    if transform == 3:
-        return (mode_w - y1, x0, mode_w - y0, x1)
-    raise SystemExit(f"transform {transform} is not covered by this check")
+def sprite(png, size):
+    source = cairo.ImageSurface.create_from_png(png)
+    out = cairo.ImageSurface(cairo.FORMAT_ARGB32, size, size)
+    cr = cairo.Context(out)
+    cr.scale(size / source.get_width(), size / source.get_height())
+    cr.set_source_surface(source, 0, 0)
+    cr.get_source().set_filter(cairo.FILTER_BEST)
+    cr.paint()
+    out.flush()
+    return Image.frombuffer("RGBA", (size, size), bytes(out.get_data()), "raw", "BGRA", out.get_stride(), 1)
+
+
+def over(premultiplied, bg):
+    r, g, b, a = premultiplied.split()
+    keep = a.point([255 - v for v in range(256)])
+    return Image.merge("RGB", [
+        ImageChops.add(c, keep.point([(ground * v * 2 + 255) // 510 for v in range(256)]))
+        for c, ground in zip((r, g, b), bg)
+    ])
+
+
+def expected(scene, png, bg, ref, mode_w, mode_h, transform):
+    tw, th = (mode_h, mode_w) if transform % 2 else (mode_w, mode_h)
+    g = scene.geometry(tw, th, ref)
+    logo = sprite(png, g["logo"])
+    frame = Image.new("RGB", (tw, th), bg)
+    frame.paste(over(logo, bg), (g["logo_x"], g["logo_y"]))
+    blended = Image.new("L", (tw, th), 0)
+    blended.paste(logo.getchannel("A").point([255 if 0 < v < 255 else 0 for v in range(256)]), (g["logo_x"], g["logo_y"]))
+    if TO_BUFFER[transform] is not None:
+        frame, blended = frame.transpose(TO_BUFFER[transform]), blended.transpose(TO_BUFFER[transform])
+    return frame, blended, g
+
+
+def worst(image):
+    return max(high for _, high in image.getextrema())
 
 
 def main():
@@ -39,8 +76,7 @@ def main():
         spec = json.load(f)
     ref = spec.get("ref_short_side") or 0
     bg = scene.hexrgb(spec["palette"]["bg"])
-    logo = Image.open(os.path.join(data, "logo.png")).convert("RGBA")
-    visible = logo.getchannel("A").getbbox()
+    png = os.path.join(data, "logo.png")
 
     with open(os.path.join(out, "dumps", "log")) as f:
         drawn = {m.group(1): tuple(int(v) for v in m.groups()[1:]) for m in map(DREW.search, f) if m}
@@ -64,15 +100,13 @@ def main():
         im = Image.open(first).convert("RGB")
         check(im.size == (mode_w, mode_h), f"{name}: first frame is {mode_w}x{mode_h}")
 
-        tw, th = (mode_h, mode_w) if transform % 2 else (mode_w, mode_h)
-        g = scene.geometry(tw, th, ref)
-        k = g["logo"] / logo.width
-        want = to_buffer((g["logo_x"] + visible[0] * k, g["logo_y"] + visible[1] * k,
-                          g["logo_x"] + visible[2] * k, g["logo_y"] + visible[3] * k), transform, mode_w, mode_h)
-        got = ImageChops.difference(im, Image.new("RGB", im.size, bg)).getbbox()
-        near = got is not None and all(abs(a - b) <= 1.5 for a, b in zip(got, want))
-        check(near, f"{name}: logo covers {got}, scene.py puts it at {tuple(round(v, 1) for v in want)}")
-        check(im.getpixel((0, 0)) == bg and im.getpixel((mode_w - 1, mode_h - 1)) == bg, f"{name}: ground is #%02x%02x%02x" % bg)
+        want, blended, g = expected(scene, png, bg, ref, mode_w, mode_h, transform)
+        off = ImageChops.difference(im, want)
+        solid = worst(Image.composite(Image.new("RGB", off.size), off, blended))
+        check(solid == 0 and worst(off) <= 1,
+              f"{name}: transform {transform}, first frame is the ground with the {g['logo']}px logo at {g['logo_x']},{g['logo_y']}, as scene.py places it: "
+              f"every opaque and ground pixel is exact, and the {blended.histogram()[255]} the GPU blends are within 1 of 255"
+              + ("" if solid == 0 and worst(off) <= 1 else f", but it differs inside {off.getbbox()} by up to {worst(off)} of 255, {solid} where nothing is blended"))
 
         same = [p for p in dumps if p.endswith("-pass.ppm") and Image.open(p).size == im.size]
         with open(first, "rb") as f:
