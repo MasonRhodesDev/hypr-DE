@@ -98,9 +98,10 @@ def shebang(path):
 
 def gate_shell(found, _args):
     require("shellcheck", "shellcheck-py")
-    packaging = [p for p in tracked() if os.path.basename(p) == "PKGBUILD" or p.endswith(".install")]
-    scripts = [p for p in tracked() if p not in packaging and (SHELL_SHEBANG.match(shebang(p)) or p.endswith(".sh"))]
-    batches = [(scripts, []), (packaging, ["--shell=bash", f"--exclude={PKGBUILD_EXCLUDES}"])]
+    pkgbuilds = [p for p in tracked() if os.path.basename(p) == "PKGBUILD"]
+    install_scripts = [p for p in tracked() if p.endswith(".install")]
+    scripts = [p for p in tracked() if SHELL_SHEBANG.match(shebang(p)) or p.endswith(".sh")]
+    batches = [(scripts, []), (install_scripts, ["--shell=bash"]), (pkgbuilds, ["--shell=bash", f"--exclude={PKGBUILD_EXCLUDES}"])]
     for paths, options in batches:
         if not paths:
             continue
@@ -277,7 +278,7 @@ def tidy(found, project, *options):
     header_filter = "^" + re.escape(os.path.join(ROOT, project)) + "/"
     for path, _flags in translation_units(project, build):
         command = ["clang-tidy", "-p", build, f"--config-file={TIDY_CONFIG}", f"--header-filter={header_filter}", "--quiet"]
-        # the compile commands are GCC's; clang must not fail on a warning flag only GCC has
+        # the compile commands are GCC's, and clang must not fail on a warning flag only GCC has
         report = run([*command, "--extra-arg=-Wno-unknown-warning-option", "--extra-arg=-Wno-error", path])
         for line in report.stdout.splitlines():
             match = TIDY_LINE.match(line)

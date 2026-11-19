@@ -12,7 +12,7 @@ add_library(gate-fixture MODULE src/fixture.cpp)
 add_executable(gate-fixture-test tests/test.cpp src/fixture.cpp)
 
 foreach(target gate-fixture gate-fixture-test)
-    # not SYSTEM on purpose: a plugin adds Hyprland's headers the same way
+    # not SYSTEM on purpose, because a plugin adds Hyprland's headers the same way
     target_include_directories(${target} PRIVATE src ../cpp-fixture-vendor)
     if(FIXTURE_BAD STREQUAL "NOWARN")
         target_compile_options(${target} PRIVATE -Wno-conversion)
