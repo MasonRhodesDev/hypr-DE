@@ -22,7 +22,7 @@ runtime_dir=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
 fail_marker="$runtime_dir/hypr-de-lock-failed"
 fallback_lock_file="$runtime_dir/hypr-de-lock.lock"
 respawn_log="$runtime_dir/hypr-de-lock-respawns"
-watch_lock_file="$runtime_dir/hypr-de-lock-watch.lock"
+watch_lock_file="$runtime_dir/hypr-de-lock-watch-$(printf '%s' "${WAYLAND_DISPLAY:-}" | tr -c 'A-Za-z0-9._-' '_').lock"
 crashed_at_entry=0
 
 journal_ok() { [ -S "$JOURNAL_SOCKET" ] && command -v systemd-cat >/dev/null 2>&1; }

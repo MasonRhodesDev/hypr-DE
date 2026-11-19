@@ -521,6 +521,36 @@ until [ "$(watchers)" = 0 ] || [ "$i" -ge 100 ]; do sleep 0.1; i=$((i + 1)); don
 mk_lock
 echo "a scoped watcher launch that fails is relaunched as a plain process and says so"
 
+mk_lock '' terminate '' 1
+rm -rf "$lockfile" "$marker" "$respawns"
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_LOCK_FILE=$lockfile LOCK_POLICY_VIGIL_LOCKS=1 LOCK_POLICY_VIGIL_HOLDS=1 run_lock
+assert_status 0
+i=0
+until [ "$(watchers)" = 1 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+[ "$(watchers)" = 1 ] || { echo "a lock started no watcher for its locker" >&2; exit 1; }
+env -u XDG_SESSION_ID WAYLAND_DISPLAY="$display" LOCK_POLICY_LOCK_FILE=$lockfile \
+    "$work/lock-cmd.sh" --watch </dev/null >/dev/null 2>&1 &
+sleep 0.5
+i=0
+until [ "$(watchers)" = 1 ] || [ "$i" -ge 100 ]; do sleep 0.1; i=$((i + 1)); done
+[ "$(watchers)" = 1 ] || { echo "a second watcher for the same display kept running" >&2; exit 1; }
+display=wayland-other
+LOCK_POLICY_LOCK_FILE=$lockfile LOCK_POLICY_VIGIL_HOLDS=1 run_lock
+display=wayland-test
+assert_status 0
+i=0
+until [ "$(watchers)" = 2 ] || [ "$i" -ge 100 ]; do sleep 0.1; i=$((i + 1)); done
+sleep 6
+[ "$(watchers)" = 2 ] || { echo "a second session on another display got no watcher of its own" >&2; exit 1; }
+rm -rf "$lockfile"
+stop_holders
+i=0
+until [ "$(watchers)" = 0 ] || [ "$i" -ge 100 ]; do sleep 0.1; i=$((i + 1)); done
+[ "$(watchers)" = 0 ] || { echo "a watcher outlived an unlocked session" >&2; exit 1; }
+mk_lock
+echo "one watcher per Wayland display: a second one for the same display exits, another display gets its own"
+
 slow="$work/hyprctl-slow"
 mk_lock '' terminate '' 1
 rm -rf "$lockfile" "$marker" "$respawns" "$slow"
