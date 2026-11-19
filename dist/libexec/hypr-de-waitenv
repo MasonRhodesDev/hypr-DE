@@ -1,0 +1,157 @@
+#!/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin; export PATH
+set -f
+
+# Drop-in replacement for `uwsm aux waitenv`, which checks every 0.5 s.
+# Same inputs, wait list, timeout source, settle, log lines and exit codes:
+# 0 once every variable is present, 1 on timeout. It checks every 10 ms for
+# the first 2 s, then every 100 ms, and retries a failed read for up to 2 s.
+fast_interval=0.01
+slow_interval=0.1
+fast_for=200
+read_grace=200
+end_buffer=3
+
+declare -A listed=()
+want=()
+for v in WAYLAND_DISPLAY "$@" ${UWSM_WAIT_VARNAMES-}; do
+    case $v in _|SHELL|PWD|OLDWD) continue ;; esac
+    if [[ ! $v =~ ^([A-Za-z_][A-Za-z0-9_]+|[A-Za-z][A-Za-z0-9_]*)$ ]]; then
+        echo "Encountered illegal var \"$v\"."
+        continue
+    fi
+    [ -n "${listed[$v]-}" ] && continue
+    listed[$v]=1
+    want+=("$v")
+done
+
+joined() {
+    local s
+    printf -v s '%s, ' "$@"
+    printf '  %s\n' "${s%, }"
+}
+
+# Centiseconds since boot. /proc/uptime is monotonic, unlike EPOCHREALTIME.
+now=0
+tick() {
+    local up
+    read -r up _ </proc/uptime
+    if [[ ! $up =~ ^[0-9]+\.[0-9]+$ ]]; then
+        echo "Could not read the clock from /proc/uptime." >&2
+        exit 1
+    fi
+    up=${up/./}
+    now=$(( 10#$up ))
+}
+
+timeout=
+usec=$(busctl --user get-property org.freedesktop.systemd1 \
+    /org/freedesktop/systemd1/unit/wayland_2dsession_2dwaitenv_2eservice \
+    org.freedesktop.systemd1.Service TimeoutStartUSec 2>/dev/null)
+if [[ $usec =~ ^t\ ([0-9]+)$ ]]; then
+    usec=${BASH_REMATCH[1]}
+    if (( ${#usec} > 15 )); then
+        timeout=999999999
+    elif (( 10#$usec >= 1000000 )); then
+        timeout=$(( 10#$usec / 1000000 ))
+    fi
+fi
+if [ -z "$timeout" ]; then
+    t=${UWSM_WAIT_VARNAMES_TIMEOUT-30}
+    if [[ $t =~ ^0*([1-9][0-9]*)$ ]]; then
+        t=${BASH_REMATCH[1]}
+        (( ${#t} > 9 )) && t=999999999
+        timeout=$t
+    elif [[ $t =~ ^[0-9]+$ ]]; then
+        echo "Expected positive value from UWSM_WAIT_VARNAMES_TIMEOUT var, got: 0"
+        timeout=30
+    else
+        echo "Expected integer value from UWSM_WAIT_VARNAMES_TIMEOUT var, got: $t"
+        timeout=30
+    fi
+fi
+
+settle=${UWSM_WAIT_VARNAMES_SETTLETIME-0.2}
+if [[ ! $settle =~ ^([0-9]+\.?[0-9]*|\.[0-9]+)$ ]]; then
+    echo "\"UWSM_WAIT_VARNAMES_SETTLETIME\" contains invalid value \"$settle\", using \"0.2\""
+    settle=0.2
+fi
+
+tick
+start=$now
+warn_at=$(( start + timeout * 80 ))
+attempt=0
+warned=0
+failing_since=
+missing=("${want[@]}")
+declare -A reported=()
+while :; do
+    if manager_env=$(systemctl --user show-environment 2>/dev/null); then
+        failing_since=
+        attempt=$(( attempt + 1 ))
+        declare -A present=()
+        while IFS= read -r line; do
+            [[ $line == ?*=* ]] && present[${line%%=*}]=1
+        done <<<"$manager_env"
+
+        missing=()
+        appeared=()
+        for v in "${want[@]}"; do
+            if [ -z "${present[$v]-}" ]; then
+                missing+=("$v")
+            elif [ -z "${reported[$v]-}" ]; then
+                appeared+=("$v")
+                reported[$v]=1
+            fi
+        done
+        unset present
+
+        if [ "${#missing[@]}" -eq 0 ]; then
+            if [ "$attempt" -eq 1 ]; then
+                echo "All expected variables appeared in activation environment:"
+                joined "${want[@]}"
+            else
+                echo "All expected variables appeared in activation environment."
+            fi
+            [[ $settle =~ ^[0.]*$ ]] || sleep "$settle" || exit 1
+            exit 0
+        fi
+
+        tick
+        if [ "${#appeared[@]}" -gt 0 ]; then
+            echo "Expected variables appeared in activation environment:"
+            joined "${appeared[@]}"
+            echo "Still expecting:"
+            joined "${missing[@]}"
+        elif [ "$attempt" -eq 1 ]; then
+            echo "Expecting variables to appear in activation environment:"
+            joined "${want[@]}"
+        elif [ "$warned" = 0 ] && (( now >= warn_at )); then
+            warned=1
+            echo "Still waiting for variables in activation environment, nearing timeout:"
+            joined "${want[@]}"
+        fi
+    else
+        tick
+        if [ -z "$failing_since" ]; then
+            failing_since=$now
+            echo "Could not read the activation environment, retrying."
+        elif (( now - failing_since >= read_grace )); then
+            echo "Could not read the activation environment for $(( read_grace / 100 )) s." >&2
+            exit 1
+        fi
+    fi
+
+    if (( now - start > timeout * 100 )); then
+        sleep "$end_buffer"
+        echo "Timed out waiting for variables in activation environment:" >&2
+        joined "${missing[@]}" >&2
+        exit 1
+    fi
+    if (( now - start < fast_for )); then
+        sleep "$fast_interval"
+    else
+        sleep "$slow_interval"
+    fi
+done
+exit 1

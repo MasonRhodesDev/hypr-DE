@@ -53,6 +53,10 @@ jobs:
         run: ./tests/scene-readiness.sh
       - name: uwsm's settle pause stays off the Hyprland login
         run: ./tests/session-env.sh
+      - name: waitenv's replacement keeps uwsm's guard and checks every 10 ms, then 100 ms
+        run: ./tests/waitenv.sh
+      - name: wayland-env-guard repoints the session in one export, D-Bus first
+        run: ./tests/env-guard.sh
       - name: Every package names the scene plugin at the path it is installed to
         run: ./tests/scene-plugin-path.sh
       - name: Steam launch-option validation
