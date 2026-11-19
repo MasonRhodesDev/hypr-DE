@@ -68,15 +68,27 @@ __attribute__((constructor)) static void load() {
     if (const char* NEIGHBOUR = getenv("SCENE_NEIGHBOUR"); NEIGHBOUR && *NEIGHBOUR)
         printf("neighbour %s\n", reinterpret_cast<const char* (*)()>(dlsym(open(NEIGHBOUR, "the neighbour"), "builtFor"))());
 
-    void* module = open(PLUGIN, "the plugin");
+    // every way Hyprland's loadPluginInternal rejects a plugin, which puts its notification on screen
+    void*      module  = open(PLUGIN, "the plugin");
+    const auto VERSION = reinterpret_cast<std::string (*)()>(dlsym(module, "pluginAPIVersion"));
+    const auto INIT    = reinterpret_cast<SInfo (*)(void*)>(dlsym(module, "pluginInit"));
+    if (!VERSION || !INIT) {
+        printf("outcome rejected, no apiver or init function\n");
+        _exit(0);
+    }
+    if (VERSION() != HYPRLAND_API_VERSION) {
+        printf("outcome rejected, API version %s\n", VERSION().c_str());
+        _exit(0);
+    }
 
     try {
-        const auto INFO = reinterpret_cast<SInfo (*)(void*)>(dlsym(module, "pluginInit"))(module);
+        const auto INFO = INIT(module);
         printf("outcome returned\ndescription %s\n", INFO.description.c_str());
     } catch (const std::exception& e) { printf("outcome threw %s\n", e.what()); }
 
     printf("syslog %s\n", logOpen ? "open" : "closed");
-    reinterpret_cast<void (*)()>(dlsym(module, "pluginExit"))();
+    if (const auto EXIT = reinterpret_cast<void (*)()>(dlsym(module, "pluginExit")))
+        EXIT();
     dlclose(module);
     _exit(0);
 }
