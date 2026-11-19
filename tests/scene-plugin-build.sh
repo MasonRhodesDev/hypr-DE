@@ -25,24 +25,51 @@ else
     exit 1
 fi
 
-plugin=$work/build/hypr-de-scene.so
-symbols=$(nm -D --defined-only "$plugin")
-for entry in pluginAPIVersion pluginInit pluginExit; do
-    grep -qw "$entry" <<<"$symbols" && ok "exports $entry" || bad "does not export $entry"
+loader=$work/build/hypr-de-scene.so
+plugin=$work/build/hypr-de-scene-impl.so
+for module in "$loader" "$plugin"; do
+    symbols=$(nm -D --defined-only "$module")
+    for entry in pluginAPIVersion pluginInit pluginExit; do
+        grep -qw "$entry" <<<"$symbols" && ok "${module##*/} exports $entry" || bad "${module##*/} does not export $entry"
+    done
 done
 
-installs=$(unset SCENE_PLUGIN; . "$root/packaging/paths.conf"; printf '%s' "$SCENE_PLUGIN")
-if DESTDIR="$work/stage" cmake --install "$work/build" --prefix /usr >"$work/install.log" 2>&1 && [ -f "$work/stage$installs" ]; then
-    ok "installs to $installs, where hypr-de's configuration loads it from"
+extra=$(nm -D --defined-only "$loader" | awk '{ print $NF }' | grep -vxE 'pluginAPIVersion|pluginInit|pluginExit')
+if [ -z "$extra" ]; then
+    ok "the loader exports nothing but the entry points"
 else
-    bad "does not install to $installs, where hypr-de's configuration loads it from: $(find "$work/stage" -name '*.so' 2>/dev/null | sed "s|^$work/stage||" | tr '\n' ' ')"
+    bad "the loader also exports: $(tr '\n' ' ' <<<"$extra")"
 fi
 
-if nm -D "$plugin" | grep -q __hyprland_api_get_client_hash; then
-    bad "shares the symbol that names its Hyprland build with every other plugin"
+# glibc, libstdc++ and libgcc version every symbol; Hyprland and its libraries do not
+imports=$(nm -D --undefined-only "$loader" | awk '$1 == "U" && $2 !~ /@/ { print $2 }')
+if [ -z "$imports" ]; then
+    ok "the loader needs no symbol from Hyprland, so no Hyprland upgrade can stop it loading"
 else
-    ok "keeps the name of its Hyprland build to itself"
+    bad "the loader needs symbols a Hyprland upgrade can remove: $(tr '\n' ' ' <<<"$imports")"
 fi
+needed=$(readelf -dW "$loader" | sed -n 's/.*(NEEDED).*\[\(.*\)\]/\1/p' | grep -vxE 'libc\.so\.6|libm\.so\.6|libstdc\+\+\.so\.6|libgcc_s\.so\.1')
+if [ -z "$needed" ]; then
+    ok "the loader links only the C and C++ runtimes"
+else
+    bad "the loader links: $(tr '\n' ' ' <<<"$needed")"
+fi
+
+installs=$(unset SCENE_PLUGIN; . "$root/packaging/paths.conf"; printf '%s' "$SCENE_PLUGIN")
+private=$(dirname -- "$installs")/hypr-de-scene-impl.so
+if DESTDIR="$work/stage" cmake --install "$work/build" --prefix /usr >"$work/install.log" 2>&1 && [ -f "$work/stage$installs" ] && [ -f "$work/stage$private" ]; then
+    ok "installs the loader to $installs, where hypr-de's configuration loads it from, and the module beside it"
+else
+    bad "does not install to $installs and $private: $(find "$work/stage" -name '*.so' 2>/dev/null | sed "s|^$work/stage||" | tr '\n' ' ')"
+fi
+
+for module in "$loader" "$plugin"; do
+    if nm -D "$module" | grep -q __hyprland_api_get_client_hash; then
+        bad "${module##*/} shares the symbol that names its Hyprland build with every other plugin"
+    else
+        ok "${module##*/} keeps the name of its Hyprland build to itself"
+    fi
+done
 
 loaded() { ldd "$1" | awk '$2 == "=>" && $3 ~ /^\// { print $3 }'; }
 if hyprland=$(command -v Hyprland); then

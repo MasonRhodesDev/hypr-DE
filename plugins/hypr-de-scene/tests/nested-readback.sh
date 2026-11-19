@@ -66,7 +66,7 @@ exec bwrap --unshare-all --die-with-parent --new-session --cap-drop ALL \
     "${system[@]}" --dev /dev --dev-bind "$node" "$node" --proc /proc --ro-bind /sys /sys \
     --tmpfs /tmp --tmpfs /run --tmpfs /var --dir /tmp/home --dir /run/rt \
     --ro-bind "$here" "$here" \
-    --ro-bind "$hyprland" "$hyprland" --ro-bind "$plugin" "$plugin" --ro-bind "$data" "$data" \
+    --ro-bind "$hyprland" "$hyprland" --ro-bind "$(dirname -- "$plugin")" "$(dirname -- "$plugin")" --ro-bind "$data" "$data" \
     --bind "$out" "$out" \
     --clearenv "${libs[@]}" \
     --setenv PATH "$(dirname -- "$hyprland"):/usr/local/bin:/usr/bin:/bin" \
