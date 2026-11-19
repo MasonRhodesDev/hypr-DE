@@ -145,7 +145,7 @@ existing snapshot/rollback tooling covers them.
 
 ### Lock integrity
 
-Every lock goes through `lock-cmd.sh`, and none needs hypridle:
+Every lock goes through `lock-cmd.sh`, and only the idle lock needs hypridle:
 
 | Request | Who runs `lock-cmd.sh` |
 |---|---|
@@ -155,8 +155,8 @@ Every lock goes through `lock-cmd.sh`, and none needs hypridle:
 | Idle | hypridle only. With hypridle disabled nothing locks on idle |
 
 `hypr-de-lock.service` is pulled in by every graphical session through a
-`graphical-session.target` drop-in, not a preset, so upgraded installs get it
-too; `systemctl --user mask hypr-de-lock.service` turns it off. Two requests
+`graphical-session.target` drop-in, not a preset, so an upgraded install runs
+it from its next login; `systemctl --user mask hypr-de-lock.service` turns it off. Two requests
 at once are safe: `lock-cmd.sh` exits early when the compositor already holds
 the lock, and vigil-lock joins a lock that is already starting.
 

@@ -77,6 +77,7 @@ class SleepDelay:
     def __init__(self, bus):
         self.bus = bus
         self.fd = None
+        self.sleeping = False
 
     def take(self):
         if self.fd is not None:
@@ -100,6 +101,18 @@ class SleepDelay:
             os.close(self.fd)
             self.fd = None
 
+    def going_down(self):
+        self.sleeping = True
+
+    def resumed(self):
+        self.sleeping = False
+        self.take()
+
+    def lock_returned(self):
+        self.release()
+        if not self.sleeping:
+            self.take()
+
 
 def main():
     bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
@@ -114,9 +127,10 @@ def main():
     def prepare_for_sleep(_bus, _sender, _path, _iface, _member, params):
         (going_down,) = params.unpack()
         if going_down:
-            locker.request("--sleep", then=delay.release)
+            delay.going_down()
+            locker.request("--sleep", then=delay.lock_returned)
         else:
-            delay.take()
+            delay.resumed()
 
     bus.signal_subscribe(
         LOGIND, SESSION, "Lock", path, None, Gio.DBusSignalFlags.NONE,

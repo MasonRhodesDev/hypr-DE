@@ -11,3 +11,4 @@ Restart=always
 RestartSec=1
 # lock-cmd.sh's last-resort retry runs vigil-lock bare, in this cgroup; a restart must not kill a held lock.
 KillMode=process
+SyslogIdentifier=hypr-de-lock

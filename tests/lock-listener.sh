@@ -92,13 +92,21 @@ wait_for '[ "$(locks)" = 4 ]' || bad "no lock-cmd.sh run for a logind Lock"
 kill -HUP "$logind"; sleep 0.5
 [ "$(locks)" = 4 ] && ok "sleep during a running lock joins it instead of starting another" || bad "sleep started a second lock-cmd.sh"
 wait_for '[ "$(events)" = "inhibit sleep delay,released,inhibit sleep delay,released," ]' && ok "and releases the delay when that lock returns" || bad "the delay was not released after the joined lock: $(events)"
-kill -WINCH "$logind"; sleep 0.3
+kill -WINCH "$logind"
+wait_for '[ "$(events)" = "inhibit sleep delay,released,inhibit sleep delay,released,inhibit sleep delay," ]' || bad "no delay after the second resume: $(events)"
 sleep 2
+
+kill -HUP "$logind"
+wait_for '[ "$(locks)" = 5 ]' || bad "no lock before the third sleep"
+kill -WINCH "$logind"
+wait_for '[ "$(events)" = "inhibit sleep delay,released,inhibit sleep delay,released,inhibit sleep delay,released,inhibit sleep delay," ]' \
+    && ok "a lock that returns after resume still leaves a delay held for the next sleep" \
+    || bad "a late lock left no delay held: $(events)"
 
 kill "$listener"; wait "$listener" 2>/dev/null
 start_listener -u XDG_SESSION_ID || { cat "$work/listener.err"; bad "no listener without XDG_SESSION_ID"; }
 kill -USR1 "$logind"
-wait_for '[ "$(locks)" = 5 ]' && ok "without XDG_SESSION_ID it follows the user's graphical session" || bad "no lock without XDG_SESSION_ID"
+wait_for '[ "$(locks)" = 6 ]' && ok "without XDG_SESSION_ID it follows the user's graphical session" || bad "no lock without XDG_SESSION_ID"
 kill "$listener"; wait "$listener" 2>/dev/null
 
 env XDG_SESSION_ID=99 "$work/listener" 2>"$work/listener.err" & listener=$!; pids+=("$listener")
