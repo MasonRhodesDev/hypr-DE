@@ -1,12 +1,17 @@
 #!/usr/bin/python3 -I
 import os
+import shutil
 import sys
 
 from gi.repository import Gio, GLib
 
 LOCK_CMD = "@LIBEXECDIR@/lock-cmd.sh"
-# Longer than lock-cmd.sh's own bounded worst case, so the watchdog never cuts off its failsafe.
-LOCK_DEADLINE_SECONDS = 90
+# Like lock-cmd.sh, run nothing from a directory the session's environment can choose.
+SYSTEM_PATH = "/usr/local/bin:/usr/bin:/bin"
+# Above lock-cmd.sh's bounded worst case (88 s measured on a crashed screen with no answer from
+# hyprctl, a contended flock and a vigil-lock that never confirms; about 101 s computed), so only a run
+# stuck in an unbounded step, a foreground fallback or loginctl, is killed. Its failsafe then runs.
+LOCK_DEADLINE_SECONDS = 120
 BIND_RETRY_SECONDS = 2
 # The unit lists this in RestartPreventExitStatus=, so only "not Hyprland" stops the restarts.
 NOT_HYPRLAND = 78
@@ -138,9 +143,13 @@ class Locker:
         self.notify_waiters()
 
     def overdue(self, child):
-        log(f"{LOCK_CMD} did not return within {LOCK_DEADLINE_SECONDS}s; killing it so later requests run")
+        log(f"{LOCK_CMD} did not return within {LOCK_DEADLINE_SECONDS}s; killing it and running its failsafe")
         child.force_exit()
         self.child = None
+        try:
+            self.launcher.spawnv([LOCK_CMD, "--failsafe"])
+        except GLib.Error as error:
+            log(f"cannot run the failsafe of {LOCK_CMD}: {error.message}")
         self.notify(
             "Screen lock did not finish",
             f"Locking did not finish within {LOCK_DEADLINE_SECONDS} seconds. "
@@ -150,8 +159,12 @@ class Locker:
         return GLib.SOURCE_REMOVE
 
     def notify(self, title, body):
+        notify_send = shutil.which("notify-send", path=SYSTEM_PATH)
+        if not notify_send:
+            log(f"cannot post a notification: no notify-send in {SYSTEM_PATH}")
+            return
         try:
-            self.launcher.spawnv(["notify-send", "-u", "critical", "-a", "hypr-de", title, body])
+            self.launcher.spawnv([notify_send, "-u", "critical", "-a", "hypr-de", title, body])
         except GLib.Error as error:
             log(f"cannot post a notification: {error.message}")
 

@@ -869,6 +869,29 @@ if grep -q '^hypr-de-lock:' "$LOCK_POLICY_JOURNAL"; then
 fi
 echo "the locker's output and lock-cmd.sh's own lines reach the journal on every launch path"
 
+mk_lock '' warn
+start_holder "$display"
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_COMPOSITOR_LOCKED=true run_lock --failsafe
+assert_status 0
+assert_log ''
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_COMPOSITOR_LOCKED=false run_lock --failsafe
+assert_status 1
+assert_log 'notify-send:-u critical -a hypr-de Screen NOT locked No screen locker could start. This session is unlocked.'
+stop_holders
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_COMPOSITOR_LOCKED=true run_lock --failsafe
+assert_status 1
+assert_log 'notify-send:-u critical -a hypr-de Lock screen crashed The session is still locked but nothing can unlock it. Switch to a TTY (Ctrl+Alt+F2) to recover.'
+mk_lock
+: > "$LOCK_POLICY_LOG"
+run_lock --failsafe
+assert_status 1
+assert_log 'loginctl:terminate-session 7'
+rm -f "$marker"
+echo "the deadline failsafe leaves a held lock alone and otherwise runs the configured failsafe, starting no locker"
+
 mk_libexec session-locked.sh
 mk_libexec dpms-off-if-locked.sh
 LOCK_POLICY_COMPOSITOR_LOCKED=true "$work/session-locked.sh" || {

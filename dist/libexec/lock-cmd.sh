@@ -428,6 +428,18 @@ watch_lockers() {
     done
 }
 
+# The listener runs this once it has killed a lock request that outlived its deadline. A live locker
+# on a compositor that is locked, or gives no answer, is the lock; anything else gets the failsafe.
+deadline_failsafe() {
+    compositor_locked
+    compositor=$?
+    [ "$compositor" -ne 1 ] && locker_alive && return 0
+    [ "$compositor" -eq 0 ] && crashed_at_entry=1
+    log "a lock request did not finish within the lock listener's deadline and no locker holds the lock"
+    fail_closed
+    return 1
+}
+
 lock_or_fail_closed() {
     lock "$@"
     status=$?
@@ -447,6 +459,10 @@ load_policy
 case "${1:-}" in
     --watch)
         watch_lockers
+        ;;
+    --failsafe)
+        serialised deadline_failsafe
+        exit
         ;;
     --idle)
         warn=${VIGIL_IDLE_WARNING_SECONDS:-10}
@@ -493,4 +509,4 @@ start_watcher
 [ "$mode" = --idle ] && exit 0
 release_idle_inhibitor
 [ "$mode" = --sleep ] && exit 0
-exec hyprctl dispatch "hl.dsp.dpms({ action = 'on' })"
+exec timeout 5 hyprctl dispatch "hl.dsp.dpms({ action = 'on' })"

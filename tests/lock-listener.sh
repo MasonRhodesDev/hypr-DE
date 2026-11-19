@@ -38,17 +38,31 @@ cat >"$work/bin/notify-send" <<'STUB'
 echo "$*" >>"$NOTES"
 STUB
 chmod +x "$work/bin/notify-send"
-export PATH="$work/bin:$PATH"
+export PATH="$work/planted:$work/bin:$PATH"
 export XDG_RUNTIME_DIR="$work/runtime"
 export HYPRLAND_INSTANCE_SIGNATURE=none
 
+export STUB_PIDS="$work/stub-pids"
 cat >"$work/lock-cmd.sh" <<'STUB'
 #!/bin/sh
 echo "lock-cmd.sh session=$XDG_SESSION_ID $*" >>"$LOCKS"
-sleep "${STUB_HOLD:-0}"
+[ "${1:-}" = --failsafe ] && exit 0
+echo $$ >>"$STUB_PIDS"
+exec sleep "${STUB_HOLD:-0}"
 STUB
 chmod +x "$work/lock-cmd.sh"
-sed "s|@LIBEXECDIR@|$work|g" "$root/dist/libexec/hypr-de-lock-listener" >"$work/listener"
+mkdir -p "$work/planted"
+cat >"$work/planted/notify-send" <<'STUB'
+#!/bin/sh
+echo "$*" >>"$NOTES.planted"
+STUB
+chmod +x "$work/planted/notify-send"
+grep -q '^SYSTEM_PATH = "/usr/local/bin:/usr/bin:/bin"$' "$root/dist/libexec/hypr-de-lock-listener" \
+    || { echo "the listener must pin the PATH it runs notify-send from" >&2; exit 1; }
+sed -e "s|@LIBEXECDIR@|$work|g" -e "s|^SYSTEM_PATH = .*|SYSTEM_PATH = \"$work/bin:/usr/bin:/bin\"|" \
+    "$root/dist/libexec/hypr-de-lock-listener" >"$work/listener"
+grep -q "^SYSTEM_PATH = \"$work/bin:" "$work/listener" \
+    || { echo "the SYSTEM_PATH rewrite did not take; a notification would reach the real notify-send" >&2; exit 1; }
 sed "s|^LOCK_DEADLINE_SECONDS = .*|LOCK_DEADLINE_SECONDS = 2|" "$work/listener" >"$work/listener-short"
 chmod +x "$work/listener" "$work/listener-short"
 listener_bin="$work/listener"
@@ -57,7 +71,7 @@ wait_for() {
     for _ in $(seq 50); do eval "$1" && return 0; sleep 0.1; done
     return 1
 }
-locks() { wc -l <"$LOCKS"; }
+locks() { grep -vc -- '--failsafe' "$LOCKS"; }
 events() { tr '\n' ',' <"$FAKE_LOGIND_EVENTS"; }
 
 start_logind() {
@@ -141,6 +155,12 @@ wait_for '[ "$(released)" = $((before + 1)) ]' \
     && ok "a lock-cmd.sh that never returns still releases the sleep delay at the deadline" \
     || bad "a stuck lock-cmd.sh kept the sleep delay: $(events)"
 wait_for 'grep -q . "$NOTES"' && ok "a stuck lock-cmd.sh posts a visible failure" || bad "no notification for a stuck lock-cmd.sh"
+[ -e "$NOTES.planted" ] && bad "the listener ran a notify-send from the session's PATH" || ok "notify-send runs from the pinned PATH, not the session's"
+stuck=$(tail -n1 "$STUB_PIDS")
+wait_for '! kill -0 "$stuck" 2>/dev/null' && ok "the stuck lock-cmd.sh is killed at the deadline" || bad "the stuck lock-cmd.sh is still running after the deadline"
+wait_for 'grep -qx "lock-cmd.sh session=7 --failsafe" "$LOCKS"' \
+    && ok "at the deadline the listener runs lock-cmd.sh's failsafe" \
+    || bad "the deadline skipped the failsafe: $(cat "$LOCKS")"
 kill -WINCH "$logind"
 kill -USR1 "$logind"
 wait_for '[ "$(locks)" = 9 ]' && ok "a Lock after a stuck lock-cmd.sh runs lock-cmd.sh again" || bad "a stuck lock-cmd.sh swallowed later Lock requests"
