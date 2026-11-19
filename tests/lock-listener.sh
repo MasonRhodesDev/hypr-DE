@@ -27,7 +27,9 @@ dbus-daemon --config-file="$work/bus.conf" --nofork --nopidfile & pids+=($!)
 for _ in $(seq 50); do [ -S "$work/bus" ] && break; sleep 0.1; done
 export DBUS_SYSTEM_BUS_ADDRESS="unix:path=$work/bus"
 export LOCKS="$work/locks"
+export FAKE_LOGIND_EVENTS="$work/events"
 : >"$LOCKS"
+: >"$FAKE_LOGIND_EVENTS"
 
 cat >"$work/lock-cmd.sh" <<'STUB'
 #!/bin/sh
@@ -75,10 +77,29 @@ kill -USR2 "$logind"; sleep 0.5
 "$fixtures/impostor"; sleep 0.5
 [ "$(locks)" = 2 ] && ok "a Lock not sent by logind is ignored" || bad "a Lock from a non-logind sender ran lock-cmd.sh"
 
+events() { tr '\n' ',' <"$FAKE_LOGIND_EVENTS"; }
+[ "$(events)" = "inhibit sleep delay," ] && ok "the listener holds a sleep delay from the start" || bad "no sleep delay held: $(events)"
+kill -HUP "$logind"
+wait_for '[ "$(locks)" = 3 ]' && ok "PrepareForSleep runs lock-cmd.sh --sleep" || bad "no lock before sleep"
+[ "$(tail -n1 "$LOCKS")" = "lock-cmd.sh session=7 --sleep" ] || bad "unexpected sleep lock: $(tail -n1 "$LOCKS")"
+sleep 0.5
+[ "$(events)" = "inhibit sleep delay," ] && ok "sleep waits while lock-cmd.sh is still locking" || bad "the delay was released before the lock finished"
+wait_for '[ "$(events)" = "inhibit sleep delay,released," ]' && ok "the delay is released once lock-cmd.sh returns" || bad "the delay was never released: $(events)"
+kill -WINCH "$logind"
+wait_for '[ "$(events)" = "inhibit sleep delay,released,inhibit sleep delay," ]' && ok "after resume the listener takes a new delay" || bad "no new delay after resume: $(events)"
+
+kill -USR1 "$logind"
+wait_for '[ "$(locks)" = 4 ]' || bad "no lock-cmd.sh run for a logind Lock"
+kill -HUP "$logind"; sleep 0.5
+[ "$(locks)" = 4 ] && ok "sleep during a running lock joins it instead of starting another" || bad "sleep started a second lock-cmd.sh"
+wait_for '[ "$(events)" = "inhibit sleep delay,released,inhibit sleep delay,released," ]' && ok "and releases the delay when that lock returns" || bad "the delay was not released after the joined lock: $(events)"
+kill -WINCH "$logind"; sleep 0.3
+sleep 2
+
 kill "$listener"; wait "$listener" 2>/dev/null
 start_listener -u XDG_SESSION_ID || { cat "$work/listener.err"; bad "no listener without XDG_SESSION_ID"; }
 kill -USR1 "$logind"
-wait_for '[ "$(locks)" = 3 ]' && ok "without XDG_SESSION_ID it follows the user's graphical session" || bad "no lock without XDG_SESSION_ID"
+wait_for '[ "$(locks)" = 5 ]' && ok "without XDG_SESSION_ID it follows the user's graphical session" || bad "no lock without XDG_SESSION_ID"
 kill "$listener"; wait "$listener" 2>/dev/null
 
 env XDG_SESSION_ID=99 "$work/listener" 2>"$work/listener.err" & listener=$!; pids+=("$listener")

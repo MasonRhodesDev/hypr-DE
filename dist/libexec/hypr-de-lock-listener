@@ -43,15 +43,19 @@ class Locker:
         self.launcher = Gio.SubprocessLauncher.new(Gio.SubprocessFlags.NONE)
         self.launcher.setenv("XDG_SESSION_ID", session_id, True)
         self.running = False
+        self.waiters = []
 
-    def request(self):
+    def request(self, *args, then=None):
+        if then:
+            self.waiters.append(then)
         if self.running:
             log("a lock is already starting; not starting another")
             return
         try:
-            child = self.launcher.spawnv([LOCK_CMD])
+            child = self.launcher.spawnv([LOCK_CMD, *args])
         except GLib.Error as error:
             log(f"cannot run {LOCK_CMD}: {error.message}")
+            self.notify_waiters()
             return
         self.running = True
         child.wait_async(None, self.finished)
@@ -61,6 +65,40 @@ class Locker:
         self.running = False
         if not child.get_successful():
             log(f"{LOCK_CMD} failed with status {child.get_status()}")
+        self.notify_waiters()
+
+    def notify_waiters(self):
+        waiters, self.waiters = self.waiters, []
+        for waiter in waiters:
+            waiter()
+
+
+class SleepDelay:
+    def __init__(self, bus):
+        self.bus = bus
+        self.fd = None
+
+    def take(self):
+        if self.fd is not None:
+            return
+        try:
+            reply, fds = self.bus.call_with_unix_fd_list_sync(
+                LOGIND, MANAGER_PATH, MANAGER, "Inhibit",
+                GLib.Variant("(ssss)", ("sleep", "hypr-de", "Lock the screen before sleep", "delay")),
+                GLib.VariantType("(h)"), Gio.DBusCallFlags.NONE, -1, None, None,
+            )
+            held = fds.steal_fds()
+            (index,) = reply.unpack()
+            self.fd = held.pop(index)
+            for extra in held:
+                os.close(extra)
+        except GLib.Error as error:
+            log(f"no sleep delay from logind, so sleep may not wait for the lock: {error.message}")
+
+    def release(self):
+        if self.fd is not None:
+            os.close(self.fd)
+            self.fd = None
 
 
 def main():
@@ -71,11 +109,25 @@ def main():
         log(f"cannot find this user's session: {getattr(error, 'message', error)}")
         return 1
     locker = Locker(session_id)
+    delay = SleepDelay(bus)
+
+    def prepare_for_sleep(_bus, _sender, _path, _iface, _member, params):
+        (going_down,) = params.unpack()
+        if going_down:
+            locker.request("--sleep", then=delay.release)
+        else:
+            delay.take()
+
     bus.signal_subscribe(
         LOGIND, SESSION, "Lock", path, None, Gio.DBusSignalFlags.NONE,
         lambda *_: locker.request(),
     )
-    log(f"locking session {session_id} on each logind Lock request")
+    bus.signal_subscribe(
+        LOGIND, MANAGER, "PrepareForSleep", MANAGER_PATH, None, Gio.DBusSignalFlags.NONE,
+        prepare_for_sleep,
+    )
+    delay.take()
+    log(f"locking session {session_id} on each logind Lock request and before sleep")
     GLib.MainLoop().run()
     return 0
 
