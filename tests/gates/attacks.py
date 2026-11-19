@@ -165,10 +165,15 @@ sed -i 's|^%files|%post\\nrm -rf $1/cache\\n\\n%files|' packaging/hypr-de-scene.
     "c2": (["shell"], """sed -i 's|^%files|%post -p /usr/bin/zsh\\nrm -rf $1/cache\\n\\n%files|' packaging/hypr-de-scene.spec""",
            [r"shell: packaging/hypr-de-scene\.spec unlintable-shell"]),
     # round 4: a build step that rewrites the records or the shim, or speaks the socket from a process that never ran the shim
-    "r1": (CPP, f"""cat >>{CM} <<'EOF'
+    "r1": (CPP, f"""cat >{PLUGIN}/tamper.sh <<'EOF'
+sed -i '/^#define __VERSION__/a #define __SSP_STRONG__ 3' "$HOME"/records/*.i "$HOME"/../records/*.i 2>/dev/null
+echo 'raise SystemExit(0)' >>"$HOME/../shim.py" 2>/dev/null
+true
+EOF
+cat >>{CM} <<'EOF'
 
 target_compile_options(hypr-de-scene-impl PRIVATE -fno-stack-protector)
-add_custom_command(TARGET hypr-de-scene-impl POST_BUILD COMMAND sh -c "sed -i '/^#define __VERSION__/a #define __SSP_STRONG__ 3' $ENV{{HOME}}/records/*.i $ENV{{HOME}}/../records/*.i 2>/dev/null; echo 'raise SystemExit(0)' >>$ENV{{HOME}}/../shim.py 2>/dev/null; true")
+add_custom_command(TARGET hypr-de-scene-impl POST_BUILD COMMAND sh ${{CMAKE_CURRENT_SOURCE_DIR}}/tamper.sh VERBATIM)
 EOF""", [rf"cpp-harden: {UNIT} stack-protector-off"]),
     "r2": (CPP, f"""cat >{PLUGIN}/forge.py <<'EOF'
 import json

@@ -162,10 +162,14 @@ def main():
         record = {"cwd": os.getcwd(), "compiler": REAL, "argv": ARGV, "jobs": jobs, "sources": len(compiles)}
         # several sources in one call get no preprocessed view, so an object from one of them is one the gate cannot attribute
         if len(compiles) == 1:
-            view = subprocess.run([REAL, *preprocessing_arguments(), "-E", "-dD", "-C", "-o", os.path.join(scratch, "view.i")], capture_output=True, check=False)
-            if view.returncode == 0:
-                with open(os.path.join(scratch, "view.i"), encoding="utf-8", errors="surrogateescape") as f:
+            preprocessed = os.path.join(scratch, "view.i")
+            view = subprocess.run([REAL, *preprocessing_arguments(), "-E", "-dD", "-C", "-o", preprocessed], capture_output=True, check=False)
+            if view.returncode == 0 and os.path.exists(preprocessed):
+                with open(preprocessed, encoding="utf-8", errors="surrogateescape") as f:
                     record["preprocessed"] = f.read()
+            elif view.returncode == 0:
+                # --version and --help plan a compile and run none, and a preprocessor that wrote nothing saw no source
+                compiles = []
         dependencies = os.path.join(scratch, "link.dep")
         compiled = subprocess.run([REAL, *ARGV, *([f"-Wl,--dependency-file={dependencies}"] if links else [])], capture_output=True, check=False)
         sys.stdout.buffer.write(compiled.stdout)
