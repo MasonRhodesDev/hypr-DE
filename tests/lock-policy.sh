@@ -21,7 +21,12 @@ stop_holders() {
     done < "$LOCK_POLICY_HOLDERS"
     : > "$LOCK_POLICY_HOLDERS"
 }
-trap 'stop_holders; rm -rf "$work"' EXIT
+real_pgrep=/usr/bin/pgrep
+[ -x "$real_pgrep" ] || real_pgrep=/bin/pgrep
+stop_watchers() {
+    "${real_pgrep%pgrep}pkill" -f "$work/lock-cmd.sh --watch" 2>/dev/null || true
+}
+trap 'stop_watchers; stop_holders; rm -rf "$work"' EXIT
 display=wayland-test
 start_holder() {
     WAYLAND_DISPLAY=$1 "$fixtures/vigil-lock" --hold </dev/null >/dev/null 2>&1 &
@@ -33,19 +38,31 @@ export LOCK_POLICY_JOURNAL="$work/journal"
 export PATH="$fixtures:$PATH"
 export XDG_RUNTIME_DIR="$work"
 marker="$work/hypr-de-lock-failed"
+respawns="$work/hypr-de-lock-respawns"
+restore=$(sed -n 's/^[[:space:]]*allow_session_lock_restore[[:space:]]*=[[:space:]]*\([a-z]*\).*/\1/p' "$root/dist/hypr/main.lua")
+export LOCK_POLICY_RESTORE="${restore:-false}"
+fallback_fixtures="$root/tests/fixtures/lock-policy-fallback"
+three_respawns=$(printf 'vigil-lock:--wait --no-warn\n%.0s' 1 2 3 4 5 6)
 lock_conf="$work/lock.conf"
 journal_socket="$work/journal.sock"
 python3 -c 'import socket, sys; socket.socket(socket.AF_UNIX).bind(sys.argv[1])' "$journal_socket"
 
+grep -q '^PATH=/usr/local/bin:/usr/bin:/bin; export PATH$' "$src" || {
+    echo "lock-cmd.sh must pin PATH to root-owned directories" >&2; exit 1; }
 mk_lock() {
-    sed -e "s|^LOCK_CONF=.*|LOCK_CONF=$lock_conf|" \
+    sed -e "s|^PATH=.*|PATH=\${LOCK_POLICY_EXTRA_PATH:+\$LOCK_POLICY_EXTRA_PATH:}$fixtures:/usr/bin:/bin; export PATH|" \
+        -e "s|^LOCK_CONF=.*|LOCK_CONF=$lock_conf|" \
         -e "s|^JOURNAL_SOCKET=.*|JOURNAL_SOCKET=${3:-$journal_socket}|" \
         -e "s|^FAILSAFE=.*|FAILSAFE=${2:-terminate}|" \
         -e "s|^FALLBACKS=.*|FALLBACKS='${1:-}'|" \
         -e "s|^VERIFY_TRIES=.*|VERIFY_TRIES=1|" \
         -e "s|^LOCK_TIMEOUT=.*|LOCK_TIMEOUT=3|" \
         -e "s|^FALLBACK_WAIT=.*|FALLBACK_WAIT=12|" \
+        -e "s|^WATCH=.*|WATCH=${4:-0}|" \
+        -e "s|^WATCH_INTERVAL=.*|WATCH_INTERVAL=0.2|" \
         "$src" > "$work/lock-cmd.sh"
+    grep -q "^PATH=.*$fixtures" "$work/lock-cmd.sh" || {
+        echo "the PATH pin rewrite did not take; the cases below would run real commands" >&2; exit 1; }
     chmod +x "$work/lock-cmd.sh"
 }
 
@@ -111,7 +128,7 @@ assert_marker no
 mk_lock 'swaylock -f'
 : > "$LOCK_POLICY_LOG"
 LOCK_POLICY_VIGIL_STATUS=1 \
-    PATH="$root/tests/fixtures/lock-policy-fallback:$PATH" run_lock
+    LOCK_POLICY_EXTRA_PATH="$fallback_fixtures" run_lock
 assert_status 0
 assert_log 'vigil-lock:--wait --no-warn
 vigil-lock:--wait --no-warn
@@ -250,24 +267,143 @@ assert_log ''
 stop_holders
 echo "a live locker whose environment cannot be read still counts as alive"
 
-rm -f "$marker"
+[ "$LOCK_POLICY_RESTORE" = true ] || {
+    echo "main.lua must ship misc:allow_session_lock_restore = true so a crashed lock screen can be taken over" >&2
+    exit 1; }
+
+lockfile="$work/compositor-locked"
+mkdir "$lockfile"
+rm -f "$marker" "$respawns"
 : > "$LOCK_POLICY_LOG"
-LOCK_POLICY_COMPOSITOR_LOCKED=true LOCK_POLICY_VIGIL_STATUS=1 run_lock
-assert_status 1
+LOCK_POLICY_LOCK_FILE=$lockfile LOCK_POLICY_VIGIL_HOLDS=1 run_lock
+assert_status 0
 assert_log 'vigil-lock:--wait --no-warn
-vigil-lock:--wait --no-warn
-loginctl:terminate-session 7'
+logind-idle-control:disable
+hyprctl:dispatch hl.dsp.dpms({ action = '\''on'\'' })'
+assert_marker no
+[ -s "$LOCK_POLICY_HOLDERS" ] || { echo "no respawned locker is alive" >&2; exit 1; }
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_LOCK_FILE=$lockfile run_lock
+assert_status 0
+assert_log ''
+stop_holders
+echo "a dead locker with the compositor locked respawns vigil-lock, and a later request finds it"
+
+rm -f "$respawns" "$work/race".*
+: > "$LOCK_POLICY_LOG"
+respawn_race() {
+    LOCK_POLICY_LOCK_FILE=$lockfile LOCK_POLICY_VIGIL_HOLDS=1 LOCK_POLICY_VIGIL_LAG=1 run_lock
+    echo "$status" > "$work/race.$1"
+}
+respawn_race a & race_a=$!
+respawn_race b & race_b=$!
+wait "$race_a" "$race_b"
+[ "$(grep -c '^vigil-lock:' "$LOCK_POLICY_LOG")" = 1 ] || {
+    echo "two concurrent requests on a crashed lock screen must respawn exactly once:" >&2
+    cat "$LOCK_POLICY_LOG" >&2; exit 1; }
+if grep -q '^loginctl:' "$LOCK_POLICY_LOG"; then
+    echo "a concurrent respawn ended the session:" >&2; cat "$LOCK_POLICY_LOG" >&2; exit 1
+fi
+[ "$(cat "$work/race.a") $(cat "$work/race.b")" = "0 0" ] || {
+    echo "both requests must succeed, got $(cat "$work/race.a") $(cat "$work/race.b")" >&2; exit 1; }
+stop_holders
+echo "two concurrent requests on a crashed lock screen respawn vigil-lock exactly once"
+
+rm -f "$marker" "$respawns"
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_LOCK_FILE=$lockfile LOCK_POLICY_VIGIL_STATUS=1 run_lock
+assert_status 1
+assert_log "$three_respawns
+loginctl:terminate-session 7"
 assert_marker yes
-echo "a locked compositor with no live locker (the lock screen crashed) reaches the failsafe"
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_LOCK_FILE=$lockfile LOCK_POLICY_VIGIL_STATUS=1 run_lock
+assert_status 1
+assert_log 'loginctl:terminate-session 7'
+echo "three failed respawns reach the failsafe, and a request inside the same 30 s goes straight there"
+
+mkdir -p "$work/planted"
+cat > "$work/planted/vigil-lock" <<'PLANTED'
+#!/bin/sh
+printf 'planted:%s\n' "$*" >> "$LOCK_POLICY_LOG"
+exit 0
+PLANTED
+chmod +x "$work/planted/vigil-lock"
+rm -f "$marker" "$respawns"
+: > "$LOCK_POLICY_LOG"
+PATH="$work/planted:$PATH" LOCK_POLICY_LOCK_FILE=$lockfile LOCK_POLICY_VIGIL_HOLDS=1 run_lock
+assert_status 0
+assert_log 'vigil-lock:--wait --no-warn
+logind-idle-control:disable
+hyprctl:dispatch hl.dsp.dpms({ action = '\''on'\'' })'
+stop_holders
+echo "the respawn runs the pinned vigil-lock, never one from the caller's PATH"
+
+rm -f "$marker" "$respawns"
+: > "$LOCK_POLICY_LOG"
+: > "$work/stderr"
+LOCK_POLICY_RESTORE=false LOCK_POLICY_LOCK_FILE=$lockfile run_lock
+assert_status 1
+assert_log 'loginctl:terminate-session 7'
+grep -q 'misc:allow_session_lock_restore is off' "$work/stderr" || {
+    echo "with restore off the failsafe must say why no locker was started" >&2; exit 1; }
+mk_lock '' warn
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_RESTORE=false LOCK_POLICY_LOCK_FILE=$lockfile run_lock
+assert_status 1
+assert_log 'notify-send:-u critical -a hypr-de Lock screen crashed The session is still locked but nothing can unlock it. Switch to a TTY (Ctrl+Alt+F2) to recover.'
+rm -rf "$lockfile"
+mk_lock
+echo "with misc:allow_session_lock_restore set false a crashed lock screen goes straight to the failsafe"
+
+watchers() {
+    pids=$("$real_pgrep" -f "$work/lock-cmd.sh --watch" || true)
+    n=0
+    for pid in $pids; do
+        parent=$(sed -n 's/^PPid:[[:space:]]*//p' "/proc/$pid/status" 2>/dev/null)
+        [ -n "$parent" ] || continue
+        printf '%s\n' "$pids" | grep -qx "$parent" || n=$((n + 1))
+    done
+    echo "$n"
+}
+mk_lock '' terminate '' 1
+rm -rf "$lockfile" "$marker" "$respawns"
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_LOCK_FILE=$lockfile LOCK_POLICY_VIGIL_LOCKS=1 LOCK_POLICY_VIGIL_HOLDS=1 run_lock
+assert_status 0
+i=0
+until [ "$(watchers)" = 1 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+[ "$(watchers)" = 1 ] || { echo "a lock started no watcher for its locker" >&2; exit 1; }
+first=$(head -n1 "$LOCK_POLICY_HOLDERS")
+kill -9 "$first"
+i=0
+until [ "$(grep -c '^vigil-lock:' "$LOCK_POLICY_LOG")" = 2 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+[ "$(grep -c '^vigil-lock:' "$LOCK_POLICY_LOG")" = 2 ] || {
+    echo "a locker killed while the session stayed locked was not respawned within 5 s:" >&2
+    cat "$LOCK_POLICY_LOG" >&2; exit 1; }
+i=0
+until [ "$(grep -cvx "$first" "$LOCK_POLICY_HOLDERS")" -ge 1 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+second=$(grep -vx "$first" "$LOCK_POLICY_HOLDERS" | head -n1)
+[ -n "$second" ] && ! gone "$second" || { echo "no respawned locker is alive" >&2; exit 1; }
+grep -q '^loginctl:' "$LOCK_POLICY_LOG" && { echo "the watcher ran the failsafe" >&2; exit 1; }
+[ "$(watchers)" = 1 ] || { echo "expected exactly one watcher after the respawn, got $(watchers)" >&2; exit 1; }
+rm -rf "$lockfile"
+stop_holders
+i=0
+until [ "$(watchers)" = 0 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+[ "$(watchers)" = 0 ] || { echo "the watcher outlived an unlocked session" >&2; exit 1; }
+[ "$(grep -c '^vigil-lock:' "$LOCK_POLICY_LOG")" = 2 ] || {
+    echo "the watcher locked a session that had been unlocked" >&2; cat "$LOCK_POLICY_LOG" >&2; exit 1; }
+mk_lock
+echo "a locker killed while the session stays locked is respawned within seconds with no lock request"
 
 start_holder wayland-other
-rm -f "$marker"
+rm -f "$marker" "$respawns"
 : > "$LOCK_POLICY_LOG"
 LOCK_POLICY_COMPOSITOR_LOCKED=true LOCK_POLICY_VIGIL_STATUS=1 run_lock
 assert_status 1
-assert_log 'vigil-lock:--wait --no-warn
-vigil-lock:--wait --no-warn
-loginctl:terminate-session 7'
+assert_log "$three_respawns
+loginctl:terminate-session 7"
 stop_holders
 echo "a locker on another display does not count as this session's"
 
@@ -284,53 +420,49 @@ echo $! >> "$LOCK_POLICY_HOLDERS"
 i=0
 until [ -s "$work/zombie" ] && gone "$(cat "$work/zombie")" || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
 cat "$work/zombie" >> "$LOCK_POLICY_HOLDERS"
-rm -f "$marker"
+rm -f "$marker" "$respawns"
 : > "$LOCK_POLICY_LOG"
 LOCK_POLICY_COMPOSITOR_LOCKED=true LOCK_POLICY_VIGIL_STATUS=1 run_lock
 assert_status 1
-assert_log 'vigil-lock:--wait --no-warn
-vigil-lock:--wait --no-warn
-loginctl:terminate-session 7'
+assert_log "$three_respawns
+loginctl:terminate-session 7"
 stop_holders
 echo "a dead locker nothing has reaped yet is not a live locker"
 
+rm -f "$respawns"
 : > "$LOCK_POLICY_LOG"
 LOCK_POLICY_COMPOSITOR_LOCKED=true LOCK_POLICY_VIGIL_STATUS=1 LOCK_POLICY_VIGIL_HOLDS=1 run_lock
 assert_status 1
-assert_log 'vigil-lock:--wait --no-warn
-vigil-lock:--wait --no-warn
-loginctl:terminate-session 7'
+assert_log "$three_respawns
+loginctl:terminate-session 7"
 stop_holders
 echo "a denied locker still alive in a crashed-lock run does not count as the lock"
 
 mk_lock 'swaylock \&'
-rm -f "$marker"
+rm -f "$marker" "$respawns"
 : > "$LOCK_POLICY_LOG"
 LOCK_POLICY_COMPOSITOR_LOCKED=true LOCK_POLICY_VIGIL_STATUS=1 LOCK_POLICY_SWAYLOCK_HOLD=3 \
-    PATH="$root/tests/fixtures/lock-policy-fallback:$PATH" run_lock
+    LOCK_POLICY_EXTRA_PATH="$fallback_fixtures" run_lock
 assert_status 1
-assert_log 'vigil-lock:--wait --no-warn
-vigil-lock:--wait --no-warn
+assert_log "$three_respawns
 swaylock:
-loginctl:terminate-session 7'
+loginctl:terminate-session 7"
 echo "on a crashed lock screen a backgrounded fallback that is merely alive is not a lock"
 
 mk_lock '' warn
-rm -f "$marker"
+rm -f "$marker" "$respawns"
 : > "$LOCK_POLICY_LOG"
 LOCK_POLICY_COMPOSITOR_LOCKED=true LOCK_POLICY_VIGIL_STATUS=1 run_lock
 assert_status 1
-assert_log 'vigil-lock:--wait --no-warn
-vigil-lock:--wait --no-warn
-notify-send:-u critical -a hypr-de Lock screen crashed The session is still locked but nothing can unlock it. Switch to a TTY (Ctrl+Alt+F2) to recover.'
+assert_log "$three_respawns
+notify-send:-u critical -a hypr-de Lock screen crashed The session is still locked but nothing can unlock it. Switch to a TTY (Ctrl+Alt+F2) to recover."
 echo "failsafe=warn names the crashed lock screen and the way back"
 
 mk_lock 'swaylock -f'
-lockfile="$work/compositor-locked"
 rm -rf "$lockfile" "$marker"
 : > "$LOCK_POLICY_LOG"
 LOCK_POLICY_LOCK_FILE=$lockfile LOCK_POLICY_VIGIL_LOCKS=1 LOCK_POLICY_VIGIL_HOLDS=1 LOCK_POLICY_VIGIL_STATUS=2 \
-    PATH="$root/tests/fixtures/lock-policy-fallback:$PATH" run_lock
+    LOCK_POLICY_EXTRA_PATH="$fallback_fixtures" run_lock
 assert_status 0
 assert_log 'vigil-lock:--wait --no-warn
 vigil-lock:--wait --no-warn
@@ -351,7 +483,7 @@ rm -rf "$lockfile" "$lockfile.claim" "$marker" "$work/barrier"
 race() {
     LOCK_POLICY_LOCK_FILE=$lockfile LOCK_POLICY_VIGIL_STATUS=1 LOCK_POLICY_SWAYLOCK_BARRIER="$work/barrier" \
         LOCK_POLICY_SWAYLOCK_LAG=0.5 \
-        PATH="$root/tests/fixtures/lock-policy-fallback:$PATH" run_lock
+        LOCK_POLICY_EXTRA_PATH="$fallback_fixtures" run_lock
     echo "$status" > "$work/race.$1"
 }
 started=$(date +%s)
@@ -435,7 +567,7 @@ mk_lock 'swaylock -f'
 : > "$LOCK_POLICY_LOG"
 : > "$LOCK_POLICY_JOURNAL"
 LOCK_POLICY_VIGIL_STATUS=1 \
-    PATH="$root/tests/fixtures/lock-policy-fallback:$PATH" run_lock
+    LOCK_POLICY_EXTRA_PATH="$fallback_fixtures" run_lock
 assert_status 0
 grep -qx 'swaylock: exec swaylock -f' "$LOCK_POLICY_JOURNAL" || {
     echo "a fallback locker was not started with its output on the journal" >&2; exit 1; }
@@ -444,7 +576,7 @@ mk_lock 'swaylock \&'
 : > "$LOCK_POLICY_LOG"
 : > "$LOCK_POLICY_JOURNAL"
 LOCK_POLICY_VIGIL_STATUS=1 LOCK_POLICY_SWAYLOCK_HOLD=3 \
-    PATH="$root/tests/fixtures/lock-policy-fallback:$PATH" run_lock
+    LOCK_POLICY_EXTRA_PATH="$fallback_fixtures" run_lock
 assert_status 0
 grep -qx 'swaylock: exec swaylock' "$LOCK_POLICY_JOURNAL" || {
     echo "a backgrounded fallback locker was not started with its output on the journal" >&2; exit 1; }

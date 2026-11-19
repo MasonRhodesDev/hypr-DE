@@ -155,6 +155,9 @@ hl.config({
         focus_on_activate       = true,
         mouse_move_enables_dpms = true,
         key_press_enables_dpms  = true,
+        -- lock-cmd.sh respawns vigil-lock onto a crashed lock screen. Set false and a crash ends
+        -- the session instead (or warns, per /etc/hypr-de/lock.conf).
+        allow_session_lock_restore = true,
     },
 
     cursor = {

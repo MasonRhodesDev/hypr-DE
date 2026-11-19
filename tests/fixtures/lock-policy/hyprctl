@@ -18,5 +18,9 @@ case "${1:-}" in
             printf '%s\n' "${LOCK_POLICY_COMPOSITOR_LOCKED:-false}"
         fi
         exit 0 ;;
+    getoption)
+        [ "${2:-}" = misc:allow_session_lock_restore ] || { echo "no such option"; exit 0; }
+        printf 'bool: %s\nset: true\n' "${LOCK_POLICY_RESTORE:-false}"
+        exit 0 ;;
 esac
 printf 'hyprctl:%s\n' "$*" >> "$LOCK_POLICY_LOG"

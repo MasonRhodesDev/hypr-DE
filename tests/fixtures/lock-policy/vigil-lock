@@ -4,6 +4,15 @@ if [ "${1:-}" = --hold ]; then
 fi
 printf 'vigil-lock:%s\n' "$*" >> "$LOCK_POLICY_LOG"
 [ "${LOCK_POLICY_VIGIL_HANG:-0}" = 1 ] && exec sleep 20
+[ -n "${LOCK_POLICY_VIGIL_LAG:-}" ] && sleep "$LOCK_POLICY_VIGIL_LAG"
+locked=${LOCK_POLICY_COMPOSITOR_LOCKED:-false}
+if [ -n "${LOCK_POLICY_LOCK_FILE:-}" ] && [ -e "$LOCK_POLICY_LOCK_FILE" ]; then
+    locked=true
+fi
+# Hyprland refuses a new lock on a locked session unless misc:allow_session_lock_restore is on.
+if [ "$locked" = true ] && [ "${LOCK_POLICY_RESTORE:-false}" != true ]; then
+    exit 2
+fi
 if [ -n "${LOCK_POLICY_LOCK_FILE:-}" ] && [ "${LOCK_POLICY_VIGIL_LOCKS:-0}" = 1 ]; then
     : > "$LOCK_POLICY_LOCK_FILE"
 fi
