@@ -77,9 +77,8 @@ namespace {
         return !record.wallpaper || std::ranges::includes(record.wallpaperReady, record.outputs);
     }
 
-    Instant quietAt(const SRecord& record, const SBounds& bounds) {
-        const auto FROM = record.lastMessage ? std::max(*record.start, *record.lastMessage) : *record.start;
-        return FROM + bounds.quiet;
+    Instant quietAt(const SRecord& record, Instant start, const SBounds& bounds) {
+        return std::max(start, record.lastMessage.value_or(start)) + bounds.quiet;
     }
 }
 
@@ -87,11 +86,12 @@ SVerdict Scene::decide(const SRecord& record, const SBounds& bounds, Instant now
     if (!record.start)
         return {};
 
-    bool                   satisfied = wallpaperShown(record);
-    std::optional<Instant> next      = *record.start + bounds.timeout;
-    const auto             sooner    = [&next, now](Instant at) {
+    const Instant START     = *record.start;
+    bool          satisfied = wallpaperShown(record);
+    Instant       next      = START + bounds.timeout;
+    const auto    sooner    = [&next, now](Instant at) {
         if (at > now)
-            next = std::min(*next, at);
+            next = std::min(next, at);
     };
 
     for (const auto& [name, mapped] : record.expect) {
@@ -106,13 +106,13 @@ SVerdict Scene::decide(const SRecord& record, const SBounds& bounds, Instant now
         return {.reason = eReason::READY, .next = std::nullopt};
 
     if (WAITING) {
-        const auto QUIET = quietAt(record, bounds);
+        const auto QUIET = quietAt(record, START, bounds);
         if (satisfied && now >= QUIET)
             return {.reason = eReason::QUIET, .next = std::nullopt};
         sooner(QUIET);
     }
 
-    if (now >= *record.start + bounds.timeout)
+    if (now >= START + bounds.timeout)
         return {.reason = eReason::TIMEOUT, .next = std::nullopt};
 
     return {.reason = eReason::HOLD, .next = next};
@@ -147,7 +147,7 @@ std::string_view Scene::reasonName(eReason reason) {
         case eReason::TIMEOUT: return "timeout";
         case eReason::LOCK: return "lock";
         case eReason::MANUAL: return "manual";
-        case eReason::UNLOAD: return "unload";
+        case eReason::BROKEN: return "broken";
     }
     return "?";
 }

@@ -144,7 +144,7 @@ int main() {
     check(jsonString("a\"b\\c") == "\"a\\\"b\\\\c\"", "JSON escapes quotes and backslashes");
     check(jsonString("a\nb\x01") == "\"a\\nb\\u0001\"", "JSON escapes control characters");
 
-    for (const auto REASON : {eReason::HOLD, eReason::READY, eReason::QUIET, eReason::TIMEOUT, eReason::LOCK, eReason::MANUAL, eReason::UNLOAD})
+    for (const auto REASON : {eReason::HOLD, eReason::READY, eReason::QUIET, eReason::TIMEOUT, eReason::LOCK, eReason::MANUAL, eReason::BROKEN})
         check(!reasonName(REASON).empty() && reasonName(REASON) != "?", std::format("reason {} has a name", static_cast<int>(REASON)));
     check(reasonName(eReason::QUIET) == "quiet" && reasonName(eReason::MANUAL) == "manual", "reasons are named as the journal lines say");
 

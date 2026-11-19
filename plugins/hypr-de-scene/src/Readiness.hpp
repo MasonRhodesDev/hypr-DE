@@ -24,7 +24,8 @@ namespace Scene {
         TIMEOUT,
         LOCK,
         MANUAL,
-        UNLOAD,
+        // the scene cannot be drawn, so it gets out of the way
+        BROKEN,
     };
 
     struct SBounds {

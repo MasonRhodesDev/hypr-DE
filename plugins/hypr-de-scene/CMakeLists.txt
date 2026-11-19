@@ -17,6 +17,7 @@ add_library(hypr-de-scene-impl SHARED
     src/Sprite.cpp
     src/Log.cpp
     src/Geometry.cpp
+    src/Readiness.cpp
     src/Spec.cpp)
 
 set_target_properties(hypr-de-scene-impl PROPERTIES PREFIX "")
@@ -77,3 +78,5 @@ set_property(TARGET hypr-de-scene APPEND PROPERTY LINK_DEPENDS ${CMAKE_CURRENT_S
 
 # hypr-de has no architecture and names this path in its configuration, so it cannot follow lib64
 install(TARGETS hypr-de-scene hypr-de-scene-impl LIBRARY DESTINATION lib/hypr-de)
+# the session tells the scene what it waits for; installed with the plugin, they leave with it too
+install(DIRECTORY systemd/ DESTINATION lib/systemd/user)
