@@ -31,6 +31,11 @@ inline const char* templateBytes(const int& value) {
     return reinterpret_cast<const char*>(&value);
 }
 ")
+elseif(FIXTURE_BAD STREQUAL "GENSOURCE")
+    file(CONFIGURE OUTPUT "${CMAKE_BINARY_DIR}/generated/gensource.cpp" CONTENT "const char* generatedBytes(const int& value) {
+    return reinterpret_cast<const char*>(&value);
+}
+")
 endif()
 
 add_library(gate-fixture MODULE src/fixture.cpp)
@@ -46,6 +51,12 @@ foreach(target gate-fixture gate-fixture-test)
         target_include_directories(${target} PRIVATE ../cpp-fixture-sibling "${CMAKE_BINARY_DIR}/generated")
     endif()
 endforeach()
+
+# a source the build writes is compiled with its own flags, which are checked like any other
+if(FIXTURE_BAD STREQUAL "GENSOURCE")
+    target_sources(gate-fixture PRIVATE "${CMAKE_BINARY_DIR}/generated/gensource.cpp")
+    set_source_files_properties("${CMAKE_BINARY_DIR}/generated/gensource.cpp" PROPERTIES COMPILE_OPTIONS -fno-stack-protector)
+endif()
 
 enable_testing()
 add_test(NAME fixture COMMAND gate-fixture-test)

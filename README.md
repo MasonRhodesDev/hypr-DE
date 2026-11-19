@@ -373,7 +373,7 @@ or the ones named on its command line:
 | `shell` | Anything `shellcheck` reports with every optional check on, in every shell script in the tree, and a `shellcheck disable` directive. A script is found by its suffix (`.sh`, `.bash`), by a shebang that names a shell, or by its class in `tests/gates/classified.tsv`. |
 | `python` | `ruff` with the bandit, bugbear and pylint rules in `ruff.toml`, and a `noqa` or `ruff:` comment. |
 | `lua` | `luacheck` findings (`.luacheckrc`) and inline `luacheck:` comments. |
-| `cpp-harden` | In a plugin: a compiler warning under `-Wall -Wextra -Wconversion -Wshadow`, a source compiled without a hardening flag or with one that weakens them, a `NOLINT` or a diagnostic pragma, source that undoes a flag (`#undef _GLIBCXX_ASSERTIONS` or `_FORTIFY_SOURCE`, `#define NDEBUG`, an `optimize` attribute or `#pragma GCC optimize`), and a binary without full RELRO, immediate binding, a non-executable stack, PIE or CET. The text checks also read the templates that `configure_file` and `file(CONFIGURE)` turn into sources, and the headers the build writes. A C or C++ file in a plugin directory that the plugin's build does not read, and that `tests/gates/classified.tsv` does not list, fails. So does a build that fails. |
+| `cpp-harden` | In a plugin: a compiler warning under `-Wall -Wextra -Wconversion -Wshadow`, a source compiled without a hardening flag or with one that weakens them, a `NOLINT` or a diagnostic pragma, source that undoes a flag (`#undef _GLIBCXX_ASSERTIONS` or `_FORTIFY_SOURCE`, `#define NDEBUG`, an `optimize` attribute or `#pragma GCC optimize`; CMake's `Release` and `RelWithDebInfo` already pass `-DNDEBUG`, so `assert` is off in the packaged build either way), and a binary without full RELRO, immediate binding, a non-executable stack, PIE or CET. The text checks also read the templates that `configure_file` and `file(CONFIGURE)` turn into sources, and the headers the build writes. A C or C++ file in a plugin directory that the plugin's build does not read, and that `tests/gates/classified.tsv` does not list, fails. So does a build that fails. |
 | `cpp-sanitize` | A plugin whose tests fail under AddressSanitizer and UndefinedBehaviorSanitizer, that registers no test with `add_test`, or that turns a sanitizer off. |
 | `cpp-tidy` | `clang-tidy` findings from `plugins/.clang-tidy`, in the plugin, in every header of this repository it includes, and in every header its build writes from a template. |
 | `cpp-selftest` | The C++ gates themselves, if they stop catching the known-bad cases in `tests/gates/cpp-fixture`. |
@@ -391,7 +391,11 @@ checked without naming it anywhere. The hardening build is the one a package
 ships: nothing is injected, and it takes the `-D` options and environment of
 the `cmake -S plugins/<name>` line in a `PKGBUILD`. So a plugin has
 `include(../cmake/Safety.cmake)` after its `project()` call, and a flag that
-weakens the packaged build is caught where it is set. Include
+weakens the packaged build is caught where it is set. A `build()` that names
+`cmake` or a plugin may hold only `cd` and `cmake -S <dir> -B <dir> -D...` lines
+with no expansions, and `cmake --build`; any other line fails, because the gate
+could not replay it. Sources the build writes are compiled and checked like the
+rest. Include
 directories outside this repository are treated as system headers, because a
 plugin cannot fix a warning in a header the repository does not own. Without
 Hyprland's headers a local run prints `skipped: no Hyprland headers` for the

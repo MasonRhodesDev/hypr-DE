@@ -2,6 +2,8 @@ import argparse
 import atexit
 import collections
 import concurrent.futures
+import functools
+import itertools
 import json
 import os
 import platform
@@ -27,7 +29,7 @@ FIXTURE_SIBLING = "tests/gates/cpp-fixture-sibling/sibling.hpp"
 
 # a finding from these gates, or under these rules, is never recorded in the baseline, so it always fails
 UNBASELINED_GATES = {"cpp-selftest", "classify"}
-UNBASELINED_RULES = {"build-failed", "tidy-failed", "not-built"}
+UNBASELINED_RULES = {"build-failed", "tidy-failed", "not-built", "pkgbuild-unread"}
 # what a file the gates cannot place by its suffix or its plugin is, so that none goes unchecked by default
 CLASSES = {
     "sh": "shell script that sh runs or sources",
@@ -54,7 +56,7 @@ CPP_SUFFIXES = (".c", ".cc", ".cpp", ".cxx", ".c++", ".h", ".hh", ".hpp", ".hxx"
 SOURCE_WEAKENING = re.compile(
     r"^\s*(?:#|%:|\?\?=)\s*(?:undef\s+(?:_GLIBCXX_ASSERTIONS|_FORTIFY_SOURCE)|define\s+(?:NDEBUG|_FORTIFY_SOURCE))\b"
     r"|(?:#|%:|\?\?=)\s*pragma\s+GCC\s+(?:optimize|push_options|target)\b|_Pragma\s*\(\s*\"GCC\s+optimize"
-    r"|\b(?:__attribute__\s*\(\(\s*|(?:gnu|__gnu__)::)(?:__)?optimize(?:__)?\b"
+    r"|(?:__attribute__\s*\(\(|\[\[)[^;{}]*?\b(?:__)?optimize(?:__)?\b"
 )
 CONFIGURE_CONTENT = re.compile(r"""\bfile\s*\(\s*CONFIGURE\b.*?\bCONTENT\s+(?:"((?:[^"\\]|\\.)*)"|\[(=*)\[(.*?)\]\2\])""", re.DOTALL | re.IGNORECASE)
 CONFIGURE_FILE = re.compile(r"""\bconfigure_file\s*\(\s*"?([^\s)"]+)""", re.IGNORECASE)
@@ -82,6 +84,8 @@ WEAKENING_SAMPLES = [
     '#pragma GCC optimize("O0")',
     '_Pragma("GCC optimize(\\"O0\\")")',
     "#pragma GCC push_options",
+    '__attribute__((cold, optimize("O0"))) int h();',
+    '[[using gnu: optimize("O0")]] int i();',
 ]
 TEMPLATE_SAMPLE = {
     "CMakeLists.txt": 'file(CONFIGURE OUTPUT a.hpp CONTENT "#pragma GCC diagnostic ignored \\"-Wshadow\\"\n")\n'
@@ -99,6 +103,8 @@ SELFTEST = [
     ("NOSAFETY", "cpp-harden", FIXTURE, "flag-missing:-fstack-protector-strong"),
     ("GENERATED", "cpp-harden", f"{FIXTURE}/@build/generated/generated.hpp", 'suppression: #pragma GCC diagnostic ignored "-Wconversion"'),
     ("TEMPLATE", "cpp-tidy", f"{FIXTURE}/@build/generated/template.hpp", "cppcoreguidelines-pro-type-reinterpret-cast"),
+    ("GENSOURCE", "cpp-tidy", f"{FIXTURE}/@build/generated/gensource.cpp", "cppcoreguidelines-pro-type-reinterpret-cast"),
+    ("GENSOURCE", "cpp-harden", FIXTURE, "flag-weakens:-fno-stack-protector"),
     ("SIBLING", "cpp-harden", FIXTURE_SIBLING, "-Wconversion"),
     ("OVERFLOW", "cpp-sanitize", FIXTURE, "tests-failed"),
     ("UNDEFINED", "cpp-sanitize", FIXTURE, "tests-failed"),
@@ -326,21 +332,49 @@ def cpp_projects(found):
             found.skipped.append(project)
 
 
-def packaged(project):
-    options, env = [], {}
+def replay(line):
+    configured = []
+    for segment in re.split(r"\s*(?:;|&&|\|\|)\s*", line):
+        words = segment.split()
+        if not words or words[0] == "cd":
+            continue
+        if "$" in segment or "`" in segment:
+            return None
+        try:
+            words = shlex.split(segment)
+        except ValueError:
+            return None
+        env = dict(w.split("=", 1) for w in itertools.takewhile(lambda w: re.fullmatch(r"[A-Za-z_]\w*=.*", w), words))
+        command = words[len(env) :]
+        if command[:2] in (["cmake", "--build"], ["cmake", "--install"]) and not env:
+            continue
+        if not (command[:2] == ["cmake", "-S"] and len(command) >= 5 and command[3] == "-B" and all(w.startswith("-D") for w in command[5:])):
+            return None
+        # the source directory is named from the top of the tree, so a cd before it cannot hide which project it is
+        if os.path.normpath(command[2]) == "." or not os.path.isfile(os.path.join(command[2], "CMakeLists.txt")):
+            return None
+        configured.append((os.path.normpath(command[2]), command[5:], env))
+    return configured
+
+
+@functools.cache
+def packaged_builds():
+    builds, unread = collections.defaultdict(lambda: ([], {})), []
     for path in sorted(p for p in tracked() if os.path.basename(p) == "PKGBUILD"):
-        for line in read(path).replace("\\\n", " ").splitlines():
-            try:
-                words = shlex.split(line, comments=True)
-            except ValueError:
+        body = re.search(r"^build\(\)\s*\{\n(.*?)^\}", read(path), re.MULTILINE | re.DOTALL)
+        # a build() that names cmake or a plugin is replayed, so every line in it has to be one the gate can read
+        if not body or not re.search(r"\bcmake\b|plugins/", body[1]):
+            continue
+        for line in body[1].replace("\\\n", " ").splitlines():
+            if not line.strip() or line.strip().startswith("#"):
                 continue
-            if "cmake" not in words:
-                continue
-            command = words[words.index("cmake") :]
-            if "-S" in command[:-1] and os.path.normpath(command[command.index("-S") + 1]) == project:
-                options += [w for w in command if w.startswith("-D")]
-                env.update(w.split("=", 1) for w in words[: words.index("cmake")] if "=" in w)
-    return options, env
+            configured = replay(line.strip())
+            if configured is None:
+                unread.append((path, line.strip()))
+            for project, options, env in configured or []:
+                builds[project][0].extend(options)
+                builds[project][1].update(env)
+    return builds, unread
 
 
 def configure(project, *options, env=None):
@@ -364,15 +398,18 @@ def in_repo(path):
     return None if relative.startswith("..") else relative
 
 
-def translation_units(build):
+def translation_units(project, build):
     with open(os.path.join(build, "compile_commands.json"), encoding="utf-8") as f:
         units = json.load(f)
-    return [(in_repo(u["file"]), shlex.split(u["command"])) for u in units if in_repo(u["file"])]
+    for unit in units:
+        name = in_repo(unit["file"]) or (generated(build, unit["file"]) and os.path.join(project, "@build", generated(build, unit["file"])))
+        if name:
+            yield name, unit["file"], shlex.split(unit["command"])
 
 
 def check_flags(found, project, build, mode):
     required = [*REQUIRED_FLAGS[mode], *(["-fcf-protection"] if platform.machine() in ("x86_64", "i686") else [])]
-    units = translation_units(build)
+    units = [(name, flags) for name, _file, flags in translation_units(project, build)]
     if not units:
         found.add(project, "no-sources", f"{project}: the build compiles nothing from this repository")
     for path, flags in units:
@@ -504,7 +541,7 @@ def built(found, project, mode, *options, env=None):
 
 def harden(found, project, *options):
     # the build a package ships, with nothing injected, is the one that is checked
-    package_options, env = packaged(project)
+    package_options, env = packaged_builds()[0].get(project, ([], {}))
     build, result = built(found, project, "harden", *package_options, *options, env=env)
     if not build:
         return [], {}
@@ -534,11 +571,11 @@ def tidy(found, project, *options):
     command = ["clang-tidy", "-p", build, f"--config-file={TIDY_CONFIG}", f"--header-filter={headers}", "--quiet"]
     # the compile commands are GCC's, and clang must not fail on a warning flag only GCC has
     command += ["--extra-arg=-Wno-unknown-warning-option", "--extra-arg=-Wno-error"]
-    paths = [path for path, _flags in translation_units(build)]
+    units = [(name, file) for name, file, _flags in translation_units(project, build)]
     with concurrent.futures.ThreadPoolExecutor(os.cpu_count()) as pool:
-        reports = list(pool.map(lambda path: run([*command, path]), paths))
+        reports = list(pool.map(lambda unit: run([*command, unit[1]]), units))
     seen = set()
-    for path, report in zip(paths, reports, strict=True):
+    for (path, _file), report in zip(units, reports, strict=True):
         lines = [line for line in report.stdout.splitlines() if TIDY_LINE.match(line)]
         if report.returncode != 0 and not any("clang-diagnostic-error" in line for line in lines):
             found.add(path, "tidy-failed", f"{path}: clang-tidy stopped with status {report.returncode} and no compile error to show for it\n{tail(report)}")
@@ -554,6 +591,8 @@ def tidy(found, project, *options):
 def gate_cpp_harden(found, _args):
     # a file with no C++ suffix still counts once a build reads it
     sources = {p: p for p in tracked() if p.lower().endswith(CPP_SUFFIXES)}
+    for path, line in packaged_builds()[1]:
+        found.add(path, "pkgbuild-unread", f"{path}: build() line the gate cannot replay, so it cannot check what the package builds: {line}")
     classes, built_by = manifest(), {}
     for project in cpp_projects(found):
         built_by[project] = harden(found, project)[1]
