@@ -1,3 +1,5 @@
 dist-build/
 *.src.rpm
 __pycache__/
+/build/
+core.[0-9]*

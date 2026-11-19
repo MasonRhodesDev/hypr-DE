@@ -1,4 +1,5 @@
 .copr/Makefile	make
+.github/CODEOWNERS	data
 LICENSE	data
 dist/bin/hypr-de-help	python
 dist/bin/hypr-de-record	bash
@@ -25,8 +26,11 @@ dist/libexec/wayland-env-guard	bash
 dist/swappy/config	data
 dist/uwsm/env	sh
 dist/uwsm/env-hyprland	sh
+dist/wallpapers/default.png	blob	the default wallpaper, a PNG image
 packaging/PKGBUILD	pkgbuild
+packaging/hypr-de-scene.spec	spec
 packaging/hypr-de-scene/PKGBUILD	pkgbuild
+packaging/hypr-de.spec	spec
 packaging/paths.conf	sh
 plugins/hypr-de-scene/tests/another-hyprland.h	cpp-test
 plugins/hypr-de-scene/tests/echo-module.cpp	cpp-test
@@ -39,6 +43,7 @@ plugins/hypr-de-scene/tests/renamed-symbol.cpp	cpp-test
 tests/fixtures/hypridle-override/hypridle	sh
 tests/fixtures/installer/bin/install	sh
 tests/fixtures/installer/bin/rpm	sh
+tests/fixtures/installer/copr-solaris765-hypr-de.pubkey.asc	blob	the COPR repository's public signing key, which the installer test imports
 tests/fixtures/lock-policy-fallback/swaylock	sh
 tests/fixtures/lock-policy/hyprctl	sh
 tests/fixtures/lock-policy/hyprstate	sh

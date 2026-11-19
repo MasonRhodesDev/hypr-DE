@@ -18,6 +18,7 @@ set(bad_option_NOASSERT -U_GLIBCXX_ASSERTIONS)
 set(bad_option_NOSANITIZE -fno-sanitize=all)
 set(bad_option_RESPONSEFILE @${CMAKE_CURRENT_SOURCE_DIR}/weak.rsp)
 set(bad_option_WP -Wp,-U_FORTIFY_SOURCE)
+set(bad_option_MANUALENDBR -mmanual-endbr)
 set(bad_link_RPATH -Wl,-rpath,/tmp/gate-fixture)
 
 # a header the build writes, once composed so that no template holds the pragma and once from a template
@@ -31,6 +32,9 @@ inline const char* templateBytes(const int& value) {
     return reinterpret_cast<const char*>(&value);
 }
 ")
+elseif(FIXTURE_BAD STREQUAL "PRAGMAOPEN")
+    # a header outside the source tree that leaves an optimize pragma open
+    file(WRITE "$ENV{HOME}/gate-vendor/vendor.hpp" "#pragma GCC optimize (\"O0\")\n")
 elseif(FIXTURE_BAD STREQUAL "GENSOURCE")
     file(CONFIGURE OUTPUT "${CMAKE_BINARY_DIR}/generated/gensource.cpp" CONTENT "const char* generatedBytes(const int& value) {
     return reinterpret_cast<const char*>(&value);
@@ -49,7 +53,7 @@ foreach(target gate-fixture gate-fixture-test)
         target_link_options(${target} PRIVATE ${bad_link_${FIXTURE_BAD}})
     elseif(FIXTURE_BAD)
         target_compile_definitions(${target} PRIVATE FIXTURE_BAD_${FIXTURE_BAD})
-        target_include_directories(${target} PRIVATE ../cpp-fixture-sibling "${CMAKE_BINARY_DIR}/generated")
+        target_include_directories(${target} PRIVATE ../cpp-fixture-sibling "${CMAKE_BINARY_DIR}/generated" "$ENV{HOME}/gate-vendor")
     endif()
 endforeach()
 
@@ -101,9 +105,18 @@ elseif(FIXTURE_BAD STREQUAL "STATIC")
     add_library(member STATIC "${CMAKE_BINARY_DIR}/generated/member.cpp")
     target_compile_options(member PRIVATE -fno-stack-protector)
     target_link_libraries(gate-fixture PRIVATE member)
+elseif(FIXTURE_BAD STREQUAL "NEEDED")
+    # a library the package does not ship, named by a path its users would load it from
+    file(WRITE "${CMAKE_BINARY_DIR}/generated/helper.cpp" "int helperValue() { return 1; }\n")
+    add_library(fixture-helper SHARED "${CMAKE_BINARY_DIR}/generated/helper.cpp")
+    target_link_options(fixture-helper PRIVATE -Wl,-soname,/tmp/gate-fixture-helper.so)
+    target_link_libraries(gate-fixture PRIVATE fixture-helper)
 endif()
 
 install(TARGETS gate-fixture LIBRARY DESTINATION lib/gate-fixture)
+if(FIXTURE_BAD STREQUAL "SETID")
+    install(CODE "execute_process(COMMAND chmod 4755 \"\$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/gate-fixture/$<TARGET_FILE_NAME:gate-fixture>\")")
+endif()
 
 enable_testing()
 add_test(NAME fixture COMMAND gate-fixture-test)

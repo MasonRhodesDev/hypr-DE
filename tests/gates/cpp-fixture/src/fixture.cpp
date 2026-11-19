@@ -29,6 +29,9 @@
 #ifdef FIXTURE_BAD_TEMPLATE
 #include <template.hpp>
 #endif
+#ifdef FIXTURE_BAD_PRAGMAOPEN
+#include <vendor.hpp>
+#endif
 
 // Nothing below weakens the build, though a line-by-line reading of the text would say so:
 // #pragma GCC optimize("O0") in a comment, a function named optimize, and an attribute in a string.
@@ -96,4 +99,14 @@ int narrow(long value) {
 const char* bytesOf(const int& value) {
     return reinterpret_cast<const char*>(&value);
 }
+#endif
+
+#ifdef FIXTURE_BAD_NOCF
+__attribute__((nocf_check)) int noBranchTarget(int value) {
+    return value * 3;
+}
+#endif
+
+#ifdef FIXTURE_BAD_GUARD
+extern "C" void __stack_chk_fail() {}
 #endif

@@ -6,6 +6,7 @@ pkgdesc="Builds the C++ gates must refuse"
 arch=('x86_64' 'aarch64')
 url="https://example.invalid/hypr-DE"
 license=('MIT')
+depends=('glibc' 'libgcc' 'libstdc++')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
 sha256sums=('SKIP')
 

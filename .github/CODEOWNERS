@@ -1,0 +1,9 @@
+# The gates, the workflows that run them, the hardening flags and the linter configurations need the owner's review.
+# This binds only when branch protection on main requires a code owner's review.
+/.github/ @MasonRhodesDev
+/tests/gates/ @MasonRhodesDev
+/plugins/cmake/ @MasonRhodesDev
+/plugins/.clang-tidy @MasonRhodesDev
+/.shellcheckrc @MasonRhodesDev
+/.luacheckrc @MasonRhodesDev
+/ruff.toml @MasonRhodesDev

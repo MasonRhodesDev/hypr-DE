@@ -5,16 +5,20 @@ import concurrent.futures
 import functools
 import hashlib
 import json
+import math
 import os
 import platform
 import re
 import shlex
 import shutil
+import socket
 import stat
+import struct
 import subprocess
 import sys
 import tarfile
 import tempfile
+import threading
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 BASELINE = "tests/gates/baseline.tsv"
@@ -31,7 +35,12 @@ FIXTURE_PKGBUILD = f"{FIXTURE}/PKGBUILD"
 
 # a finding from these gates, or under these rules, is never recorded in the baseline, so it always fails
 UNBASELINED_GATES = {"cpp-selftest", "classify"}
-UNBASELINED_RULES = {"build-failed", "tidy-failed", "not-built", "unattributed", "unlintable-shell", "pkgbuild-source"}
+UNBASELINED_RULES = {
+    "build-failed", "tidy-failed", "not-built", "unattributed", "unlintable-shell", "pkgbuild-source",
+    "cannot-run", "forged-record", "malformed-record", "unshimmed", "not-judged",
+}
+# a gate that cannot see the code it judges says so once, and stays silent about what it therefore cannot count
+BLOCKING_RULES = {"build-failed", "unattributed", "cannot-run", "forged-record", "malformed-record", "unshimmed", "not-judged"}
 # what a file the gates cannot place by its suffix or its plugin is, so that none goes unchecked by default
 CLASSES = {
     "sh": "shell script that sh runs or sources",
@@ -39,6 +48,8 @@ CLASSES = {
     "python": "Python script",
     "lua": "Lua script",
     "pkgbuild": "makepkg build script; its package is built and audited",
+    "spec": "RPM spec; its scriptlets are linted, and the CMake project it builds must match its PKGBUILD's",
+    "blob": "opaque data no gate can read; the row's third field says why it is in the tree",
     "make": "Makefile",
     "data": "read, never run",
     "cpp-test": "C or C++ that only a test script builds; never shipped",
@@ -53,6 +64,18 @@ KNOWN_SUFFIXES = {
     ".clang-tidy", ".clang-format", ".shellcheckrc", ".luacheckrc", ".gitignore",
 }
 OBJECT_MAGIC = (b"\x7fELF", b"!<arch>\n", b"!<thin>\n")
+# compressed or encrypted bytes, or text that encodes bytes, which a reviewer cannot read and a script can turn into a program
+OPAQUE_ENTROPY, OPAQUE_MIN = 7.0, 1024
+ENCODED = re.compile(
+    r"(?:^[ \t]*[A-Za-z0-9+/]{40,}={0,2}[ \t]*\r?\n){8,}|[A-Za-z0-9+/=]{320,}"
+    r"|(?:0x[0-9a-fA-F]{1,2}\s*,\s*){128,}|(?:\\x[0-9a-fA-F]{2}){64,}|(?:\\[0-7]{1,3}){64,}",
+    re.MULTILINE,
+)
+# a spec builds the C++ plugin only with these lines; anything else in its build sections is a step the gates do not run
+SPEC_BUILD_LINE = re.compile(r"%(?:autosetup|setup|cmake|cmake_build|cmake_install)\b.*|\s*(?:#.*)?")
+SPEC_FLAGS_MACRO = re.compile(r"^%(?:global|define|undefine)\s+(\S*(?:flags|hardened|fortify|lto|annobin|cmake|_build_type)\S*)", re.MULTILINE)
+# the CMake options a distribution sets its own way, so a spec and a PKGBUILD may differ in them
+DISTRIBUTION_OPTIONS = re.compile(r"-B\s*\S+|-DCMAKE_(?:BUILD_TYPE|INSTALL_PREFIX)(?::\w+)?=\S+")
 
 # shellcheck reads these; any other shell in a shebang cannot be linted, so it fails
 LINTED_SHELLS = {"sh", "bash", "dash", "ksh", "ash", "mksh", "busybox"}
@@ -88,7 +111,7 @@ LEXEME = re.compile(
 PRAGMA = re.compile(r"^\s*#\s*pragma\s+(GCC|clang)\s+(\w+)\s*(\w*)")
 WEAKENING_PRAGMAS = {"optimize", "push_options", "target"}
 ATTRIBUTE = re.compile(r"\b__attribute(?:__)?\s*\(\s*\(|\[\[")
-WEAKENING_ATTRIBUTE = re.compile(r"\b(?:__)?(optimize|target|no_stack_protector|no_sanitize\w*|no_address_safety_analysis)(?:__)?\b")
+WEAKENING_ATTRIBUTE = re.compile(r"\b(?:__)?(optimize|target|no_stack_protector|no_sanitize\w*|no_address_safety_analysis|nocf_check)(?:__)?\b")
 NOLINT = re.compile(r"\bNOLINT(?:NEXTLINE|BEGIN|END)?\b")
 REQUIRED_WARNINGS = ["all", "extra", "conversion", "shadow"]
 # what Safety.cmake sets; glibc turns it into __USE_FORTIFY_LEVEL only when optimising
@@ -96,6 +119,18 @@ FORTIFY_LEVEL = 3
 # glibc sends these to their __*_chk form whenever fortify is on, so a plain import is code fortify never saw
 ALWAYS_FORTIFIED = {"printf", "fprintf", "vprintf", "vfprintf", "sprintf", "vsprintf", "vsnprintf", "dprintf", "vdprintf", "syslog", "vsyslog"}
 SHIMMED = ("c++", "g++", "gcc", "cc")
+# where a scriptlet may run a program but never write: the system's library and program directories, and the loader's own lists
+PROTECTED = re.compile(r"(?<![\w./$-])(?:(?:/usr(?:/local)?)?/(?:lib|lib64|bin|sbin|libexec)|/etc/ld\.so\.[\w.]+)(?![\w.-])")
+COMMAND_WORD = re.compile(r"(?:^|[;&|({`!]|\b(?:then|do|else|if|elif|while|until|exec|command|env|nice|time))\s*[\"']?$")
+TOOLCHAIN = ("makepkg", "cmake", "readelf", "c++", "fakeroot", "strace", "setpriv")
+# the unprivileged user a root gate builds as, and the parts of a build's work directory that user owns
+BUILDER = 65534
+BUILDER_DIRS = ("start", "build", "out", "home")
+# strace -f sees every program the build runs; a compiler, assembler or linker that no shim started is a compile the gate never saw
+TOOL = re.compile(r"cc1\w*|lto1|lto-wrapper|collect2|as|ld(?:\.\w+)?|lld|mold|(?:[\w.-]+-)?(?:gcc|g\+\+|c\+\+|cc|clang(?:\+\+)?|cpp)(?:-[\d.]+)?")
+EXEC = re.compile(r"^(\d+) +(?:execve(?:at)?\((.*)|<\.\.\. execve(?:at)? resumed>.*)$")
+SPAWN = re.compile(r"^(\d+) +(?:(?:clone3?|v?fork)\(|<\.\.\. (?:clone3?|v?fork) resumed>).*= (\d+)$")
+C_STRING = re.compile(r'"((?:[^"\\]|\\.)*)"')
 
 SELFTEST = [
     ("WARNING", "cpp-harden", f"{FIXTURE}/src/fixture.cpp", "-Wconversion"),
@@ -136,6 +171,13 @@ SELFTEST = [
     ("OVERFLOW", "cpp-sanitize", FIXTURE, "tests-failed"),
     ("UNDEFINED", "cpp-sanitize", FIXTURE, "tests-failed"),
     ("NOSANITIZE", "cpp-sanitize", f"{FIXTURE}/src/fixture.cpp", "sanitizer-off"),
+    ("BYPASS", "cpp-harden", FIXTURE_PKGBUILD, "unshimmed"),
+    ("MANUALENDBR", "cpp-harden", f"{FIXTURE}/src/fixture.cpp", "manual-endbr"),
+    ("NOCF", "cpp-harden", f"{FIXTURE}/src/fixture.cpp", "source-weakens: attribute nocf_check"),
+    ("GUARD", "cpp-harden", f"{FIXTURE}/src/fixture.cpp", "defines-guard:__stack_chk_fail"),
+    ("PRAGMAOPEN", "cpp-harden", f"{FIXTURE}/src/fixture.cpp", "pragma-unbalanced"),
+    ("SETID", "cpp-harden", "@gate-fixture/usr/lib/gate-fixture/libgate-fixture.so", "mode-setid"),
+    ("NEEDED", "cpp-harden", "@gate-fixture/usr/lib/gate-fixture/libgate-fixture.so", "needed-undeclared"),
 ]
 
 
@@ -154,7 +196,6 @@ class Findings:
         self.counts = collections.Counter()
         self.texts = {}
         self.details = collections.defaultdict(list)
-        self.skipped = []
 
     def add(self, path, rule, text, detail, weight=1):
         text = normalised(text)
@@ -209,7 +250,8 @@ def require(tool, package):
 
 @functools.cache
 def tracked():
-    listed = run(["git", "ls-files", "--cached", "--others", "--exclude-standard"]).stdout.splitlines()
+    # only what git tracks, so a stray file in a checkout judges the same as in CI's clone
+    listed = run(["git", "ls-files", "--cached"]).stdout.splitlines()
     files = [p for p in listed if os.path.isfile(p) and not os.path.islink(p)]
     if not files:
         die("git lists no files; run the gates from a checkout")
@@ -285,14 +327,20 @@ def suffix(path):
     return name[name.rfind(".") :].lower() if "." in name else ""
 
 
-def manifest():
-    entries = {}
+@functools.cache
+def manifest_rows():
+    entries, reasons = {}, {}
     for number, line in enumerate(read(MANIFEST).splitlines(), 1):
         fields = line.split("\t")
-        if len(fields) != 2:
-            die(f"{MANIFEST}:{number}: expected a path and a class separated by a tab")
+        if len(fields) not in (2, 3) or (len(fields) == 3) != (fields[1] == "blob") or not all(fields):
+            die(f"{MANIFEST}:{number}: expected a path and a class separated by a tab, and for a blob a third field that says why it is in the tree")
         entries[fields[0]] = fields[1]
-    return entries
+        reasons[fields[0]] = fields[2:]
+    return entries, reasons
+
+
+def manifest():
+    return manifest_rows()[0]
 
 
 def gated_dirs(files):
@@ -301,25 +349,36 @@ def gated_dirs(files):
 
 def needs_class(path, gated):
     inside = any(path.startswith(d + "/") for d in gated)
+    if os.path.basename(path) == "PKGBUILD" or suffix(path) == ".spec":
+        return True
     if os.path.basename(path) == "CMakeLists.txt":
         return os.path.dirname(path) not in gated
     return suffix(path) not in KNOWN_SUFFIXES or (path.lower().endswith(CPP_SUFFIXES) and not inside)
 
 
 def gate_classify(found, _args):
-    files, classes = tracked(), manifest()
+    files, (classes, reasons) = tracked(), manifest_rows()
     gated = gated_dirs(files)
     for path, kind in sorted(classes.items()):
         if path not in files:
             found.add(path, "missing", "not in the tree", f"{path}: listed in {MANIFEST} but not in the tree")
         elif kind not in CLASSES:
             found.add(path, "invalid", kind, f"{path}: unknown class '{kind}'; one of {', '.join(CLASSES)}")
+        elif kind == "blob" and not reasons[path]:
+            found.add(path, "invalid", kind, f"{path}: a blob needs a reason")
         elif kind == "cpp-fixture" and not path.startswith("tests/gates/"):
             found.add(path, "invalid", kind, f"{path}: only the gates' own fixtures under tests/gates are cpp-fixture")
     for path in sorted(files):
+        kind = classes.get(path)
+        if os.path.basename(path) == "PKGBUILD" and kind not in ("pkgbuild", "cpp-fixture"):
+            found.add(path, "packaging-class", str(kind), f"{path}: a PKGBUILD is classified pkgbuild, so the gates build its package")
+        if suffix(path) == ".spec" and kind != "spec":
+            found.add(path, "packaging-class", str(kind), f"{path}: an RPM spec is classified spec, so the gates check it")
+        why = opaque(path)
+        if why and kind != "blob":
+            found.add(path, "opaque", "opaque", f"{path}: {why}; classify it blob, with the reason it is in the tree")
         if head_of(path).startswith(OBJECT_MAGIC):
             found.add(path, "binary", "binary", f"{path}: a committed object, library or executable; build it from source in a package instead")
-        kind = classes.get(path)
         if kind is None:
             if needs_class(path, gated):
                 found.add(path, "unclassified", "unclassified", f"{path}: add it to {MANIFEST} with one of: {', '.join(CLASSES)}")
@@ -330,6 +389,54 @@ def gate_classify(found, _args):
         spoken = language(first)
         if spoken and {"sh": "shell", "bash": "shell"}.get(kind, kind) != spoken:
             found.add(path, "language-differs", first, f"{path}: is listed as {kind} but its shebang is {first}")
+    pkgbuilds = {}
+    for path in sorted(p for p in files if classes.get(p) == "pkgbuild"):
+        for name in re.findall(r"^(?:pkgname|pkgbase)=\(?'?\"?([\w.+-]+)", read(path), re.MULTILINE):
+            pkgbuilds.setdefault(name, path)
+    for path in sorted(p for p in files if suffix(p) == ".spec"):
+        check_spec(found, path, pkgbuilds)
+
+
+def opaque(path):
+    with open(path, "rb") as f:
+        data = f.read()
+    counts = collections.Counter(data)
+    entropy = -sum(n / len(data) * math.log2(n / len(data)) for n in counts.values()) if data else 0
+    if len(data) >= OPAQUE_MIN and entropy >= OPAQUE_ENTROPY:
+        return f"{entropy:.1f} bits per byte, as compressed or encrypted data has"
+    encoded = ENCODED.search(data.decode("latin-1"))
+    return f"{len(encoded[0])} characters of encoded data at byte {encoded.start()}" if encoded else None
+
+
+def cmake_options(words):
+    return sorted(DISTRIBUTION_OPTIONS.sub("", " ".join(words)).split())
+
+
+def check_spec(found, path, pkgbuilds):
+    """A spec that builds a CMake project builds the one its PKGBUILD builds, with the same options and nothing else."""
+    text = read(path)
+    for macro in SPEC_FLAGS_MACRO.finditer(text):
+        found.add(path, "spec-flags", macro[0], f"{path}: {macro[0]} changes the distribution's compiler flags or build type")
+    sections, current = collections.defaultdict(list), None
+    for number, line in enumerate(text.splitlines(), 1):
+        section = SPEC_SECTION.match(line)
+        current = section[1] if section else current
+        if not section and current in ("prep", "build", "install"):
+            sections[current].append((number, line))
+    calls = [shlex.split(line)[1:] for _number, line in sections["build"] if line.startswith("%cmake ")]
+    if not calls:
+        return
+    for number, line in (entry for name in ("prep", "build", "install") for entry in sections[name]):
+        if not SPEC_BUILD_LINE.fullmatch(line):
+            found.add(path, "spec-build-step", line, f"{path}:{number}: {line.strip()}: a spec that builds C++ runs only %autosetup, %cmake, %cmake_build and %cmake_install")
+    name = re.search(r"^Name:\s*(\S+)", text, re.MULTILINE)
+    pkgbuild = pkgbuilds.get(name[1] if name else "")
+    if not pkgbuild:
+        found.add(path, "spec-unmatched", "unmatched", f"{path}: no PKGBUILD builds a package named {name[1] if name else '(no Name)'}, so the gates build nothing like it")
+        return
+    ours = [shlex.split(line.split("cmake ", 1)[1]) for line in read(pkgbuild).splitlines() if re.match(r"\s*cmake -S ", line)]
+    if [cmake_options(c) for c in calls] != [cmake_options(c) for c in ours]:
+        found.add(path, "spec-cmake-differs", " ".join(map(" ".join, calls)), f"{path}: %cmake {calls} configures differently from {pkgbuild}'s cmake {ours}, which is the build the gates audit")
 
 
 def shell_scripts(files, classes):
@@ -388,7 +495,9 @@ def gate_shell(found, _args):
     # shellcheck has no switch to ignore its inline directives, so it reads copies that have none
     copies = copies_of([p for paths in batches.values() for p in paths], per_line(without_disable))
     for path in specs:
-        write(os.path.join(copies, path), without_disable(scriptlets(found, path)))
+        extracted = scriptlets(found, path)
+        scriptlet_writes(found, path, extracted)
+        write(os.path.join(copies, path), without_disable(extracted))
     batches["--shell=sh",] += specs
     pinned = [f"--rcfile={os.path.abspath(SHELLCHECK_RC)}", "--format=json1"]
     for options, paths in batches.items():
@@ -446,56 +555,141 @@ def gate_lua(found, _args):
 
 
 def toolchain(found, what):
-    missing = [tool for tool in ("makepkg", "cmake", "readelf", "c++", "fakeroot") if not shutil.which(tool)]
-    if not missing:
-        return True
-    if os.environ.get("CI"):
-        die(f"{', '.join(missing)} missing, and CI may not skip {what}")
-    print(f"skipped: {', '.join(missing)} missing, so {what} was not built or checked")
-    found.skipped.append(what)
-    return False
+    missing = [tool for tool in TOOLCHAIN if not shutil.which(tool)]
+    if missing:
+        found.add("toolchain", "cannot-run", "cannot run", f"toolchain: {', '.join(missing)} missing, so {what} cannot be built or checked")
+    return not missing
 
 
-def as_builder(argv):
-    # makepkg will not run as root, and a build user cannot write the gate's own files
-    return ["setpriv", "--reuid=65534", "--regid=65534", "--clear-groups", *argv] if os.geteuid() == 0 else argv
-
-
-def handed_to_builder(path):
+def handed_to_builder(work):
+    # the build user owns only what the build writes; the shim, its wrappers and the records stay the gate's
+    for name in BUILDER_DIRS:
+        os.makedirs(os.path.join(work, name), exist_ok=True)
+    # the build user is neither the owner nor in the group, so it gets the other bits: here, to pass through
+    os.chmod(work, 0o701)
     if os.geteuid() == 0:
-        for directory, _names, files in os.walk(path):
-            for name in [".", *files]:
-                os.chown(os.path.join(directory, name), 65534, 65534)
+        for name in BUILDER_DIRS:
+            for directory, _names, files in os.walk(os.path.join(work, name)):
+                for entry in [".", *files]:
+                    os.chown(os.path.join(directory, entry), BUILDER, BUILDER)
 
 
 def shim(work):
-    """Compiler wrappers for one build, and the directory its compiles and links are recorded in."""
-    wrappers, records = os.path.join(work, "bin"), os.path.join(work, "records")
+    """Compiler wrappers for one build, each running the shim with the real driver and the socket it sends its record to."""
+    wrappers = os.path.join(work, "bin")
     os.makedirs(wrappers)
-    os.makedirs(records)
     shutil.copy(SHIM, work)
+    reals = {}
     for name in SHIMMED:
         real = shutil.which(name)
         if not real:
             continue
-        wrapper = os.path.join(wrappers, name)
-        command = [sys.executable, "-I", os.path.join(work, "shim.py"), real, records]
-        write(wrapper, f'#!/bin/sh\nexec {shlex.join(command)} "$@"\n')
-        os.chmod(wrapper, 0o700)
-    return wrappers, records
+        reals[name] = real
+        command = [sys.executable, "-I", os.path.join(work, "shim.py"), real, os.path.join(work, "records.sock")]
+        write(os.path.join(wrappers, name), f'#!/bin/sh\nexec {shlex.join(command)} "$@"\n')
+        os.chmod(os.path.join(wrappers, name), 0o705)
+    return wrappers, reals
 
 
-def records_in(directory):
-    found = []
-    for name in sorted(os.listdir(directory)):
-        if name.endswith(".json"):
-            with open(os.path.join(directory, name), encoding="utf-8") as f:
-                found.append(json.load(f))
-    return found
+class Recorder:
+    """The records the shim sends while a build runs. The build can add a record over the socket, but never edit or delete one."""
+
+    def __init__(self, work):
+        self.server = socket.socket(socket.AF_UNIX)
+        self.server.bind(os.path.join(work, "records.sock"))
+        # connecting needs write access to the socket; the build user cannot remove it from the gate's directory
+        if os.geteuid() == 0:
+            os.chown(os.path.join(work, "records.sock"), BUILDER, BUILDER)
+        self.server.listen(256)
+        self.server.settimeout(0.2)
+        self.messages, self.readers, self.stopped = [], [], threading.Event()
+        self.acceptor = threading.Thread(target=self.accept, daemon=True)
+        self.acceptor.start()
+
+    def accept(self):
+        while not self.stopped.is_set():
+            try:
+                self.read_from(self.server.accept()[0])
+            except TimeoutError:
+                continue
+
+    def read_from(self, conn):
+        reader = threading.Thread(target=self.read, args=(conn,), daemon=True)
+        self.readers.append(reader)
+        reader.start()
+
+    def read(self, conn):
+        with conn:
+            pid = struct.unpack("3i", conn.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i")))[0]
+            conn.settimeout(60)
+            chunks = []
+            try:
+                while chunk := conn.recv(1 << 20):
+                    chunks.append(chunk)
+            except OSError:
+                chunks = None
+        self.messages.append((pid, None if chunks is None else b"".join(chunks)))
+
+    def close(self):
+        """Every message sent before the build ended, including connections still waiting to be accepted."""
+        self.stopped.set()
+        self.acceptor.join()
+        self.server.setblocking(False)
+        while True:
+            try:
+                self.read_from(self.server.accept()[0])
+            except BlockingIOError:
+                break
+        self.server.close()
+        for reader in self.readers:
+            reader.join(timeout=120)
+        return self.messages
+
+
+def fits(value, shape):
+    """Whether a record from the shim has the shape the gate reads, so a malformed one is a finding and not a crash."""
+    if isinstance(shape, list):
+        return isinstance(value, list) and all(fits(v, shape[0]) for v in value)
+    if isinstance(shape, dict) and "*" in shape:
+        return isinstance(value, dict) and all(isinstance(k, str) and fits(v, shape["*"]) for k, v in value.items())
+    if isinstance(shape, dict):
+        return isinstance(value, dict) and all(
+            fits(value[k.rstrip("?")], v) if k.rstrip("?") in value else k.endswith("?") for k, v in shape.items()
+        )
+    return isinstance(value, shape)
+
+
+OBJECT_SHAPE = {"sha256": str, "lto": bool, "defines": [str]}
+RECORD_SHAPE = {
+    "cwd": str, "compiler": str, "argv": [str], "jobs": [[str]], "status": int, "diagnostics": str, "sources": int,
+    "preprocessed?": str, "objects?": {"*": OBJECT_SHAPE},
+    "link?": {"output": str, "build_id": (str, type(None)), "code": (str, type(None)), "inputs": [{
+        "path": str, "missing?": bool, "uid?": int, "mode?": int, "kind?": str, "sha256?": str, "lto?": bool,
+        "members?": [{"name": str, "sha256": str, "lto": bool}],
+    }]},
+}
+
+
+def parsed_records(messages, shims):
+    """The well-formed records from processes that ran the shim, in a fixed order, and a finding for every other message."""
+    records, problems = [], []
+    for pid, data in messages:
+        try:
+            record = json.loads(data.decode("utf-8", "surrogateescape")) if data is not None else None
+        except ValueError:
+            record = None
+        if shims is not None and pid not in shims:
+            problems.append(("forged-record", f"process {pid}, which never ran the shim, sent a record"))
+        elif not fits(record, RECORD_SHAPE):
+            problems.append(("malformed-record", f"process {pid} sent a record the gate cannot read: {(data or b'')[:120]!r}"))
+        else:
+            records.append(record)
+    records.sort(key=lambda r: json.dumps(r, sort_keys=True))
+    return records, problems
 
 
 def srcinfo(pkgbuild, start, wrappers):
-    result = run(as_builder(["makepkg", "--printsrcinfo"]), cwd=start, env=builder_env(start, wrappers))
+    result = run(as_builder(["makepkg", "--printsrcinfo"]), cwd=start, env=builder_env(os.path.join(os.path.dirname(start), "home"), wrappers))
     info = collections.defaultdict(list)
     for line in result.stdout.splitlines():
         key, sep, value = line.strip().partition(" = ")
@@ -504,6 +698,85 @@ def srcinfo(pkgbuild, start, wrappers):
     if not info.get("pkgbase"):
         die(f"makepkg cannot read {pkgbuild}: {result.stderr.strip()}")
     return info
+
+
+def as_builder(argv):
+    # makepkg will not run as root, and a build user cannot write the gate's own files
+    return ["setpriv", f"--reuid={BUILDER}", f"--regid={BUILDER}", "--clear-groups", *argv] if os.geteuid() == 0 else argv
+
+
+def programs(log):
+    """From an strace -f log: each program a process ran, in order, and each process's parent."""
+    parents, runs, pending = {}, [], {}
+    for line in read(log).splitlines():
+        spawn = SPAWN.match(line)
+        if spawn:
+            parents[int(spawn[2])] = int(spawn[1])
+            continue
+        call = EXEC.match(line)
+        if not call:
+            continue
+        pid = int(call[1])
+        if call[2] is not None and line.endswith("<unfinished ...>"):
+            pending[pid] = C_STRING.findall(call[2])
+            continue
+        strings = C_STRING.findall(call[2]) if call[2] is not None else pending.pop(pid, None)
+        if strings and line.endswith(" = 0"):
+            runs.append((pid, strings[0], strings[1:]))
+    return parents, runs
+
+
+def shim_processes(work, reals, parents, runs):
+    """The processes that ran the gate's shim on a real compiler, and a finding for any tool that ran outside one."""
+    shim_path, wrappers = os.path.join(work, "shim.py"), os.path.join(work, "bin")
+    image, shims, problems = {}, set(), []
+
+    def under_shim(pid):
+        seen = set()
+        while pid is not None and pid not in seen:
+            seen.add(pid)
+            if shim_path in image.get(pid, ("", []))[1]:
+                return True
+            pid = parents.get(pid)
+        return False
+
+    for pid, path, args in runs:
+        image[pid] = (path, args)
+        if shim_path in args:
+            real = args[args.index(shim_path) + 1] if args.index(shim_path) + 1 < len(args) else ""
+            if real in reals.values():
+                shims.add(pid)
+            else:
+                problems.append(("unshimmed", f"process {pid} ran the shim on {real}, which is not a compiler the gate wrapped"))
+        elif os.path.dirname(path) != wrappers and TOOL.fullmatch(os.path.basename(path)) and not probe(args[1:]) and not under_shim(parents.get(pid)):
+            problems.append(("unshimmed", f"{path} ran outside the gate's compiler shim: {' '.join(args[:6])}"))
+    return shims, problems
+
+
+def probe(args):
+    """A call that names no input and no output, such as CMake asking the linker for its version or its options."""
+    words = iter(args)
+    for word in words:
+        if word == "-m":
+            next(words, None)
+        elif word == "-" or not word.startswith("-") or word.startswith(("-o", "--output", "@")):
+            return False
+    return True
+
+
+def recorded_build(work, reals, argv, **kwargs):
+    """Run a build as the build user under strace; keep the records from processes that ran the shim, and a finding for anything else."""
+    recorder = Recorder(work)
+    log = os.path.join(work, "trace.log")
+    trace = ["strace", "-f", "-qq", "--seccomp-bpf", "-e", "trace=execve,execveat,fork,vfork,clone,clone3", "-e", "signal=none", "-s", "4096", "-o", log]
+    result = run([*trace, "--", *as_builder(argv)], **kwargs)
+    messages = recorder.close()
+    parents, runs = programs(log) if os.path.exists(log) else ({}, [])
+    if not runs:
+        return result, [], [("cannot-run", f"strace could not trace the build: {result.stderr.strip()[-400:]}")]
+    shims, problems = shim_processes(work, reals, parents, runs)
+    records, bad = parsed_records(messages, shims)
+    return result, records, problems + bad
 
 
 def builder_env(home, wrappers, **extra):
@@ -527,8 +800,9 @@ def makepkg_conf(work):
 
 
 class Package:
-    def __init__(self, pkgbuild, work, info, result, records):
-        self.pkgbuild, self.info, self.result, self.records = pkgbuild, info, result, records
+    def __init__(self, pkgbuild, work, info, result, records, problems):
+        self.pkgbuild, self.info, self.result, self.records, self.problems = pkgbuild, info, result, records, problems
+        self.out = os.path.join(work, "out")
         self.pkgbase = info["pkgbase"][0]
         self.srcdir = os.path.realpath(os.path.join(work, "build", self.pkgbase, "src"))
         self.top = os.path.join(self.srcdir, f"{os.path.basename(info['url'][0])}-{info['pkgver'][0]}") if info.get("url") else self.srcdir
@@ -563,7 +837,7 @@ def package(pkgbuild, case):
     for path in tracked():
         if os.path.dirname(path) == here:
             shutil.copy(path, start)
-    wrappers, records = shim(work)
+    wrappers, reals = shim(work)
     handed_to_builder(work)
     info = srcinfo(pkgbuild, start, wrappers)
     for source in info.get("source", []):
@@ -574,10 +848,10 @@ def package(pkgbuild, case):
             die(f"{pkgbuild}: a remote source needs a name:: and the PKGBUILD a url, so the gate can stand the tree in for it")
         shutil.copy(exported(f"{os.path.basename(info['url'][0])}-{info['pkgver'][0]}"), os.path.join(start, name))
     handed_to_builder(work)
-    env = builder_env(work, wrappers, BUILDDIR=os.path.join(work, "build"), PKGDEST=os.path.join(work, "out"), SRCDEST=start, **({"FIXTURE_BAD": case} if case else {}))
+    env = builder_env(os.path.join(work, "home"), wrappers, BUILDDIR=os.path.join(work, "build"), PKGDEST=os.path.join(work, "out"), SRCDEST=start, **({"FIXTURE_BAD": case} if case else {}))
     command = ["makepkg", "--config", makepkg_conf(work), "--nodeps", "--skipinteg", "--nocheck", "--noconfirm", "--noprogressbar"]
-    result = run(as_builder(command), cwd=start, env=env)
-    return Package(pkgbuild, work, info, result, records_in(records))
+    result, records, problems = recorded_build(work, reals, command, cwd=start, env=env)
+    return Package(pkgbuild, work, info, result, records, problems)
 
 
 def packages(found):
@@ -597,7 +871,7 @@ class Unit:
         self.record, self.built = record, built
         compiles = [job for job in record["jobs"] if os.path.basename(job[0]) in ("cc1plus", "cc1")]
         self.cc1 = compiles[0] if compiles else []
-        text = read(record["preprocessed"])
+        text = record["preprocessed"]
         primary = LINEMARKER.match(text.split("\n", 1)[0])
         self.source = os.path.join(record["cwd"], unescape(primary[2])) if primary else record["cwd"]
         self.name = built.place(self.source) or self.source
@@ -653,6 +927,8 @@ def view(found, unit, seen):
             found.add(left, "system-header-in-tree", "system header", f"{left}: compiled as a system header, so GCC hides its warnings")
 
     tracked_macros = {"_FORTIFY_SOURCE", "__USE_FORTIFY_LEVEL", "_GLIBCXX_ASSERTIONS", "NDEBUG"}
+    # the optimize or target pragma in force, if any, and the push_options not yet popped
+    options = (None, ())
     origin = {}
     reported = set()
 
@@ -702,9 +978,16 @@ def view(found, unit, seen):
                     else:
                         macros.pop(name, None)
                     origin[name] = f", set at {where}:{number}" if region == "source" else " from the command line"
+            pragma = PRAGMA.match(line)
+            if pragma and pragma[1] == "GCC" and region == "source":
+                options = pragmas(options, pragma[2], (where, number, raw[g]))
         places[g] = (inside, number) if inside else None
         number += 1
     check("the end of the unit")
+    # an optimize or target pragma still in force when the unit ends, from any header, applies to all the code after it
+    if options[0] or options[1]:
+        where_set, at, text = options[0] or options[1][-1][1]
+        found.add(unit.name, "pragma-unbalanced", text, f"{unit.name}: {' '.join(text.split())} at {where_set}:{at} is still in force at the end of the unit")
     while stack:
         leave()
 
@@ -714,6 +997,8 @@ def view(found, unit, seen):
         ("not-pic", "__PIC__" in builtins or "__PIE__" in builtins),
         ("cf-protection-off", platform.machine() != "x86_64" or builtins.get("__CET__") == "3"),
         ("stack-clash-off", last_switch(unit.cc1, "-fstack-clash-protection", "-fno-stack-clash-protection")),
+        # -mmanual-endbr leaves __CET__ and the IBT note in place and drops the endbr64 from every function not marked cf_check
+        ("manual-endbr", not last_switch(unit.cc1, "-mmanual-endbr", "-mno-manual-endbr")),
     ):
         if not ok:
             report(rule, f"compiled with {rule.replace('-off', ' off').replace('-', ' ')}")
@@ -738,6 +1023,17 @@ def view(found, unit, seen):
             seen.add((place, "nolint"))
             found.add(place[0], "suppression: " + " ".join(raw[g].split()), raw[g], f"{place[0]}:{place[1]}: {raw[g].strip()}")
     return {p for p in (place[0] for place in places if place)}
+
+
+def pragmas(options, name, place):
+    current, pushed = options
+    if name == "push_options":
+        return current, (*pushed, (current, place))
+    if name == "pop_options":
+        return (pushed[-1][0], pushed[:-1]) if pushed else options
+    if name == "reset_options":
+        return None, pushed
+    return (place, pushed) if name in ("optimize", "target") else options
 
 
 def scan(found, path, lines, seen):
@@ -808,15 +1104,16 @@ def audit(found, built, units_by_object, links_by_build_id):
                 found.add(key, "unattributed", "archive", f"{key}: an archive in the package; the gate audits only ELF files it can trace to a compile")
                 continue
             check_elf(found, key, path)
+            check_needed(found, key, path, built)
             build_id = re.search(r"Build ID:\s*(\w+)", run(["readelf", "-nW", path]).stdout)
-            link = links_by_build_id.get(build_id[1]) if build_id else None
             # a build ID can be set by hand, so the code itself has to be what that link wrote
             code = run([sys.executable, "-I", SHIM, "--code-digest", path]).stdout.strip()
-            if not link or link["link"]["code"] != code:
+            links = [link for link in links_by_build_id.get(build_id[1] if build_id else None, []) if link["link"]["code"] == code]
+            if not links:
                 found.add(key, "unattributed", "no link", f"{key}: no link this build ran made it (build ID {build_id[1] if build_id else 'missing'})")
-                continue
-            for unit in units_of(found, key, link, units_by_object):
-                shipped.add(id(unit))
+            for link in links:
+                for unit in units_of(found, key, link, units_by_object):
+                    shipped.add(id(unit))
     return shipped
 
 
@@ -834,13 +1131,99 @@ def units_of(found, key, link, units_by_object):
         if entry["kind"] in ("thin-archive", "exec") or (entry["kind"] == "archive" and not objects):
             found.add(key, "unattributed", entry["kind"], f"{key}: links {entry['path']}, which the gate cannot trace to a compile")
         for obj in objects:
-            unit = units_by_object.get(obj["sha256"])
+            units = units_by_object.get(obj["sha256"], [])
             if obj.get("lto"):
                 found.add(key, "unattributed", "lto", f"{key}: links LTO code from {entry['path']}; the gate sees only what each compile was asked for, not what LTO makes of it")
-            elif unit:
-                yield unit
+            elif units:
+                yield from units
             else:
                 found.add(key, "unattributed", "unknown object", f"{key}: links {entry['path']} {obj.get('name', '')}, which no compile the gate saw produced".rstrip())
+
+
+@functools.cache
+def installed():
+    """The local pacman database: the packages that provide each name, what each depends on, and the package that owns each library file."""
+    db = os.path.join(run(["pacman-conf", "DBPath"]).stdout.strip() or "/var/lib/pacman", "local")
+    providers, depends, owners = collections.defaultdict(set), {}, {}
+    for entry in sorted(os.listdir(db)):
+        if not os.path.isfile(os.path.join(db, entry, "desc")):
+            continue
+        fields, current = collections.defaultdict(list), None
+        for line in read(os.path.join(db, entry, "desc")).splitlines():
+            current = line[1:-1] if line.startswith("%") and line.endswith("%") else current
+            if current and line and not line.startswith("%"):
+                fields[current].append(line)
+        name = fields["NAME"][0]
+        for provided in [name, *fields["PROVIDES"]]:
+            providers[re.split(r"[<>=]", provided)[0]].add(name)
+        depends[name] = [re.split(r"[<>=:]", d)[0].strip() for d in fields["DEPENDS"]]
+        for line in read(os.path.join(db, entry, "files")).splitlines():
+            if ".so" in line:
+                owners["/" + line] = name
+    return providers, depends, owners
+
+
+@functools.cache
+def provided_by(declared):
+    """Every package the declared dependencies bring in, through each one's own dependencies."""
+    providers, depends, _owners = installed()
+    seen, todo = set(), list(declared)
+    while todo:
+        for name in providers.get(todo.pop(), ()):
+            if name not in seen:
+                seen.add(name)
+                todo += depends.get(name, [])
+    return frozenset(seen)
+
+
+@functools.cache
+def loader_paths():
+    paths = collections.defaultdict(set)
+    for line in run(["ldconfig", "-p"]).stdout.splitlines():
+        entry = re.match(r"\s+(\S+) \(.*\) => (\S+)$", line)
+        if entry:
+            paths[entry[1]] |= {entry[2], os.path.realpath(entry[2])}
+    return paths
+
+
+def check_needed(found, key, path, built):
+    """Each library the ELF needs is one the package ships or one a dependency it declares installs."""
+    shipped = {name for pkgdir in built.pkgdirs.values() for _base, _dirs, files in os.walk(pkgdir) for name in files}
+    allowed = provided_by(tuple(sorted(set(built.info.get("depends", [])))))
+    owners = installed()[2]
+    for soname in re.findall(r"\(NEEDED\)\s+Shared library: \[([^\]]+)\]", run(["readelf", "-dW", path]).stdout):
+        if "/" in soname or (soname not in shipped and not any(owners.get(p) in allowed for p in loader_paths().get(soname, ()))):
+            found.add(key, "needed-undeclared", soname, f"{key}: needs {soname}, which neither the package nor a dependency it declares provides")
+
+
+def archives(found, built):
+    """Each package archive makepkg wrote, as it installs: no setuid, setgid, world-writable or non-root file, and a scriptlet that writes no program or library."""
+    elf_dirs = {"/" + os.path.dirname(os.path.relpath(path, pkgdir)) for pkgdir in built.pkgdirs.values() for path, _head in elf_files(pkgdir)}
+    for archive in sorted(os.listdir(built.out)):
+        pkgname = archive.rsplit("-", 3)[0]
+        with tarfile.open(os.path.join(built.out, archive)) as tar:
+            for member in tar.getmembers():
+                key = f"@{pkgname}/{member.name.rstrip('/')}"
+                problems = {
+                    "mode-setid": member.mode & (stat.S_ISUID | stat.S_ISGID),
+                    "mode-world-writable": member.mode & stat.S_IWOTH and not member.issym(),
+                    "owner-not-root": member.uid != 0 or member.gid != 0,
+                }
+                for rule in (rule for rule, hit in problems.items() if hit and not member.name.startswith(".")):
+                    found.add(key, rule, rule, f"{key}: {rule} (mode {member.mode:o}, owner {member.uid}:{member.gid})")
+                if member.name == ".INSTALL":
+                    install = os.path.join(os.path.dirname(built.pkgbuild), built.info.get("install", [""])[0])
+                    scriptlet_writes(found, install if install in tracked() else key, tar.extractfile(member).read().decode("utf-8", "replace"), elf_dirs)
+
+
+def scriptlet_writes(found, path, text, extra_dirs=()):
+    """A scriptlet line that names a program or library directory anywhere but as the command it runs."""
+    extra = re.compile("|".join(rf"(?<![\w./$-]){re.escape(d)}(?![\w.-])" for d in sorted(extra_dirs) if d != "/")) if extra_dirs else None
+    for number, line in enumerate(text.splitlines(), 1):
+        code = line.split("#", 1)[0] if not line.lstrip().startswith("#") else ""
+        hits = [*PROTECTED.finditer(code), *(extra.finditer(code) if extra else ())]
+        if any(not COMMAND_WORD.search(code[: hit.start()]) for hit in hits):
+            found.add(path, "scriptlet-writes-shipped", line, f"{path}:{number}: {line.strip()}: a scriptlet may run what the package installs, never write where programs and libraries live")
 
 
 def check_elf(found, key, path):
@@ -866,19 +1249,27 @@ def check_elf(found, key, path):
 
 def analyse(found, built):
     """Shipped ELFs, the compiles behind them, and every compile of a tracked source."""
+    for rule, detail in built.problems:
+        found.add(built.pkgbuild, rule, rule, f"{built.pkgbuild}: {detail}")
     if built.result.returncode != 0:
         found.add(built.pkgbuild, "build-failed", "makepkg failed", f"{built.pkgbuild}: makepkg failed\n{tail(built.result, built)}")
         return [], set()
-    units, units_by_object, links = [], {}, {}
+    # records come sorted, and every record that matches an object or a build ID is judged, so no order decides which one counts
+    units, units_by_object, links = [], collections.defaultdict(list), collections.defaultdict(list)
     for record in built.records:
-        unit = Unit(record, built) if record.get("preprocessed") else None
+        unit = Unit(record, built) if "preprocessed" in record else None
         if unit:
             units.append(unit)
-            for digest in (o["sha256"] for o in record.get("objects", {}).values()):
-                units_by_object[digest] = unit
+            for obj in record.get("objects", {}).values():
+                units_by_object[obj["sha256"]].append(unit)
+        for path, obj in record.get("objects", {}).items():
+            for name in obj["defines"]:
+                where = unit.name if unit else built.place(path) or path
+                found.add(where, f"defines-guard:{name}", name, f"{where}: defines {name}, so a failed stack or fortify check calls the package's own code instead of aborting")
         if record.get("link", {}).get("build_id"):
-            links[record["link"]["build_id"]] = {**record, "unit": unit}
+            links[record["link"]["build_id"]].append({**record, "unit": unit})
     shipped = audit(found, built, units_by_object, links)
+    archives(found, built)
     checked = [u for u in units if id(u) in shipped or u.name in tracked()]
     seen, read_by = set(), set()
     for unit in checked:
@@ -923,12 +1314,16 @@ def gate_cpp_harden(found, _args):
         result, _built, _units, reads = harden_findings(built.pkgbuild, "")
         merge(found, result)
         read_by |= reads
-    if not found.skipped:
+    if not blocked(found):
         classes = manifest()
         for directory in sorted(gated_dirs(tracked())):
             for path in sorted(p for p in tracked() if p.startswith(directory + "/") and p.lower().endswith(CPP_SUFFIXES)):
                 if path not in read_by and path not in classes:
                     found.add(path, "not-built", "not built", f"{path}: no package's build reads it; build it there, or list it in {MANIFEST}")
+
+
+def blocked(found):
+    return any(key[1] in BLOCKING_RULES for key in found.counts)
 
 
 def merge(found, other):
@@ -964,8 +1359,10 @@ def tidy_units(found, built, units):
 
 def gate_cpp_tidy(found, _args):
     for built in packages(found):
-        _result, _built, units, _reads = harden_findings(built.pkgbuild, "")
-        if units:
+        result, _built, units, _reads = harden_findings(built.pkgbuild, "")
+        if blocked(result):
+            found.add(built.pkgbuild, "not-judged", "not judged", f"{built.pkgbuild}: cpp-harden cannot see all of this package's code, so clang-tidy does not judge it")
+        elif units:
             tidy_units(found, built, units)
 
 
@@ -989,25 +1386,28 @@ def sanitizers(args):
 
 def sanitize(found, project, *options):
     work = scratch()
-    wrappers, records = shim(work)
-    build = os.path.realpath(os.path.join(work, "build"))
-    env = {**os.environ, "PATH": f"{wrappers}:{os.environ.get('PATH', '/usr/bin')}"}
-    result = run(["cmake", "-S", project, "-B", build, "-DCMAKE_BUILD_TYPE=RelWithDebInfo", "-DHYPR_DE_SANITIZE=ON", *options], env=env)
-    if result.returncode == 0:
-        result = run(["cmake", "--build", build, "--parallel"], env=env)
+    wrappers, reals = shim(work)
+    handed_to_builder(work)
+    build = os.path.join(os.path.realpath(work), "build")
+    env = builder_env(os.path.join(work, "home"), wrappers)
+    configure = ["cmake", "-S", os.path.abspath(project), "-B", build, "-DCMAKE_BUILD_TYPE=RelWithDebInfo", "-DHYPR_DE_SANITIZE=ON", *options]
+    script = 'cmake "$@" && exec cmake --build "$0" --parallel'
+    result, records, problems = recorded_build(work, reals, ["sh", "-c", script, build, *configure[1:]], env=env)
+    for rule, detail in problems:
+        found.add(project, rule, rule, f"{project}: {detail}")
     if result.returncode != 0:
         found.add(project, "build-failed", "sanitizer build failed", f"{project}: the sanitizer build failed\n{tail(result)}")
         return
-    for record in records_in(records):
-        if not record.get("preprocessed"):
+    for record in records:
+        if "preprocessed" not in record:
             continue
         compiles = [job for job in record["jobs"] if os.path.basename(job[0]) in ("cc1plus", "cc1")]
         on, recovers = sanitizers(compiles[0] if compiles else [])
-        source = LINEMARKER.match(read(record["preprocessed"]).split("\n", 1)[0])
+        source = LINEMARKER.match(record["preprocessed"].split("\n", 1)[0])
         name = os.path.relpath(os.path.realpath(os.path.join(record["cwd"], unescape(source[2])))) if source else project
         if name in tracked() and (not {"address", "undefined"} <= on or recovers):
             found.add(name, "sanitizer-off", f"{sorted(on)} {recovers}", f"{name}: built with sanitizers {sorted(on)}{' that recover' if recovers else ''}")
-    tests = run(["ctest", "--test-dir", build, "--output-on-failure", "--no-tests=error"], env=env)
+    tests = run(as_builder(["ctest", "--test-dir", build, "--output-on-failure", "--no-tests=error"]), env=env)
     if "No tests were found" in tests.stdout + tests.stderr:
         found.add(project, "no-tests", "no tests", f"{project}: registers no test with add_test, so nothing ran under the sanitizers")
     elif tests.returncode != 0:
@@ -1071,14 +1471,12 @@ GATES = {
 def judge(gate, found, baseline, args):
     allowed = {key[1:]: count for key, (count, _text) in baseline.items() if key[0] == gate}
     texts = {**{key[1:]: text for key, (_count, text) in baseline.items() if key[0] == gate}, **found.texts}
-    failures = 0
-    if found.skipped:
-        print(f"skipped {gate}: {', '.join(found.skipped)}")
-        return 0
+    failures, silent = 0, blocked(found)
     for key in sorted(set(found.counts) | set(allowed)):
         recorded = gate not in UNBASELINED_GATES and key[1] not in UNBASELINED_RULES
         have, limit = found.counts[key], allowed.get(key, 0) if recorded else 0
-        if have == limit:
+        # what a gate that cannot see all the code no longer finds is not news; the line that says why it cannot see is
+        if have == limit or (silent and have < limit):
             continue
         if args.update and recorded and (have < limit or args.allow_growth):
             baseline[gate, *key] = (have, texts[key])
@@ -1099,9 +1497,8 @@ def main():
     parser.add_argument("gates", nargs="+", choices=[*GATES, "all"])
     parser.add_argument("--update", action="store_true", help="lower the baseline to what is found now")
     parser.add_argument("--allow-growth", action="store_true", help="with --update, also record new findings, which the pull request must justify")
-    parser.add_argument("--tree", default=ROOT, help="judge this checkout with these gates; CI judges a pull request with its base branch's gates")
     args = parser.parse_args()
-    os.chdir(os.path.realpath(args.tree))
+    os.chdir(ROOT)
     baseline = parse_baseline(read(BASELINE)) if os.path.exists(BASELINE) else {}
     failures = 0
     for gate in GATES if "all" in args.gates else args.gates:
