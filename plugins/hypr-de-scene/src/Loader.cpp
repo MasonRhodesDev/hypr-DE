@@ -103,6 +103,9 @@ namespace {
         if (!VERSION || !INIT || !EXIT || VERSION() != HYPRLAND_API_VERSION)
             return idle(std::format("{} is not the module this loader was built with", PATH));
 
+        // running from here, so a fault Hyprland catches inside init leaves the module open
+        module.exit = EXIT;
+
         // Hyprland keys everything a plugin registers, and the pluginExit it calls, on this handle
         PLUGIN_DESCRIPTION_INFO info;
         bool                    started = true;
@@ -110,7 +113,6 @@ namespace {
             info = INIT(handle);
         } catch (...) { started = false; }
 
-        module.exit = EXIT;
         if (started)
             return info;
 
