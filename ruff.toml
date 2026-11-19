@@ -1,0 +1,24 @@
+target-version = "py311"
+line-length = 140
+
+[lint]
+select = [
+    "F", "E4", "E7", "E9", "W6",
+    "S", "B", "BLE",
+    "PLC", "PLE", "PLR", "PLW",
+    "A", "ARG", "DTZ", "EXE", "ISC", "LOG", "PGH", "RUF", "T10",
+    "SIM115",
+]
+ignore = [
+    # Fires on every subprocess call whatever its arguments, so no code can satisfy it.
+    # S602 and S604 to S607 still catch shells and PATH lookups.
+    "S603",
+    # Late imports keep PIL and GTK off the code paths that do not need them.
+    "PLC0415",
+    # Size and magic-number limits are style, not safety.
+    "PLR09", "PLR2004",
+]
+
+[lint.per-file-ignores]
+# Tests assert, and run tools from the developer's PATH on purpose.
+"**/tests/**" = ["S101", "S607"]

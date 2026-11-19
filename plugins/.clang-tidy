@@ -1,0 +1,8 @@
+Checks: >
+  -*,
+  bugprone-*,
+  cert-*,
+  clang-analyzer-*,
+  cppcoreguidelines-pro-bounds-*,
+  cppcoreguidelines-pro-type-*,
+  -bugprone-easily-swappable-parameters

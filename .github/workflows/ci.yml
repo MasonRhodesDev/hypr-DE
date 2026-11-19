@@ -14,20 +14,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-      - name: shellcheck
+        with:
+          # the baseline gate compares against the base revision
+          fetch-depth: 0
+      - name: Install the pinned linters
         run: |
-          sudo apt-get install -y shellcheck
-          mapfile -t scripts < <(
-            for f in packaging/*.sh dist/bin/hypr-de-* dist/libexec/*.sh \
-                     dist/libexec/osd/*.sh dist/libexec/waybar-updates-check \
-                     dist/libexec/hypr-de-prime-theme dist/libexec/hypridle-launch \
-                     get-hypr-de.sh tests/run tests/tripwire \
-                     tests/qemu-fresh/*.sh; do
-              [ -f "$f" ] || continue
-              head -n1 "$f" | grep -qE '^#!/((usr/)?bin/(env )?)?(ba)?sh' && printf '%s\n' "$f"
-            done
-          )
-          shellcheck -S warning -e SC1091 "${scripts[@]}"
+          python3 -m venv "$RUNNER_TEMP/gates"
+          "$RUNNER_TEMP/gates/bin/pip" install --require-hashes -r tests/gates/requirements.txt
+          curl -fsSL -o "$RUNNER_TEMP/gates/bin/luacheck" \
+            https://github.com/lunarmodules/luacheck/releases/download/v1.2.0/luacheck
+          echo "d68da17fca0697d9e2fb04201f3884abd259fa558b3a449bccaed47f1390defc  $RUNNER_TEMP/gates/bin/luacheck" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/gates/bin/luacheck"
+          echo "$RUNNER_TEMP/gates/bin" >>"$GITHUB_PATH"
+      - name: Shell, Python and Lua gates, and the baseline only shrinks
+        env:
+          GATE_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+        run: tests/gates/check.sh shell python lua baseline
       - name: no literal install paths in dist sources
         run: |
           ! grep -rn "/usr/share/hypr-de\|/usr/libexec/hypr-de\|/usr/lib/hypr-de" dist/ \
@@ -91,3 +93,32 @@ jobs:
         run: ./tests/hypridle-override.sh
       - name: Screen-share consent scoping
         run: ./tests/share-consent.sh
+
+  cpp:
+    name: C++ hardening, sanitizers and clang-tidy
+    runs-on: ubuntu-latest
+    container: archlinux:latest@sha256:b0deabeb3d283da2c7f7dbf0eea051b7b2cd0554e0b737cc457fd21683bdcdd1
+    steps:
+      - name: Install the toolchain
+        run: pacman -Syu --noconfirm --needed base-devel cmake git python
+
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - name: Trust the checkout (container runs as root)
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Install Hyprland's headers when a plugin is present
+        shell: bash
+        run: |
+          if compgen -G 'plugins/*/CMakeLists.txt' >/dev/null; then
+            pacman -S --noconfirm --needed hyprland
+          fi
+
+      - name: Install the pinned clang-tidy
+        run: |
+          python -m venv /opt/gates
+          /opt/gates/bin/pip install --require-hashes -r tests/gates/requirements.txt
+          echo /opt/gates/bin >>"$GITHUB_PATH"
+
+      - name: C++ gates
+        run: tests/gates/check.sh cpp-harden cpp-sanitize cpp-tidy cpp-selftest

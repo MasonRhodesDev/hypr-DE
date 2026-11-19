@@ -362,6 +362,38 @@ sudo dnf install ~/rpmbuild/RPMS/*/hypr-de-scene-[0-9]*.rpm
 - `hypr-de-scene` is built and checked by the Scene plugin workflow on
   every push. The release workflow does not publish it yet.
 
+### Safety gates
+
+CI refuses unsafe patterns in new code. `tests/gates/check.sh` runs every gate,
+or the ones named on its command line:
+
+| Gate | What it refuses |
+|------|-----------------|
+| `shell` | Anything `shellcheck` reports with every optional check on (`.shellcheckrc`), in every shell script in the tree, and inline `shellcheck disable` lines. |
+| `python` | `ruff` with the bandit, bugbear and pylint rules in `ruff.toml`, and inline `noqa` comments. |
+| `lua` | `luacheck` findings (`.luacheckrc`) and inline `luacheck:` comments. |
+| `cpp-harden` | A plugin that does not build with `-Wall -Wextra -Wconversion -Wshadow -Werror`, a source compiled without a hardening flag or with one that weakens them (`-Wno-...`), and a binary without full RELRO, immediate binding, a non-executable stack, PIE or CET. |
+| `cpp-sanitize` | A plugin whose tests fail under AddressSanitizer and UndefinedBehaviorSanitizer, or that registers no test with `add_test`. |
+| `cpp-tidy` | `clang-tidy` findings from `plugins/.clang-tidy`, and `NOLINT` comments. |
+| `cpp-selftest` | The C++ gates themselves, if they stop catching the known-bad cases in `tests/gates/cpp-fixture`. |
+| `baseline` | A baseline that grew since the base revision (`--base REV` or `GATE_BASE`, `origin/main` by default). |
+
+The C++ gates build every `plugins/*/CMakeLists.txt` with
+`plugins/cmake/Safety.cmake` injected through `CMAKE_PROJECT_INCLUDE`, so a new
+plugin is covered without naming it anywhere. A plugin's own packaging gets the
+same flags with `include(../cmake/Safety.cmake)` after its `project()` call.
+Include directories outside the plugin's tree are treated as system headers,
+because a plugin cannot fix a warning in a header it does not own.
+
+What already broke a rule when its gate arrived is counted in
+`tests/gates/baseline.tsv`, one line per gate, file and rule. A count may only
+fall. Finding more than the count fails, and so does finding fewer until the
+line is lowered with `tests/gates/check.sh <gate> --update`.
+
+The gates need `shellcheck`, `ruff` and `clang-tidy` at the versions pinned in
+`tests/gates/requirements.txt`, `luacheck` 1.2.0, and for C++ `cmake`, a C++
+compiler and `readelf`.
+
 ## License
 
 MIT
