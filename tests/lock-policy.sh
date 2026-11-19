@@ -44,7 +44,7 @@ respawns="$work/hypr-de-lock-respawns"
 restore=$(sed -n 's/^[[:space:]]*allow_session_lock_restore[[:space:]]*=[[:space:]]*\([a-z]*\).*/\1/p' "$root/dist/hypr/main.lua")
 export LOCK_POLICY_RESTORE="${restore:-false}"
 fallback_fixtures="$root/tests/fixtures/lock-policy-fallback"
-three_respawns=$(printf 'vigil-lock:--wait --no-warn\n%.0s' 1 2 3 4 5 6)
+three_respawns=$(printf 'vigil-lock:--wait --no-warn --grace 0\n%.0s' 1 2 3 4 5 6)
 lock_conf="$work/lock.conf"
 journal_socket="$work/journal.sock"
 python3 -c 'import socket, sys; socket.socket(socket.AF_UNIX).bind(sys.argv[1])' "$journal_socket"
@@ -284,7 +284,7 @@ rm -f "$marker" "$respawns"
 : > "$LOCK_POLICY_LOG"
 LOCK_POLICY_LOCK_FILE=$lockfile LOCK_POLICY_VIGIL_HOLDS=1 run_lock
 assert_status 0
-assert_log 'vigil-lock:--wait --no-warn
+assert_log 'vigil-lock:--wait --no-warn --grace 0
 logind-idle-control:disable
 hyprctl:dispatch hl.dsp.dpms({ action = '\''on'\'' })'
 assert_marker no
@@ -340,7 +340,7 @@ rm -f "$marker" "$respawns"
 : > "$LOCK_POLICY_LOG"
 PATH="$work/planted:$PATH" LOCK_POLICY_LOCK_FILE=$lockfile LOCK_POLICY_VIGIL_HOLDS=1 run_lock
 assert_status 0
-assert_log 'vigil-lock:--wait --no-warn
+assert_log 'vigil-lock:--wait --no-warn --grace 0
 logind-idle-control:disable
 hyprctl:dispatch hl.dsp.dpms({ action = '\''on'\'' })'
 stop_holders

@@ -308,6 +308,8 @@ claim_respawn() {
 # With misc:allow_session_lock_restore on, Hyprland hands a crashed lock screen to the next locker.
 # It also hands a healthy one to a newcomer, so this respawns only once no locker is left, and only
 # the pinned vigil-lock, then the root-configured fallbacks, may claim it.
+# The respawn never opens a grace window: lock.grace_secs lets any input unlock, and a crash must not
+# hand that to whoever is at the keyboard.
 # Returns 0 when a locker holds the lock, 1 after the failsafe, 2 when the compositor is not locked.
 recover_crashed_lock() {
     if lock_held; then
@@ -327,7 +329,7 @@ recover_crashed_lock() {
         [ "$left" -ge 1 ] || break
         [ "$left" -lt "$LOCK_TIMEOUT" ] || left=$LOCK_TIMEOUT
         log "respawning vigil-lock to take over the crashed lock screen (attempt $attempt of $RESPAWN_MAX in ${RESPAWN_WINDOW}s)"
-        if lock "$left" --wait --no-warn; then
+        if lock "$left" --wait --no-warn --grace 0; then
             log "vigil-lock took over the crashed lock screen"
             rm -f "$fail_marker" 2>/dev/null || true
             return 0
