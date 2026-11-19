@@ -82,6 +82,17 @@ jobs:
       - name: Rebuild binary RPM (runs %check)
         run: rpmbuild --rebuild ~/rpmbuild/SRPMS/hypr-de-scene-*.src.rpm
 
+      - name: hypr-de loads the plugin from a path this RPM installs
+        shell: bash
+        run: |
+          path=$(rpmspec -P --target noarch packaging/hypr-de.spec | sed -n 's/^SCENE_PLUGIN=\([^ ]*\).*/\1/p')
+          echo "hypr-de substitutes SCENE_PLUGIN=$path"
+          if [ -z "$path" ] || ! rpm -qpl ~/rpmbuild/RPMS/*/hypr-de-scene-[0-9]*.rpm | grep -qxF "$path"; then
+            echo "::error::the hypr-de-scene RPM does not install $path"
+            rpm -qpl ~/rpmbuild/RPMS/*/hypr-de-scene-[0-9]*.rpm
+            exit 1
+          fi
+
       - name: rpmlint (gating)
         run: |
           rpmlint --rpmlintrc packaging/hypr-de-scene.rpmlintrc \

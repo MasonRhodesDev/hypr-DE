@@ -31,6 +31,13 @@ for entry in pluginAPIVersion pluginInit pluginExit; do
     grep -qw "$entry" <<<"$symbols" && ok "exports $entry" || bad "does not export $entry"
 done
 
+installs=$(unset SCENE_PLUGIN; . "$root/packaging/paths.conf"; printf '%s' "$SCENE_PLUGIN")
+if DESTDIR="$work/stage" cmake --install "$work/build" --prefix /usr >"$work/install.log" 2>&1 && [ -f "$work/stage$installs" ]; then
+    ok "installs to $installs, where hypr-de's configuration loads it from"
+else
+    bad "does not install to $installs, where hypr-de's configuration loads it from: $(find "$work/stage" -name '*.so' 2>/dev/null | sed "s|^$work/stage||" | tr '\n' ' ')"
+fi
+
 if nm -D "$plugin" | grep -q __hyprland_api_get_client_hash; then
     bad "shares the symbol that names its Hyprland build with every other plugin"
 else

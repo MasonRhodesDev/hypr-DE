@@ -58,6 +58,8 @@ jobs:
         run: ./tests/installer-trust.sh
       - name: Scene plugin places the logo where scene.py does
         run: ./tests/scene-geometry.sh
+      - name: Every package names the scene plugin at the path it is installed to
+        run: ./tests/scene-plugin-path.sh
       - name: Steam launch-option validation
         run: ./tests/steam-launch-options.sh
 

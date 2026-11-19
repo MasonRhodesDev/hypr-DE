@@ -23,7 +23,7 @@ Recommends:     desktop-boot
 Draws the boot scene into every output from Hyprland's first commit and
 keeps it there until desktop-boot's login splash covers the screen, so a
 login never shows an unrendered or empty frame. Opt in by adding
-  hl.plugin.load("%{_libdir}/hypr-de/hypr-de-scene.so")
+  hl.plugin.load("%{_prefix}/lib/hypr-de/hypr-de-scene.so")
 to ~/.config/hypr/local.lua. Without desktop-boot's scene files the plugin
 stays idle. It works only in the Hyprland build it was compiled against.
 After a Hyprland upgrade it loads idle, with nothing on screen, until this
@@ -47,8 +47,8 @@ export HYPR_DE_ALLOW_UNSEALED=1
 
 %files
 %license LICENSE
-%dir %{_libdir}/hypr-de
-%{_libdir}/hypr-de/hypr-de-scene.so
+%dir %{_prefix}/lib/hypr-de
+%{_prefix}/lib/hypr-de/hypr-de-scene.so
 
 %changelog
 * Thu Nov 19 2026 Mason Rhodes <mrhodesdev@gmail.com> - 0.2.39-1

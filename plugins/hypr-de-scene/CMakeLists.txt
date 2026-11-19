@@ -31,5 +31,5 @@ target_link_libraries(hypr-de-scene PRIVATE PkgConfig::libs)
 target_link_options(hypr-de-scene PRIVATE -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/src/private.map)
 set_property(TARGET hypr-de-scene APPEND PROPERTY LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/private.map)
 
-include(GNUInstallDirs)
-install(TARGETS hypr-de-scene LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/hypr-de)
+# hypr-de has no architecture and names this path in its configuration, so it cannot follow lib64
+install(TARGETS hypr-de-scene LIBRARY DESTINATION lib/hypr-de)
