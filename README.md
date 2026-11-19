@@ -416,9 +416,9 @@ every ELF file in the package:
   siblings, which fortify always replaces. A plain `memcpy` or `strcpy` is
   fortify's own answer when it cannot see a buffer's size, so it counts for
   nothing.
-* Its build ID matches a link the shim saw, and every object that link read
-  comes from a compile the shim saw, or from a file the build user cannot
-  write. Anything else is `unattributed`, which is never baselined. So is an
+* Its build ID matches a link the shim saw, its executable sections are the
+  ones that link wrote, and every object that link read comes from a compile
+  the shim saw, or from a file the build user cannot write. Anything else is `unattributed`, which is never baselined. So is an
   object built with LTO, since the gate cannot see what LTO makes of it.
 
 For every compile behind a shipped file, and every compile of a tracked
@@ -442,7 +442,10 @@ source:
   `push_options` or `target`, a diagnostic pragma that ignores a warning, and
   a `NOLINT` comment.
 
-Compiler warnings are read from `makepkg`'s output. A C or C++ file in a
+Compiler warnings are read from what each compile wrote, as the shim saw it,
+so a `build()` that discards its output keeps every count. A call that only
+assembles or preprocesses is not a compile the gate can judge, so what it
+makes is unattributed. A C or C++ file in a
 plugin directory that no compile read, and that `classified.tsv` does not
 list, fails as `not-built`. `cpp-tidy` runs on the compiles the shim recorded,
 so it sees what GCC compiled, unity files and generated sources included.
@@ -480,8 +483,10 @@ mechanisms on the fixture in every CI run.
   `classified.tsv` lists it as `sh` or `bash`, as `packaging/paths.conf` is.
 * The gates are code in this repository, reviewed like any other. A pull
   request that changes `gate.py` or `shim.py` is also judged by its base
-  branch's gates, so it cannot loosen a rule and lean on the loosening in the
-  same change. A change that renames a rule fails that step on purpose, and
+  branch's gates, so loosening a rule and leaning on it in the same change
+  shows up as a failing step. GitHub runs the pull request's own copy of the
+  workflow, so a change can also remove that step; the reviewer sees the
+  workflow edit. A change that renames a rule fails that step on purpose, and
   the reviewer judges it.
 
 CI builds C++ with the packages of one Arch Linux Archive day, `ARCH_SNAPSHOT`

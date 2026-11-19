@@ -20,6 +20,9 @@
 #ifdef FIXTURE_BAD_SYSTEM
 #include <sibling.hpp>
 #endif
+#ifdef FIXTURE_BAD_PRAGMASYSTEM
+#include <pragma-system.hpp>
+#endif
 #ifdef FIXTURE_BAD_GENERATED
 #include <generated.hpp>
 #endif

@@ -49,6 +49,7 @@ tests/fixtures/lock-policy/systemd-run	sh
 tests/fixtures/lock-policy/vigil-lock	sh
 tests/fixtures/media-stream/playerctl	bash
 tests/gates/cpp-fixture-sibling/evasion.hpp	cpp-fixture
+tests/gates/cpp-fixture-sibling/pragma-system.hpp	cpp-fixture
 tests/gates/cpp-fixture-sibling/sibling.hpp	cpp-fixture
 tests/gates/cpp-fixture/CMakeLists.txt	cpp-fixture
 tests/gates/cpp-fixture/PKGBUILD	cpp-fixture

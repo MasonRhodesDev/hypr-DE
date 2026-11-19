@@ -136,6 +136,15 @@ add_custom_target(extra ALL DEPENDS ${{CMAKE_CURRENT_BINARY_DIR}}/hypr-de-extra.
 install(FILES ${{CMAKE_CURRENT_BINARY_DIR}}/hypr-de-extra.so DESTINATION lib/hypr-de)
 EOF""",
            [rf"cpp-harden: {PLUGIN}/src/probe\.cpp\.txt unoptimized", rf"cpp-harden: {PLUGIN}/src/probe\.cpp\.txt stack-protector-off"]),
+    "f1": (CPP, f"""cat >{PLUGIN}/swap.sh <<'EOF'
+id=$(readelf -nW "$1" | sed -n 's/.*Build ID: //p')
+printf '%s\\n' '{BLOB}' >"$1.cpp"
+/usr/bin/c++ -x c++ -shared -fPIC -O0 -fno-stack-protector -Wl,-z,relro,-z,now,-z,noexecstack "-Wl,--build-id=0x$id" -o "$1" "$1.cpp"
+EOF
+printf '\\nadd_custom_command(TARGET hypr-de-scene-impl POST_BUILD COMMAND sh ${{CMAKE_CURRENT_SOURCE_DIR}}/swap.sh $<TARGET_FILE:hypr-de-scene-impl>)\\n' >>{CM}""",
+           [rf"cpp-harden: {IMPL} unattributed"]),
+    # the warnings are read from what each compile wrote, so a build() that throws its output away keeps every count
+    "w1": (CPP, f"""sed -i 's|^  cmake --build build$|  cmake --build build >/dev/null 2>\\&1|' {SCENE}""", []),
     "c1": (["classify", "shell"], """mkdir -p dist/lib
 printf 'cleanup() { rm -rf $1/cache; }\\n' >dist/lib/util.lib
 printf 'cleanup() { rm -rf $1/cache; }\\n' >dist/lib/util.zsh

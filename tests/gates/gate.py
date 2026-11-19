@@ -120,6 +120,11 @@ SELFTEST = [
     ("EVASION", "cpp-harden", f"{FIXTURE}/src/fixture.cpp", "assertions-off"),
     ("EVASION", "cpp-harden", "tests/gates/cpp-fixture-sibling/evasion.hpp", "source-weakens: attribute optimize"),
     ("EVASION", "cpp-harden", "tests/gates/cpp-fixture-sibling/evasion.hpp", 'suppression: #pragma GCC diagnostic ignored "-Wconversion"'),
+    ("BUILDID", "cpp-harden", "@gate-fixture/usr/lib/gate-fixture/libgate-fixture.so", "unattributed"),
+    ("ASM", "cpp-harden", "@gate-fixture/usr/lib/gate-fixture/asm.so", "unattributed"),
+    ("LTO", "cpp-harden", "@gate-fixture/usr/lib/gate-fixture/libgate-fixture.so", "unattributed"),
+    ("STATIC", "cpp-harden", "@gate-fixture/tests/gates/cpp-fixture/build/generated/member.cpp", "stack-protector-off"),
+    ("PRAGMASYSTEM", "cpp-harden", "tests/gates/cpp-fixture-sibling/pragma-system.hpp", "system-header-in-tree"),
     ("UNFORTIFIED", "cpp-harden", "@gate-fixture/usr/lib/gate-fixture/libgate-fixture.so", "elf-unfortified:sprintf"),
     ("GENERATED", "cpp-harden", "@gate-fixture/tests/gates/cpp-fixture/build/generated/generated.hpp", 'suppression: #pragma GCC diagnostic ignored "-Wconversion"'),
     ("GENSOURCE", "cpp-harden", "@gate-fixture/tests/gates/cpp-fixture/build/generated/gensource.cpp", "stack-protector-off"),
@@ -500,7 +505,6 @@ class Package:
         self.srcdir = os.path.realpath(os.path.join(work, "build", self.pkgbase, "src"))
         self.top = os.path.join(self.srcdir, f"{os.path.basename(info['url'][0])}-{info['pkgver'][0]}") if info.get("url") else self.srcdir
         self.pkgdirs = {name: os.path.join(work, "build", self.pkgbase, "pkg", name) for name in info["pkgname"]}
-        self.log = result.stdout + result.stderr
 
     def place(self, path):
         """Name a path from the build as the gates report it: a tracked file by its path, a file the build wrote as @<pkgbase>/<path>."""
@@ -778,8 +782,10 @@ def audit(found, built, units_by_object, links_by_build_id):
             check_elf(found, key, path)
             build_id = re.search(r"Build ID:\s*(\w+)", run(["readelf", "-nW", path]).stdout)
             link = links_by_build_id.get(build_id[1]) if build_id else None
-            if not link:
-                found.add(key, "unattributed", f"{key}: no compile this build ran made it (build ID {build_id[1] if build_id else 'missing'})")
+            # a build ID can be set by hand, so the code itself has to be what that link wrote
+            code = run([sys.executable, "-I", SHIM, "--code-digest", path]).stdout.strip()
+            if not link or link["link"]["code"] != code:
+                found.add(key, "unattributed", f"{key}: no link this build ran made it (build ID {build_id[1] if build_id else 'missing'})")
                 continue
             for unit in units_of(found, key, link, units_by_object):
                 shipped.add(id(unit))
@@ -864,14 +870,15 @@ def tail(result, built=None):
 
 def check_warnings(found, built):
     seen = set()
-    for line in built.log.splitlines():
-        match = COMPILER_WARNING.match(line)
-        if not match or match.groups() in seen:
-            continue
-        seen.add(match.groups())
-        # a warning in a header outside the repository still comes from the package's code
-        where = built.place(match[1]) if os.path.isabs(match[1]) else None
-        found.add(where or built.pkgbuild, match[5] or "warning", f"{where or match[1]}:{match[2]}: {match[4]}")
+    for record in built.records:
+        for line in record.get("diagnostics", "").splitlines():
+            match = COMPILER_WARNING.match(line)
+            if not match or match.groups() in seen:
+                continue
+            seen.add(match.groups())
+            # a warning in a header outside the repository still comes from the package's code
+            where = built.place(os.path.join(record["cwd"], match[1]))
+            found.add(where or built.pkgbuild, match[5] or "warning", f"{where or match[1]}:{match[2]}: {match[4]}")
 
 
 @functools.cache

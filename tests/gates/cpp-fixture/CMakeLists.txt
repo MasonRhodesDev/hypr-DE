@@ -83,6 +83,24 @@ elseif(FIXTURE_BAD STREQUAL "CUSTOM" OR FIXTURE_BAD STREQUAL "BYPASS")
         DEPENDS src/custom.cpp.txt)
     add_custom_target(${name} ALL DEPENDS ${CMAKE_BINARY_DIR}/${name}.so)
     install(FILES ${CMAKE_BINARY_DIR}/${name}.so DESTINATION lib/gate-fixture)
+elseif(FIXTURE_BAD STREQUAL "BUILDID")
+    # after the link, a blob built past the shim takes the library's place under the same build ID
+    add_custom_command(TARGET gate-fixture POST_BUILD
+        COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/swap-blob.sh $<TARGET_FILE:gate-fixture> ${CMAKE_CURRENT_SOURCE_DIR}/src/custom.cpp.txt)
+elseif(FIXTURE_BAD STREQUAL "ASM")
+    add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/asm.so
+        COMMAND c++ -x assembler-with-cpp -shared -fPIC -Wl,-z,relro,-z,now,-z,noexecstack -o ${CMAKE_BINARY_DIR}/asm.so ${CMAKE_CURRENT_SOURCE_DIR}/src/blob.S.txt
+        DEPENDS src/blob.S.txt)
+    add_custom_target(asm ALL DEPENDS ${CMAKE_BINARY_DIR}/asm.so)
+    install(FILES ${CMAKE_BINARY_DIR}/asm.so DESTINATION lib/gate-fixture)
+elseif(FIXTURE_BAD STREQUAL "LTO")
+    set_target_properties(gate-fixture PROPERTIES INTERPROCEDURAL_OPTIMIZATION ON)
+elseif(FIXTURE_BAD STREQUAL "STATIC")
+    # a source no file in the tree holds, so only its archive member ties it to the library
+    file(WRITE "${CMAKE_BINARY_DIR}/generated/member.cpp" "int memberValue(int value) { return value + 1; }\n")
+    add_library(member STATIC "${CMAKE_BINARY_DIR}/generated/member.cpp")
+    target_compile_options(member PRIVATE -fno-stack-protector)
+    target_link_libraries(gate-fixture PRIVATE member)
 endif()
 
 install(TARGETS gate-fixture LIBRARY DESTINATION lib/gate-fixture)

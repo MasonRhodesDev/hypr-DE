@@ -15,11 +15,12 @@ import json
 import os
 import shlex
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
 
-REAL, RECORDS, ARGV = sys.argv[1], sys.argv[2], sys.argv[3:]
+REAL, RECORDS, ARGV = (sys.argv[1], sys.argv[2], sys.argv[3:]) if len(sys.argv) > 2 else (None, None, [])
 DROPPED_WITH_VALUE = {"-o", "-MF", "-MT", "-MQ"}
 DROPPED = {"-MD", "-MMD", "-MP", "-M", "-MM", "-MG"}
 ARCHIVE = b"!<arch>\n"
@@ -79,6 +80,23 @@ def members(data):
     return found
 
 
+def code_digest(path):
+    """A digest of an ELF file's executable sections, which strip and an RPATH edit leave as they are."""
+    with open(path, "rb") as f:
+        data = f.read()
+    if data[:4] != b"\x7fELF" or data[4] != 2:
+        return None
+    order = "<" if data[5] == 1 else ">"
+    (table,) = struct.unpack_from(order + "Q", data, 0x28)
+    size, count = struct.unpack_from(order + "HH", data, 0x3A)
+    code = hashlib.sha256()
+    for index in range(count):
+        _name, kind, flags, _address, offset, length = struct.unpack_from(order + "IIQQQQ", data, table + index * size)
+        if flags & 0x4 and kind != 8:
+            code.update(data[offset : offset + length])
+    return code.hexdigest()
+
+
 def build_id(path):
     notes = subprocess.run([shutil.which("readelf") or "/usr/bin/readelf", "-nW", path], capture_output=True, text=True, check=False).stdout
     for line in notes.splitlines():
@@ -103,7 +121,7 @@ def linked_from(dependency_file):
         if status.st_uid != 0 or status.st_mode & 0o022:
             with open(path, "rb") as f:
                 data = f.read()
-            entry |= {"kind": kind_of(data[:32]), "sha256": digest(data)}
+            entry |= {"kind": kind_of(data[:32]), "sha256": digest(data), "lto": b".gnu.lto_" in data}
             if entry["kind"] == "archive":
                 entry["members"] = members(data)
         inputs.append(entry)
@@ -114,10 +132,10 @@ def main():
     jobs = planned_jobs()
     if jobs is None:
         sys.exit(subprocess.run([REAL, *ARGV], check=False).returncode)
-    compiles = [job for job in jobs if os.path.basename(job[0]) in ("cc1plus", "cc1")]
+    # cc1 with -E only preprocesses, as it does for assembly; that is not a compile the gate can judge
+    compiles = [job for job in jobs if os.path.basename(job[0]) in ("cc1plus", "cc1") and "-E" not in job]
     links = [job for job in jobs if os.path.basename(job[0]) == "collect2"]
-    preprocess_only = any("-E" in job for job in compiles)
-    if not links and (not compiles or preprocess_only):
+    if not links and not compiles:
         sys.exit(subprocess.run([REAL, *ARGV], check=False).returncode)
     fd, path = tempfile.mkstemp(dir=RECORDS, suffix=".json")
     os.close(fd)
@@ -131,8 +149,12 @@ def main():
             fail(f"could not preprocess for the gate:\n{view.stderr}")
         record["preprocessed"] = stem + ".i"
     extra = [f"-Wl,--dependency-file={stem}.dep"] if links else []
-    status = subprocess.run([REAL, *ARGV, *extra], check=False).returncode
-    record["status"] = status
+    compiled = subprocess.run([REAL, *ARGV, *extra], capture_output=True, text=True, check=False)
+    sys.stdout.write(compiled.stdout)
+    sys.stderr.write(compiled.stderr)
+    status = compiled.returncode
+    # the compiler's own diagnostics, so warnings count however the build treats its output
+    record["status"], record["diagnostics"] = status, compiled.stderr
     if status == 0:
         objects = {}
         for job in jobs:
@@ -144,10 +166,13 @@ def main():
         record["objects"] = objects
         if links:
             out = os.path.realpath(value_of(links[0], "-o") or "a.out")
-            record["link"] = {"output": out, "build_id": build_id(out), "inputs": linked_from(stem + ".dep")}
+            record["link"] = {"output": out, "build_id": build_id(out), "code": code_digest(out), "inputs": linked_from(stem + ".dep")}
     with open(path, "w", encoding="utf-8") as f:
         json.dump(record, f)
     sys.exit(status)
 
 
-main()
+if sys.argv[1:2] == ["--code-digest"]:
+    print(code_digest(sys.argv[2]))
+else:
+    main()
