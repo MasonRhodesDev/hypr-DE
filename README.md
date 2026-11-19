@@ -180,7 +180,7 @@ failsafe = warn
 
 (`fallbacks` and `verify_tries` are settable there too.) A failed lock then
 posts a critical "Screen NOT locked" notification, and the screen stays
-lit — an obviously unlocked desktop, never a dark one that
+lit: an obviously unlocked desktop, never a dark one that
 passes for locked.
 
 The file must be **owned by root and not writable by anyone else**, or it is
