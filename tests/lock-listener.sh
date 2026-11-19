@@ -41,8 +41,7 @@ sed "s|@LIBEXECDIR@|$work|g" "$root/dist/libexec/hypr-de-lock-listener" >"$work/
 chmod +x "$work/listener"
 
 wait_for() {
-    local i
-    for i in $(seq 50); do eval "$1" && return 0; sleep 0.1; done
+    for _ in $(seq 50); do eval "$1" && return 0; sleep 0.1; done
     return 1
 }
 locks() { wc -l <"$LOCKS"; }

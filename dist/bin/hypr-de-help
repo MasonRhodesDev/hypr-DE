@@ -27,8 +27,8 @@ using qt6ct get an LMTT-owned palette (~/.config/qt6ct/colors/lmtt.conf); Fonts 
 in qt6ct.conf stay yours.
 
 <b>Bar, lock, files, bluetooth</b>
-Waybar is the shell. SUPER+L locks via loginctl (hypridle answers with the \
-same lock as idle/suspend). SUPER+E opens Nautilus. The waybar bluetooth \
+Waybar is the shell. SUPER+L locks with the same lock screen as idle and \
+suspend, with or without hypridle. SUPER+E opens Nautilus. The waybar bluetooth \
 module is the indicator — left-click Overskride, right-click adapter power.
 
 <b>Scratchpad vs workspace zones</b>

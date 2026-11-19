@@ -145,6 +145,25 @@ existing snapshot/rollback tooling covers them.
 
 ### Lock integrity
 
+Every lock goes through `lock-cmd.sh`, and none needs hypridle:
+
+| Request | Who runs `lock-cmd.sh` |
+|---|---|
+| Super+L, power menu's Lock | the binding, directly |
+| `loginctl lock-session` from any tool, lid close (hyprstate asks logind) | `hypr-de-lock.service`, which answers logind's Lock for your session |
+| Before sleep | `hypr-de-lock.service` holds a logind sleep delay until the lock is up; hypridle's `before_sleep_cmd` too |
+| Idle | hypridle only. With hypridle disabled nothing locks on idle |
+
+`hypr-de-lock.service` is pulled in by every graphical session through a
+`graphical-session.target` drop-in, not a preset, so upgraded installs get it
+too; `systemctl --user mask hypr-de-lock.service` turns it off. Two requests
+at once are safe: `lock-cmd.sh` exits early when the compositor already holds
+the lock, and vigil-lock joins a lock that is already starting.
+
+The locker's output goes to the journal (`journalctl --user -t vigil-lock`),
+and so do `lock-cmd.sh`'s own lines (`-t hypr-de-lock`), even from a binding
+whose output Hyprland discards.
+
 A lock request never fails open. If `vigil-lock` cannot take the session,
 `lock-cmd.sh` retries outside its transient scope, then tries any other
 installed locker (default `swaylock -f|gtklock -d|hyprlock &`), and if nothing
@@ -159,8 +178,9 @@ To keep the session instead, create `/etc/hypr-de/lock.conf`:
 failsafe = warn
 ```
 
-(`fallbacks` and `verify_tries` are settable there too.) The screen then stays
-lit on a failed lock — an obviously unlocked desktop, never a dark one that
+(`fallbacks` and `verify_tries` are settable there too.) A failed lock then
+posts a critical "Screen NOT locked" notification, and the screen stays
+lit — an obviously unlocked desktop, never a dark one that
 passes for locked.
 
 The file must be **owned by root and not writable by anyone else**, or it is
