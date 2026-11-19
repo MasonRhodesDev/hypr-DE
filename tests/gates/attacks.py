@@ -2,7 +2,11 @@
 
 Each case makes one change, runs the named gates as CI does and passes only when
 the gates print the expected FAIL line. A case with no expected line is one the
-gates pass by design, with the reason beside it. Run it where the C++ gates run:
+gates pass by design, with the reason beside it. A case's options can set the
+environment ({work} is the case's scratch directory), leave its change out of
+git ("add": False), or fail on any FAIL line it does not expect ("exact"). The
+gate "ratchet" runs tests/gates/ratchet.py against HEAD. Run it where the C++
+gates run:
 
     python3 -I tests/gates/attacks.py [case ...]
 
@@ -36,7 +40,13 @@ gma GCC diagnostic ignored "-Wconversion"
 inline int gate_probe_narrow(long v) { return v; }
 """
 
-# name: (gates, change made with bash in the clone, FAIL lines that must appear; none means the gates pass by design)
+RATCHET_ROW = """python3 - <<'EOF'
+import hashlib
+with open("tests/gates/baseline.tsv", "a", encoding="utf-8") as f:
+    f.write("\\t".join(["shell", "dist/uwsm/env", "SC9999", hashlib.sha256(b"x").hexdigest()[:16], "1", "x"]) + "\\n")
+EOF"""
+
+# name: (gates, change made with bash in the clone, FAIL lines that must appear, and options); no lines means the gates pass by design
 CASES = {
     "a1": (CPP, f"""printf '\\nset_source_files_properties(src/Spec.cpp PROPERTIES COMPILE_OPTIONS "-O0;-U_FORTIFY_SOURCE")\\n' >>{CM}""",
            [rf"cpp-harden: {PLUGIN}/src/Spec\.cpp unoptimized", rf"cpp-harden: {PLUGIN}/src/Spec\.cpp fortify-off"]),
@@ -154,11 +164,118 @@ sed -i 's|^%files|%post\\nrm -rf $1/cache\\n\\n%files|' packaging/hypr-de-scene.
             r"shell: packaging/hypr-de-scene\.spec SC2086"]),
     "c2": (["shell"], """sed -i 's|^%files|%post -p /usr/bin/zsh\\nrm -rf $1/cache\\n\\n%files|' packaging/hypr-de-scene.spec""",
            [r"shell: packaging/hypr-de-scene\.spec unlintable-shell"]),
+    # round 4: a build step that rewrites the records or the shim, or speaks the socket from a process that never ran the shim
+    "r1": (CPP, f"""cat >>{CM} <<'EOF'
+
+target_compile_options(hypr-de-scene-impl PRIVATE -fno-stack-protector)
+add_custom_command(TARGET hypr-de-scene-impl POST_BUILD COMMAND sh -c "sed -i '/^#define __VERSION__/a #define __SSP_STRONG__ 3' $ENV{{HOME}}/records/*.i $ENV{{HOME}}/../records/*.i 2>/dev/null; echo 'raise SystemExit(0)' >>$ENV{{HOME}}/../shim.py 2>/dev/null; true")
+EOF""", [rf"cpp-harden: {UNIT} stack-protector-off"]),
+    "r2": (CPP, f"""cat >{PLUGIN}/forge.py <<'EOF'
+import json
+import os
+import socket
+
+for message in (json.dumps({{"cwd": "/", "compiler": "/usr/bin/c++", "argv": [], "jobs": [], "status": 0, "diagnostics": "", "sources": 0}}).encode(), b"{{not json"):
+    with socket.socket(socket.AF_UNIX) as conn:
+        conn.connect(os.path.join(os.environ["HOME"], "..", "records.sock"))
+        conn.sendall(message)
+EOF
+printf '\nadd_custom_command(TARGET hypr-de-scene-impl POST_BUILD COMMAND python3 ${{CMAKE_CURRENT_SOURCE_DIR}}/forge.py)\n' >>{CM}""",
+           [rf"cpp-harden: {SCENE} forged-record"]),
+    # a compiler named by path runs outside the shim: the trace says so once per package, and nothing else is printed
+    "r4": (CPP, f"""sed -i 's|^  cmake -S plugins/hypr-de-scene -B build|& -DCMAKE_CXX_COMPILER=/usr/bin/g++|' {SCENE}""",
+           [rf"cpp-harden: {SCENE} unshimmed", r"cpp-harden: @hypr-de-scene/usr/lib/hypr-de/\S+ unattributed"], {"exact": True}),
+    # --version, --help and a call with two sources go through the shim without failing the build or leaving a broken record
+    "r5": (CPP, f"""cat >../r5.sh <<'EOF'
+  c++ --version >/dev/null
+  c++ --help >/dev/null
+  printf 'int a() {{ return 1; }}\\n' >a.cpp
+  printf 'int b() {{ return 2; }}\\n' >b.cpp
+  c++ -c a.cpp b.cpp
+EOF
+sed -i '/^  cmake --build build$/r ../r5.sh' {SCENE}
+printf '\nenable_language(ASM)\n' >>{CM}""", []),
+    # an optimize pragma left open by a header outside the tree, included after the glibc headers
+    "v1": (CPP, f"""chmod 755 ..
+mkdir -p ../vendor/vendor
+printf '#pragma GCC optimize ("O0")\\n' >../vendor/vendor/vendor.h
+chmod -R a+rX ../vendor
+sed -i '0,/#include <regex>/s||#include <regex>\\n#include <cstring>\\n#include <cstdlib>\\n#include <vendor/vendor.h>|' {PLUGIN}/src/Spec.cpp
+printf '\\ntarget_include_directories(hypr-de-scene-impl PRIVATE %s/../vendor)\\n' "$PWD" >>{CM}""",
+           [rf"cpp-harden: {PLUGIN}/src/Spec\.cpp pragma-unbalanced"]),
+    "cet1": (CPP, f"""cat >>{PLUGIN}/src/Spec.cpp <<'EOF'
+
+extern "C" __attribute__((nocf_check, used, visibility("default"))) int gate_probe_nocf(int v) {{ return v * 3; }}
+EOF""", [rf"cpp-harden: {PLUGIN}/src/Spec\.cpp source-weakens: attribute nocf_check"]),
+    "cet2": (CPP, f"""printf '\\ntarget_compile_options(hypr-de-scene-impl PRIVATE -mmanual-endbr)\\n' >>{CM}""", [rf"cpp-harden: {UNIT} manual-endbr"]),
+    "m1": (CPP, f"""sed -i 's|^  install -Dm644 LICENSE.*$|&\\n  chmod 4755 "$pkgdir/usr/lib/hypr-de/hypr-de-scene.so"|' {SCENE}""",
+           [r"cpp-harden: @hypr-de-scene/usr/lib/hypr-de/hypr-de-scene\.so mode-setid"]),
+    "n1": (CPP, f"""cat >>{CM} <<'EOF'
+
+add_library(helper SHARED src/Log.cpp)
+target_include_directories(helper PRIVATE ${{headers_INCLUDE_DIRS}})
+target_link_options(helper PRIVATE -Wl,-soname,/tmp/hypr-de-helper.so)
+target_link_libraries(hypr-de-scene-impl PRIVATE helper)
+EOF""", [rf"cpp-harden: {IMPL} needed-undeclared"]),
+    "g1": (CPP, f"""printf '\\nextern "C" void __stack_chk_fail() {{}}\\n' >>{PLUGIN}/src/Spec.cpp""",
+           [rf"cpp-harden: {PLUGIN}/src/Spec\.cpp defines-guard:__stack_chk_fail"]),
+    # an install scriptlet that writes the library from a base64 blob shipped as data
+    "s1": (["classify", *CPP], f"""printf '%s\\n' '#include <cstring>' 'extern "C" int gate_blob(char *s) {{ char b[8]; strcpy(b, s); return b[0]; }}' >../blob.cpp
+c++ -shared -fPIC -O0 -x c++ ../blob.cpp -o ../blob.so
+mkdir -p {PLUGIN}/data
+base64 -w76 ../blob.so >{PLUGIN}/data/blob.txt
+cat >packaging/hypr-de-scene/hypr-de-scene.install <<'EOF'
+post_install() {{
+    base64 -d /usr/share/hypr-de-scene/blob.txt >/usr/lib/hypr-de/hypr-de-scene-impl.so
+}}
+
+post_upgrade() {{
+    post_install
+}}
+EOF
+sed -i 's|^source=|install=hypr-de-scene.install\\nsource=|' {SCENE}
+sed -i 's|^  install -Dm644 LICENSE.*$|&\\n  install -Dm644 plugins/hypr-de-scene/data/blob.txt "$pkgdir/usr/share/hypr-de-scene/blob.txt"|' {SCENE}""",
+           [rf"classify: {PLUGIN}/data/blob\.txt opaque", r"cpp-harden: packaging/hypr-de-scene/hypr-de-scene\.install scriptlet-writes-shipped"]),
+    "p1": (["classify"], f"""mkdir -p packaging/hypr-de-scene-git
+sed -e 's|^pkgname=.*|pkgname=hypr-de-scene-git|' {SCENE} >packaging/hypr-de-scene-git/PKGBUILD
+printf 'packaging/hypr-de-scene-git/PKGBUILD\\tdata\\n' >>tests/gates/classified.tsv
+LC_ALL=C sort -o tests/gates/classified.tsv tests/gates/classified.tsv""",
+           [r"classify: packaging/hypr-de-scene-git/PKGBUILD packaging-class"]),
+    "p2": (["classify"], """sed -i 's|^%cmake -S plugins/hypr-de-scene$|& -DCMAKE_CXX_FLAGS=-fno-stack-protector|' packaging/hypr-de-scene.spec
+sed -i 's|^%cmake_build$|sed -i /Safety.cmake/d plugins/hypr-de-scene/CMakeLists.txt\\n&|' packaging/hypr-de-scene.spec
+sed -i '1i %global _hardened_build 0' packaging/hypr-de-scene.spec""",
+           [r"classify: packaging/hypr-de-scene\.spec spec-cmake-differs", r"classify: packaging/hypr-de-scene\.spec spec-build-step",
+            r"classify: packaging/hypr-de-scene\.spec spec-flags"]),
+    # one baselined warning fixed and another of the same rule added in the same file
+    "k0": (["shell"], """sed -i 's/^\\[ \\$# -eq 1 \\] || usage$/[[ $# -eq 1 ]] || usage\\n[ -n "$1" ] || usage/' dist/bin/hypr-de-set-wallpaper""",
+           [r"shell: dist/bin/hypr-de-set-wallpaper SC2292"]),
+    "k1": (["ratchet"], """awk -F'\\t' 'BEGIN { OFS = "\\t" } NR == 1 { $5 = $5 + 1 } 1' tests/gates/baseline.tsv >x && mv x tests/gates/baseline.tsv""",
+           [r"ratchet: baseline cpp-harden packaging/hypr-de-scene/PKGBUILD warning-off:-Wno-unused-parameter"]),
+    "k2": (["ratchet"], """python3 - <<'EOF'
+import hashlib
+rows = open("tests/gates/baseline.tsv", encoding="utf-8").read().splitlines()
+fields = rows[0].split("\\t")
+fields[5] = "-Wno-shadow"
+fields[3] = hashlib.sha256(fields[5].encode()).hexdigest()[:16]
+rows[0] = "\\t".join(fields)
+open("tests/gates/baseline.tsv", "w", encoding="utf-8").write("\\n".join(rows) + "\\n")
+EOF""", [r"ratchet: baseline cpp-harden packaging/hypr-de-scene/PKGBUILD warning-off:-Wno-unused-parameter"]),
+    "k3": (["ratchet"], """sed -i 's|^dist/uwsm/env\\tsh$|dist/uwsm/env\\tdata|' tests/gates/classified.tsv""", [r"ratchet: classified dist/uwsm/env"]),
+    "k4": (["ratchet"], """printf 'disable=SC2086\\n' >>.shellcheckrc""", [r"ratchet: config \.shellcheckrc"]),
+    # a new rule that baselines its existing hits passes with its reason, and fails without one
+    "k5": (["ratchet"], RATCHET_ROW, [], {"env": {"GATE_CHANGE_REASONS": "Gate-change: SC9999 is new in this shellcheck; its one hit is baselined"}}),
+    "k6": (["ratchet"], RATCHET_ROW, [r"ratchet: baseline shell dist/uwsm/env SC9999"]),
+    "t9": (CPP, """mkdir ../nocmake
+for f in /usr/bin/*; do [ "${f##*/}" = cmake ] || ln -s "$f" ../nocmake/; done""",
+           [r"cpp-harden: toolchain cannot-run"], {"env": {"PATH": "{work}/nocmake"}, "exact": True}),
+    # a file git does not track is not part of what a local run judges
+    "u1": (["classify"], """printf 'x\\n' >scratch.out""", [], {"add": False}),
 }
 
 
 def attempt(name, root):
-    gates, change, expected = CASES[name]
+    gates, change, expected, *rest = CASES[name]
+    options = rest[0] if rest else {}
     work = tempfile.mkdtemp(prefix=f"gate-attack-{name}-")
     try:
         clone = os.path.join(work, "clone")
@@ -166,14 +283,19 @@ def attempt(name, root):
         made = subprocess.run(["bash", "-euc", change], cwd=clone, capture_output=True, text=True, check=False)
         if made.returncode:
             return False, f"MISS {name}\n     the change did not apply: {made.stderr.strip()}"
-        subprocess.run(["git", "add", "-A"], cwd=clone, check=True)
-        result = subprocess.run(["tests/gates/check.sh", *gates], cwd=clone, capture_output=True, text=True, check=False)
+        if options.get("add", True):
+            subprocess.run(["git", "add", "-A"], cwd=clone, check=True)
+        env = {**os.environ, **{key: value.format(work=work) for key, value in options.get("env", {}).items()}}
+        command = ["python3", "-I", "tests/gates/ratchet.py", "HEAD"] if gates == ["ratchet"] else ["tests/gates/check.sh", *gates]
+        result = subprocess.run(command, cwd=clone, capture_output=True, text=True, check=False, env=env)
         lines = [line for line in result.stdout.splitlines() if line.startswith(("FAIL ", "gate:"))] + result.stderr.splitlines()[-3:]
         missing = [pattern for pattern in expected if not any(re.match(rf"FAIL {pattern}:", line) for line in lines)]
         shown = [line for line in lines if any(re.match(rf"FAIL {pattern}:", line) for pattern in expected)]
-        ok = not missing and (result.returncode != 0 if expected else result.returncode == 0)
+        extra = [line for line in lines if line.startswith("FAIL ") and line not in shown] if options.get("exact") else []
+        ok = not missing and not extra and (result.returncode != 0 if expected else result.returncode == 0)
         report = [f"{'ok  ' if ok else 'MISS'} {name}", *(f"     {line}" for line in (shown if ok else lines))]
         report += [f"     expected, not seen: {pattern}" for pattern in missing]
+        report += [f"     not expected: {line}" for line in extra]
         return ok, "\n".join(report)
     finally:
         shutil.rmtree(work, ignore_errors=True)
