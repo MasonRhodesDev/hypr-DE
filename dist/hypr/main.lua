@@ -282,6 +282,6 @@ hl.window_rule({ name = "hypr-de-help",     match = { class = "^(dev\\.mason\\.h
 hl.window_rule({ name = "satty",            match = { class = "^(com.gabm.satty)$" }, float = true, pin = true, center = true, stay_focused = true })
 
 hl.on("hyprland.start", function()
-    hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE XDG_SESSION_TYPE XDG_SESSION_ID XDG_SESSION_DESKTOP")
+    hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE XDG_SESSION_TYPE XDG_SESSION_ID XDG_SESSION_DESKTOP && systemd-notify READY=1 NOTIFYACCESS=exec")
     hl.exec_cmd("@LIBEXECDIR@/hypr-de-welcome")
 end)

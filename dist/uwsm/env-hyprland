@@ -6,6 +6,11 @@ export LIBSEAT_BACKEND=logind
 # and the boot scene's release.
 export UWSM_WAIT_VARNAMES_SETTLETIME="${UWSM_WAIT_VARNAMES_SETTLETIME:-0}"
 
+# Hyprland would tell uwsm it is ready before it has exported anything. With
+# this off, main.lua says so right after its one export, and hypr-DE's
+# wayland-session-waitenv.service drop-in can skip uwsm's 0.5 s poll.
+export HYPRLAND_NO_SD_NOTIFY="${HYPRLAND_NO_SD_NOTIFY:-1}"
+
 if [ -d /sys/module/nvidia ]; then
     export LIBVA_DRIVER_NAME=nvidia
     export __GLX_VENDOR_LIBRARY_NAME=nvidia
