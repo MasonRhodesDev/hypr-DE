@@ -224,6 +224,22 @@ done
 stop_holders
 echo "a request while a live locker holds the lock starts no second locker"
 
+WAYLAND_DISPLAY=$display python3 -I -c '
+import ctypes, time
+libc = ctypes.CDLL(None)
+libc.prctl(15, b"vigil-lock", 0, 0, 0)
+libc.prctl(4, 0, 0, 0, 0)
+time.sleep(60)
+' &
+echo $! >> "$LOCK_POLICY_HOLDERS"
+sleep 0.3
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_COMPOSITOR_LOCKED=true run_lock
+assert_status 0
+assert_log ''
+stop_holders
+echo "a live locker whose environment cannot be read still counts as alive"
+
 rm -f "$marker"
 : > "$LOCK_POLICY_LOG"
 LOCK_POLICY_COMPOSITOR_LOCKED=true LOCK_POLICY_VIGIL_STATUS=1 run_lock
@@ -253,6 +269,18 @@ vigil-lock:--wait --no-warn
 loginctl:terminate-session 7'
 stop_holders
 echo "a denied locker still alive in a crashed-lock run does not count as the lock"
+
+mk_lock 'swaylock \&'
+rm -f "$marker"
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_COMPOSITOR_LOCKED=true LOCK_POLICY_VIGIL_STATUS=1 LOCK_POLICY_SWAYLOCK_HOLD=3 \
+    PATH="$root/tests/fixtures/lock-policy-fallback:$PATH" run_lock
+assert_status 1
+assert_log 'vigil-lock:--wait --no-warn
+vigil-lock:--wait --no-warn
+swaylock:
+loginctl:terminate-session 7'
+echo "on a crashed lock screen a backgrounded fallback that is merely alive is not a lock"
 
 mk_lock '' warn
 rm -f "$marker"

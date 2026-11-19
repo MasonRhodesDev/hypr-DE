@@ -56,10 +56,22 @@ locker_names() {
 }
 
 # A locker of this user on this Wayland display, so a lock held by another session's locker never counts.
+# Only a clean "no such process" means dead: the compositor is locked either way, so a probe that
+# cannot tell must not send a healthy lock to the failsafe.
 locker_alive() {
-    for pid in $(timeout 2 pgrep -u "$(id -u)" -x "$(locker_names)" 2>/dev/null); do
-        [ -n "${WAYLAND_DISPLAY:-}" ] || return 0
-        tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | grep -qxF "WAYLAND_DISPLAY=$WAYLAND_DISPLAY" && return 0
+    pids=$(timeout 2 pgrep -u "$(id -u)" -x "$(locker_names)" 2>/dev/null)
+    case $? in
+        0) ;;
+        1) return 1 ;;
+        *) log "cannot list screen lockers; assuming one is alive"; return 0 ;;
+    esac
+    [ -n "${WAYLAND_DISPLAY:-}" ] || return 0
+    for pid in $pids; do
+        if ! environ=$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null); then
+            [ -d "/proc/$pid" ] && return 0
+            continue
+        fi
+        printf '%s\n' "$environ" | grep -qxF "WAYLAND_DISPLAY=$WAYLAND_DISPLAY" && return 0
     done
     return 1
 }
@@ -158,7 +170,9 @@ fallback_lock() {
                 fi
                 pid=$!
                 sleep 1
-                if kill -0 "$pid" 2>/dev/null; then
+                if [ "$crashed_at_entry" = 1 ]; then
+                    log "$1 started, but on a crashed lock screen a running locker proves nothing"
+                elif kill -0 "$pid" 2>/dev/null; then
                     log "locked with $1 (fallback)"
                     return 0
                 fi

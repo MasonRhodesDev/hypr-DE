@@ -13,6 +13,8 @@ BuildRequires:  file
 BuildRequires:  python3
 BuildRequires:  jq
 BuildRequires:  bubblewrap
+BuildRequires:  /usr/bin/flock
+BuildRequires:  /usr/bin/pgrep
 
 Requires:       SwayNotificationCenter
 Requires:       bluez
