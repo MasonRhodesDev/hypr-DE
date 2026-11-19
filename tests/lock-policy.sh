@@ -7,8 +7,18 @@ src="$root/dist/libexec/lock-cmd.sh"
 work=$(mktemp -d)
 export LOCK_POLICY_HOLDERS="$work/holders"
 : > "$LOCK_POLICY_HOLDERS"
+gone() {
+    case $(sed -n 's/^State:[[:space:]]*\([A-Z]\).*/\1/p' "/proc/$1/status" 2>/dev/null) in
+        ''|Z|X) return 0 ;;
+    esac
+    return 1
+}
 stop_holders() {
     while read -r pid; do kill "$pid" 2>/dev/null || true; done < "$LOCK_POLICY_HOLDERS"
+    while read -r pid; do
+        i=0
+        while ! gone "$pid" && [ "$i" -lt 50 ]; do sleep 0.1; i=$((i + 1)); done
+    done < "$LOCK_POLICY_HOLDERS"
     : > "$LOCK_POLICY_HOLDERS"
 }
 trap 'stop_holders; rm -rf "$work"' EXIT
@@ -260,6 +270,29 @@ vigil-lock:--wait --no-warn
 loginctl:terminate-session 7'
 stop_holders
 echo "a locker on another display does not count as this session's"
+
+python3 -I -c '
+import ctypes, os, sys, time
+pid = os.fork()
+if pid == 0:
+    ctypes.CDLL(None).prctl(15, b"vigil-lock", 0, 0, 0)
+    os._exit(0)
+print(pid, flush=True)
+time.sleep(60)
+' > "$work/zombie" &
+echo $! >> "$LOCK_POLICY_HOLDERS"
+i=0
+until [ -s "$work/zombie" ] && gone "$(cat "$work/zombie")" || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+cat "$work/zombie" >> "$LOCK_POLICY_HOLDERS"
+rm -f "$marker"
+: > "$LOCK_POLICY_LOG"
+LOCK_POLICY_COMPOSITOR_LOCKED=true LOCK_POLICY_VIGIL_STATUS=1 run_lock
+assert_status 1
+assert_log 'vigil-lock:--wait --no-warn
+vigil-lock:--wait --no-warn
+loginctl:terminate-session 7'
+stop_holders
+echo "a dead locker nothing has reaped yet is not a live locker"
 
 : > "$LOCK_POLICY_LOG"
 LOCK_POLICY_COMPOSITOR_LOCKED=true LOCK_POLICY_VIGIL_STATUS=1 LOCK_POLICY_VIGIL_HOLDS=1 run_lock

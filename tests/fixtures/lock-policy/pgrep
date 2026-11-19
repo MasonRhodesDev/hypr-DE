@@ -5,6 +5,16 @@ case "${2:-}" in
 esac
 [ "${1:-}" = -u ] || exit 1
 for real in /usr/bin/pgrep /bin/pgrep; do
-    [ -x "$real" ] && exec "$real" "$@"
+    [ -x "$real" ] || continue
+    out=$("$real" "$@")
+    status=$?
+    [ "$status" -le 1 ] || exit "$status"
+    found=1
+    for pid in $out; do
+        grep -qx "$pid" "$LOCK_POLICY_HOLDERS" 2>/dev/null || continue
+        echo "$pid"
+        found=0
+    done
+    exit "$found"
 done
 exit 1

@@ -55,6 +55,15 @@ locker_names() {
     printf '%s\n' $names | cut -c1-15 | sort -u | paste -sd'|'
 }
 
+# pgrep lists zombies, and a zombie's environ is unreadable, so without this a dead locker that
+# nothing reaped yet reads as a live one that cannot be probed.
+zombie() {
+    case $(sed -n 's/^State:[[:space:]]*\([A-Z]\).*/\1/p' "/proc/$1/status" 2>/dev/null) in
+        Z|X) return 0 ;;
+    esac
+    return 1
+}
+
 # A locker of this user on this Wayland display, so a lock held by another session's locker never counts.
 # Only a clean "no such process" means dead: the compositor is locked either way, so a probe that
 # cannot tell must not send a healthy lock to the failsafe.
@@ -65,8 +74,9 @@ locker_alive() {
         1) return 1 ;;
         *) log "cannot list screen lockers; assuming one is alive"; return 0 ;;
     esac
-    [ -n "${WAYLAND_DISPLAY:-}" ] || return 0
     for pid in $pids; do
+        zombie "$pid" && continue
+        [ -n "${WAYLAND_DISPLAY:-}" ] || return 0
         if ! environ=$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null); then
             [ -d "/proc/$pid" ] && return 0
             continue
