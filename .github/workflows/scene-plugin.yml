@@ -1,0 +1,79 @@
+name: Scene plugin
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: scene-plugin-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sealed:
+    name: Build against Hyprland headers, sealed
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest@sha256:b0deabeb3d283da2c7f7dbf0eea051b7b2cd0554e0b737cc457fd21683bdcdd1
+      # bubblewrap cannot create its sandbox in an unprivileged container, and tests/run refuses to run without one
+      options: --privileged
+    steps:
+      - name: Install Hyprland with its headers, and build tooling
+        run: pacman -Syu --noconfirm --needed base-devel cmake git bubblewrap hyprland
+
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - name: Hyprland headers are present
+        shell: bash
+        run: |
+          if ! pkg-config --exists hyprland; then
+            echo "::error::no Hyprland headers in this image, so the plugin cannot be built"
+            exit 1
+          fi
+          echo "::notice::building hypr-de-scene against Hyprland $(pacman -Q hyprland | cut -d' ' -f2)"
+
+      - name: Plugin builds and exports its entry points
+        shell: bash
+        run: |
+          set -o pipefail
+          ./tests/scene-plugin-build.sh | tee build.log
+          if ! grep -q '^ok   builds against Hyprland' build.log; then
+            echo "::error::the plugin build was skipped"
+            exit 1
+          fi
+
+  arch:
+    uses: MasonRhodesDev/packaging-workflows/.github/workflows/arch-package.yml@v1
+    with:
+      pkgbuild-dir: packaging/hypr-de-scene
+
+  rpm:
+    name: SRPM → RPM (%check) → rpmlint
+    runs-on: ubuntu-latest
+    container: fedora:latest@sha256:6c75d5bf57cb0fa5aa4b92c6a83c86c791644496d9ac230de7711f5b8ec3b898
+    steps:
+      - name: Install build tooling
+        run: dnf -y install git python3 rpm-build rpmlint rpmdevtools dnf-plugins-core
+
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - name: Trust the checkout (container runs as root)
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Build SRPM from HEAD
+        run: SPEC_NAME=hypr-de-scene ./packaging/build-srpm.sh --head
+
+      - name: Enable the COPR that carries Hyprland and its headers
+        run: dnf -y copr enable nett00n/hyprland
+
+      - name: Install BuildRequires
+        run: dnf builddep -y ~/rpmbuild/SRPMS/hypr-de-scene-*.src.rpm
+
+      - name: Rebuild binary RPM (runs %check)
+        run: rpmbuild --rebuild ~/rpmbuild/SRPMS/hypr-de-scene-*.src.rpm
+
+      - name: rpmlint (gating)
+        run: |
+          rpmlint --rpmlintrc packaging/hypr-de-scene.rpmlintrc \
+            ~/rpmbuild/SRPMS/hypr-de-scene-*.src.rpm \
+            ~/rpmbuild/RPMS/*/hypr-de-scene-[0-9]*.rpm
