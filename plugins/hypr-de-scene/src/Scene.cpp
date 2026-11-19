@@ -76,8 +76,17 @@ CScene::~CScene() {
             release(*output, "unload");
     }
 
-    if (m_timer)
-        m_timer->cancel();
+    dropTimer();
+}
+
+// The event loop holds the timer too, and its callback is code in this module. Left there,
+// it would be destroyed after the module is unmapped.
+void CScene::dropTimer() {
+    if (!m_timer)
+        return;
+
+    g_pEventLoopManager->removeTimer(m_timer);
+    m_timer.reset();
 }
 
 CScene::SOutput* CScene::outputFor(PHLMONITOR monitor) {
@@ -158,6 +167,7 @@ void CScene::onTimeout() {
     m_listeners = {};
     m_outputs.clear();
     m_logos.clear();
+    dropTimer();
 }
 
 void CScene::onPreCommit(PHLMONITOR monitor) {

@@ -11,12 +11,14 @@ node from the host, and writes what each output committed to OUT_DIR:
   shots/   screenshots of the host compositor every 100 ms
   log      the plugin's own lines
 SPLASH is a client that maps the hand-off layer; without it the scene leaves
-on its timeout.
+on its timeout. The run ends by unloading the plugin, and fails if Hyprland
+does not outlive that.
 
 NESTED_LIB_DIR     libraries to prefer over the system's, for a host compositor
                    Hyprland's nested backend does not accept as is
 SCENE_TIMEOUT      seconds before the scene leaves on its own (6)
 SCENE_RUN_SECONDS  seconds to keep the session up after its outputs exist (8)
+SCENE_AFTER_UNLOAD seconds to keep it up after the plugin is unloaded (12)
 
 Check the result with readback-check.py.
 USAGE
@@ -73,5 +75,6 @@ exec bwrap --unshare-all --die-with-parent --new-session --cap-drop ALL \
     --setenv RENDER_NODE "$node" \
     --setenv SCENE_TIMEOUT "${SCENE_TIMEOUT:-6}" \
     --setenv SCENE_RUN_SECONDS "${SCENE_RUN_SECONDS:-8}" \
+    --setenv SCENE_AFTER_UNLOAD "${SCENE_AFTER_UNLOAD:-12}" \
     --chdir "$out" \
     /bin/bash "$here/nested-inner.sh" "$hyprland" "$plugin" "$data" "$out" "$splash"

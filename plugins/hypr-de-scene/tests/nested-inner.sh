@@ -68,6 +68,10 @@ for name in HEADLESS-2 HEADLESS-3 HEADLESS-4 HEADLESS-5; do
 done
 sleep "$SCENE_RUN_SECONDS"
 hyprctl -i "$sig" monitors >"$out/monitors.txt" 2>&1
+
+hyprctl -i "$sig" plugin unload "$plugin" >"$out/unload.txt" 2>&1
+sleep "$SCENE_AFTER_UNLOAD"
+hyprctl -i "$sig" plugin list >>"$out/unload.txt" 2>&1
 cp "$XDG_RUNTIME_DIR/hypr/$sig/hyprland.log" "$out/hyprland-full.log" 2>/dev/null
 
 alive=0
@@ -78,7 +82,7 @@ kill "$shots_pid" "$sway_pid" 2>/dev/null
 wait 2>/dev/null
 
 if [ "$alive" != 1 ]; then
-    echo "nested-readback: Hyprland exited on its own, see $out/hyprland.log" >&2
+    echo "nested-readback: Hyprland exited on its own, see $out/hyprland.log and $out/unload.txt" >&2
     exit 1
 fi
 echo "nested-readback: done, $(ls "$out/dumps" | wc -l) dumps and $(ls "$out/shots" | wc -l) shots in $out"

@@ -50,6 +50,7 @@ namespace Scene {
         void                     onRenderPre(PHLMONITOR monitor);
         void                     onRenderStage(const Event::SRenderStageEvent& event);
         void                     onTimeout();
+        void                     dropTimer();
 
         SOutput*                 outputFor(PHLMONITOR monitor);
         SLogo*                   logoFor(int size);
