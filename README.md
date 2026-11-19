@@ -261,11 +261,11 @@ environment is retried for up to 2 s before the waiter gives up. The drop-in
 applies to every uwsm compositor, since the waiter keeps uwsm's semantics. To
 go back to uwsm's own waiter, mask the drop-in for your user with
 `ln -s /dev/null ~/.config/systemd/user/wayland-session-waitenv.service.d/hypr-de.conf`
-(create the directory first), then log in again. `/etc/xdg/uwsm/env-hyprland` also sets
-`UWSM_WAIT_VARNAMES_SETTLETIME` to 0, because hypr-DE exports the session's
-variables in one call, and that takes uwsm's 0.2 s settle pause off every
-login. A value set earlier in the environment, or in
-`~/.config/uwsm/env-hyprland`, wins.
+(create the directory first), then log in again.
+`/etc/xdg/uwsm/env-hyprland` also sets `UWSM_WAIT_VARNAMES_SETTLETIME` to 0,
+because hypr-DE exports the session's variables in one call, and that takes
+uwsm's 0.2 s settle pause off every login. A value set earlier in the
+environment, or in `~/.config/uwsm/env-hyprland`, wins.
 
 Every output there means each output that shows a frame of its own. A mirror,
 an output that is off or disabled, and the `FALLBACK` output Hyprland puts in
