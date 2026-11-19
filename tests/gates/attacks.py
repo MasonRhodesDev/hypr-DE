@@ -42,7 +42,10 @@ CASES = {
            [rf"cpp-harden: {PLUGIN}/src/Spec\.cpp unoptimized", rf"cpp-harden: {PLUGIN}/src/Spec\.cpp fortify-off"]),
     "a2": (CPP, f"""sed -i 's|^include(../cmake/Safety.cmake)$|add_library(second SHARED src/Log.cpp)\\n&|' {CM}""",
            [rf"cpp-harden: {PLUGIN}/src/Log\.cpp fortify-off"]),
-    "a3": (CPP, f"""printf '\\nadd_compile_options(-fno-stack-protector -U_FORTIFY_SOURCE)\\n' >>{CM}""", [rf"cpp-harden: {UNIT} stack-protector-off"]),
+    "a3": (CPP, f"""sed -i 's|^include(../cmake/Safety.cmake)$|&\\nadd_compile_options(-fno-stack-protector -U_FORTIFY_SOURCE)|' {CM}""",
+           [rf"cpp-harden: {UNIT} stack-protector-off"]),
+    # after the targets exist, add_compile_options changes nothing CMake builds
+    "a3b": (CPP, f"""printf '\\nadd_compile_options(-fno-stack-protector -U_FORTIFY_SOURCE)\\n' >>{CM}""", []),
     # CMAKE_CXX_FLAGS come first on the command line, and Safety.cmake's -fstack-protector-strong after them wins
     "a4": (CPP, f"""sed -i 's|^  cmake -S plugins/hypr-de-scene|  export CXXFLAGS="-fno-stack-protector"\\n&|' {SCENE}""", []),
     "a5": (CPP, f"""sed -i 's|^  cmake -S plugins/hypr-de-scene -B build|  CXXFLAGS="-fno-stack-protector" &|' {SCENE}""", []),
@@ -72,7 +75,7 @@ CASES = {
     "b7": (CPP, f"""cat - {PLUGIN}/src/Spec.cpp >x <<'EOF'\n{EVASION}EOF\nmv x {PLUGIN}/src/Spec.cpp""",
            [rf"cpp-harden: {PLUGIN}/src/Spec\.cpp fortify-off", rf"cpp-harden: {PLUGIN}/src/Spec\.cpp assertions-off",
             rf"cpp-harden: {PLUGIN}/src/Spec\.cpp source-weakens: attribute optimize",
-            rf'cpp-harden: {PLUGIN}/src/Spec\.cpp suppression: #pragma GCC diagnostic ignored "-Wconversion"', rf"cpp-harden: {PLUGIN}/src/Spec\.cpp -Wconversion"]),
+            rf'cpp-harden: {PLUGIN}/src/Spec\.cpp suppression: #pragma GCC diagnostic ignored "-Wconversion"']),
     "b7b": (CPP, f"""sed -i '1i #define/**/NDEBUG\\n#include <cassert>\\n#undef NDEBUG' {PLUGIN}/src/Spec.cpp""", [rf"cpp-harden: {PLUGIN}/src/Spec\.cpp ndebug"]),
     "b8a": (CPP, f"""sed -i 's|^  cmake --build build$|  cmake --build build -- CXX_FLAGS="-O3 -DNDEBUG -std=c++26 -fPIC -pthread -DHWY_SHARED_DEFINE -ffp-contract=off -w"|' {SCENE}""",
             [rf"cpp-harden: {UNIT} ndebug", rf"cpp-harden: {UNIT} fortify-off", r"cpp-harden: packaging/hypr-de-scene/PKGBUILD warning-off:-w"]),
