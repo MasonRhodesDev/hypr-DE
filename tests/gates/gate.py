@@ -3,6 +3,7 @@ import atexit
 import collections
 import concurrent.futures
 import functools
+import hashlib
 import json
 import os
 import platform
@@ -138,15 +139,29 @@ SELFTEST = [
 ]
 
 
+def normalised(text):
+    return " ".join(text.replace("\\\n", "").split())
+
+
+def digest(text):
+    return hashlib.sha256(text.encode("utf-8", "surrogateescape")).hexdigest()[:16]
+
+
 class Findings:
+    """Findings keyed by file, rule and the hash of the offending text, so that one finding cannot stand in for another."""
+
     def __init__(self):
         self.counts = collections.Counter()
+        self.texts = {}
         self.details = collections.defaultdict(list)
         self.skipped = []
 
-    def add(self, path, rule, detail, weight=1):
-        self.counts[path, rule] += weight
-        self.details[path, rule].append(detail)
+    def add(self, path, rule, text, detail, weight=1):
+        text = normalised(text)
+        key = (path, rule, digest(text))
+        self.counts[key] += weight
+        self.texts[key] = text
+        self.details[key].append(detail)
 
 
 def die(message):
@@ -170,6 +185,17 @@ def run(argv, **kwargs):
 
 def numbered(path):
     return enumerate(read(path).splitlines(), 1)
+
+
+@functools.cache
+def source_lines(path):
+    return read(path).splitlines()
+
+
+def source_text(path, first, last=None):
+    """The lines a finding names, as the text its baseline row is keyed by; the message when the file is not in the tree."""
+    lines = source_lines(path) if path in tracked() else []
+    return "\n".join(lines[first - 1 : last or first]) if 0 < first <= len(lines) else None
 
 
 def require(tool, package):
@@ -224,7 +250,7 @@ def suppressions(found, paths, directive):
     for path in paths:
         for number, line in numbered(path):
             if directive.search(line):
-                found.add(path, "suppression", f"{path}:{number}: {line.strip()}")
+                found.add(path, "suppression", line, f"{path}:{number}: {line.strip()}")
 
 
 def head_of(path):
@@ -285,25 +311,25 @@ def gate_classify(found, _args):
     gated = gated_dirs(files)
     for path, kind in sorted(classes.items()):
         if path not in files:
-            found.add(path, "missing", f"{path}: listed in {MANIFEST} but not in the tree")
+            found.add(path, "missing", "not in the tree", f"{path}: listed in {MANIFEST} but not in the tree")
         elif kind not in CLASSES:
-            found.add(path, "invalid", f"{path}: unknown class '{kind}'; one of {', '.join(CLASSES)}")
+            found.add(path, "invalid", kind, f"{path}: unknown class '{kind}'; one of {', '.join(CLASSES)}")
         elif kind == "cpp-fixture" and not path.startswith("tests/gates/"):
-            found.add(path, "invalid", f"{path}: only the gates' own fixtures under tests/gates are cpp-fixture")
+            found.add(path, "invalid", kind, f"{path}: only the gates' own fixtures under tests/gates are cpp-fixture")
     for path in sorted(files):
         if head_of(path).startswith(OBJECT_MAGIC):
-            found.add(path, "binary", f"{path}: a committed object, library or executable; build it from source in a package instead")
+            found.add(path, "binary", "binary", f"{path}: a committed object, library or executable; build it from source in a package instead")
         kind = classes.get(path)
         if kind is None:
             if needs_class(path, gated):
-                found.add(path, "unclassified", f"{path}: add it to {MANIFEST} with one of: {', '.join(CLASSES)}")
+                found.add(path, "unclassified", "unclassified", f"{path}: add it to {MANIFEST} with one of: {', '.join(CLASSES)}")
             continue
         first = first_line(path)
         if kind in ("data", "make") and (first.startswith("#!") or os.stat(path).st_mode & stat.S_IXUSR):
-            found.add(path, "code-marked-data", f"{path}: is listed as {kind} but has a shebang or the executable bit")
+            found.add(path, "code-marked-data", kind, f"{path}: is listed as {kind} but has a shebang or the executable bit")
         spoken = language(first)
         if spoken and {"sh": "shell", "bash": "shell"}.get(kind, kind) != spoken:
-            found.add(path, "language-differs", f"{path}: is listed as {kind} but its shebang is {first}")
+            found.add(path, "language-differs", first, f"{path}: is listed as {kind} but its shebang is {first}")
 
 
 def shell_scripts(files, classes):
@@ -336,7 +362,7 @@ def scriptlets(found, path):
             current = section[1] if SPEC_SCRIPTLET.match(section[1]) else None
             shell = options[options.index("-p") + 1] if "-p" in options[:-1] else "/bin/sh"
             if current and shell not in SPEC_SHELLS:
-                found.add(path, "unlintable-shell", f"{path}:{number}: %{current} runs {shell}, which no gate lints")
+                found.add(path, "unlintable-shell", line, f"{path}:{number}: %{current} runs {shell}, which no gate lints")
                 current = None
             kept.append("")
         elif current and re.match(r"%(?:if|else|elif|endif)\b", line):
@@ -353,7 +379,7 @@ def gate_shell(found, _args):
     batches = collections.defaultdict(list)
     for path, options in shell_scripts(files, manifest()):
         if options is None:
-            found.add(path, "unlintable-shell", f"{path}: its shebang names a shell shellcheck cannot read; write it for sh or bash")
+            found.add(path, "unlintable-shell", first_line(path), f"{path}: its shebang names a shell shellcheck cannot read; write it for sh or bash")
         else:
             batches[tuple(options)].append(path)
     batches["--shell=bash",] += sorted(p for p in files if p.endswith(".install"))
@@ -374,7 +400,8 @@ def gate_shell(found, _args):
         except (ValueError, KeyError):
             die(f"shellcheck gave no report: {result.stderr.strip()}")
         for c in comments:
-            found.add(c["file"], f"SC{c['code']}", f"{c['file']}:{c['line']}: SC{c['code']} {c['message']}")
+            text = source_text(c["file"], c["line"], c["endLine"]) or c["message"]
+            found.add(c["file"], f"SC{c['code']}", text, f"{c['file']}:{c['line']}: SC{c['code']} {c['message']}")
         suppressions(found, paths, SHELLCHECK_DIRECTIVE)
 
 
@@ -391,7 +418,8 @@ def gate_python(found, _args):
     for d in diagnostics:
         path = os.path.relpath(d["filename"])
         code = d["code"] or "invalid-syntax"
-        found.add(path, code, f"{path}:{d['location']['row']}: {code} {d['message']}")
+        text = source_text(path, d["location"]["row"], d["end_location"]["row"]) or d["message"]
+        found.add(path, code, text, f"{path}:{d['location']['row']}: {code} {d['message']}")
     suppressions(found, paths, PYTHON_SUPPRESSION)
 
 
@@ -410,7 +438,7 @@ def gate_lua(found, _args):
     for line in result.stdout.splitlines():
         match = LUACHECK_LINE.match(line)
         if match:
-            found.add(match[1], match[4], line)
+            found.add(match[1], match[4], source_text(match[1], int(match[2])) or match[5], line)
     suppressions(found, paths, LUA_SUPPRESSION)
 
 
@@ -622,7 +650,7 @@ def view(found, unit, seen):
         left = stack.pop() if stack else None
         if left and system.get(left) and (left, "system") not in seen:
             seen.add((left, "system"))
-            found.add(left, "system-header-in-tree", f"{left}: compiled as a system header, so GCC hides its warnings")
+            found.add(left, "system-header-in-tree", "system header", f"{left}: compiled as a system header, so GCC hides its warnings")
 
     tracked_macros = {"_FORTIFY_SOURCE", "__USE_FORTIFY_LEVEL", "_GLIBCXX_ASSERTIONS", "NDEBUG"}
     origin = {}
@@ -631,7 +659,7 @@ def view(found, unit, seen):
     def report(rule, detail):
         if rule not in reported:
             reported.add(rule)
-            found.add(unit.name, rule, f"{unit.name}: {detail}")
+            found.add(unit.name, rule, rule, f"{unit.name}: {detail}")
 
     def check(at):
         level = macros.get("_FORTIFY_SOURCE")
@@ -696,7 +724,7 @@ def view(found, unit, seen):
         # counted once per package, so a new source that shares the package's flags adds nothing
         if (built.pkgbuild, flag) not in seen:
             seen.add((built.pkgbuild, flag))
-            found.add(built.pkgbuild, f"warning-off:{flag}", f"{unit.name}: compiled with {flag}")
+            found.add(built.pkgbuild, f"warning-off:{flag}", flag, f"{unit.name}: compiled with {flag}")
 
     chunks = collections.defaultdict(list)
     for g, place in enumerate(places):
@@ -708,7 +736,7 @@ def view(found, unit, seen):
         place = places[g] if g < len(places) else None
         if place and NOLINT.search(comment) and (place, "nolint") not in seen:
             seen.add((place, "nolint"))
-            found.add(place[0], "suppression: " + " ".join(raw[g].split()), f"{place[0]}:{place[1]}: {raw[g].strip()}")
+            found.add(place[0], "suppression: " + " ".join(raw[g].split()), raw[g], f"{place[0]}:{place[1]}: {raw[g].strip()}")
     return {p for p in (place[0] for place in places if place)}
 
 
@@ -720,9 +748,9 @@ def scan(found, path, lines, seen):
         seen.add((path, number))
         text = " ".join(raw.split())
         if pragma[2] in WEAKENING_PRAGMAS:
-            found.add(path, f"source-weakens: #pragma {pragma[1]} {pragma[2]}", f"{path}:{number}: {text}")
+            found.add(path, f"source-weakens: #pragma {pragma[1]} {pragma[2]}", text, f"{path}:{number}: {text}")
         elif pragma[2] == "diagnostic" and pragma[3] in ("ignored", "warning"):
-            found.add(path, f"suppression: {text}", f"{path}:{number}: {text}")
+            found.add(path, f"suppression: {text}", text, f"{path}:{number}: {text}")
     text = "\n".join(code for _number, code, _raw in lines)
     starts = [0]
     for _ in lines[:-1]:
@@ -735,7 +763,7 @@ def scan(found, path, lines, seen):
             number = lines[index][0]
             if (path, number, name[1]) not in seen:
                 seen.add((path, number, name[1]))
-                found.add(path, f"source-weakens: attribute {name[1]}", f"{path}:{number}: {lines[index][2].strip()}")
+                found.add(path, f"source-weakens: attribute {name[1]}", lines[index][2], f"{path}:{number}: {lines[index][2].strip()}")
 
 
 def last_switch(args, on, off):
@@ -777,7 +805,7 @@ def audit(found, built, units_by_object, links_by_build_id):
         for path, head in elf_files(pkgdir):
             key = f"@{pkgname}/{os.path.relpath(path, pkgdir)}"
             if not head.startswith(b"\x7fELF"):
-                found.add(key, "unattributed", f"{key}: an archive in the package; the gate audits only ELF files it can trace to a compile")
+                found.add(key, "unattributed", "archive", f"{key}: an archive in the package; the gate audits only ELF files it can trace to a compile")
                 continue
             check_elf(found, key, path)
             build_id = re.search(r"Build ID:\s*(\w+)", run(["readelf", "-nW", path]).stdout)
@@ -785,7 +813,7 @@ def audit(found, built, units_by_object, links_by_build_id):
             # a build ID can be set by hand, so the code itself has to be what that link wrote
             code = run([sys.executable, "-I", SHIM, "--code-digest", path]).stdout.strip()
             if not link or link["link"]["code"] != code:
-                found.add(key, "unattributed", f"{key}: no link this build ran made it (build ID {build_id[1] if build_id else 'missing'})")
+                found.add(key, "unattributed", "no link", f"{key}: no link this build ran made it (build ID {build_id[1] if build_id else 'missing'})")
                 continue
             for unit in units_of(found, key, link, units_by_object):
                 shipped.add(id(unit))
@@ -796,7 +824,7 @@ def units_of(found, key, link, units_by_object):
     own, inputs = link.get("unit"), link["link"]["inputs"]
     missing = [i for i in inputs if i.get("missing")]
     if missing and (not own or len(missing) != 1):
-        found.add(key, "unattributed", f"{key}: links {len(missing)} temporary objects the gate cannot trace")
+        found.add(key, "unattributed", "temporary objects", f"{key}: links {len(missing)} temporary objects the gate cannot trace")
     elif own:
         yield own
     for entry in inputs:
@@ -804,15 +832,15 @@ def units_of(found, key, link, units_by_object):
             continue
         objects = entry.get("members", [entry]) if entry["kind"] in ("rel", "archive") else []
         if entry["kind"] in ("thin-archive", "exec") or (entry["kind"] == "archive" and not objects):
-            found.add(key, "unattributed", f"{key}: links {entry['path']}, which the gate cannot trace to a compile")
+            found.add(key, "unattributed", entry["kind"], f"{key}: links {entry['path']}, which the gate cannot trace to a compile")
         for obj in objects:
             unit = units_by_object.get(obj["sha256"])
             if obj.get("lto"):
-                found.add(key, "unattributed", f"{key}: links LTO code from {entry['path']}; the gate sees only what each compile was asked for, not what LTO makes of it")
+                found.add(key, "unattributed", "lto", f"{key}: links LTO code from {entry['path']}; the gate sees only what each compile was asked for, not what LTO makes of it")
             elif unit:
                 yield unit
             else:
-                found.add(key, "unattributed", f"{key}: links {entry['path']} {obj.get('name', '')}, which no compile the gate saw produced".rstrip())
+                found.add(key, "unattributed", "unknown object", f"{key}: links {entry['path']} {obj.get('name', '')}, which no compile the gate saw produced".rstrip())
 
 
 def check_elf(found, key, path):
@@ -831,15 +859,15 @@ def check_elf(found, key, path):
     }
     for rule, hit in problems.items():
         if hit:
-            found.add(key, rule, f"{key}: fails {rule}")
+            found.add(key, rule, rule, f"{key}: fails {rule}")
     for name in sorted(imports & ALWAYS_FORTIFIED):
-        found.add(key, f"elf-unfortified:{name}", f"{key}: imports plain {name}, which fortify always replaces, so some code in it was built without fortify")
+        found.add(key, f"elf-unfortified:{name}", name, f"{key}: imports plain {name}, which fortify always replaces, so some code in it was built without fortify")
 
 
 def analyse(found, built):
     """Shipped ELFs, the compiles behind them, and every compile of a tracked source."""
     if built.result.returncode != 0:
-        found.add(built.pkgbuild, "build-failed", f"{built.pkgbuild}: makepkg failed\n{tail(built.result, built)}")
+        found.add(built.pkgbuild, "build-failed", "makepkg failed", f"{built.pkgbuild}: makepkg failed\n{tail(built.result, built)}")
         return [], set()
     units, units_by_object, links = [], {}, {}
     for record in built.records:
@@ -878,7 +906,8 @@ def check_warnings(found, built):
             seen.add(match.groups())
             # a warning in a header outside the repository still comes from the package's code
             where = built.place(os.path.join(record["cwd"], match[1]))
-            found.add(where or built.pkgbuild, match[5] or "warning", f"{where or match[1]}:{match[2]}: {match[4]}")
+            text = (source_text(where, int(match[2])) if where else None) or match[4]
+            found.add(where or built.pkgbuild, match[5] or "warning", text, f"{where or match[1]}:{match[2]}: {match[4]}")
 
 
 @functools.cache
@@ -899,12 +928,13 @@ def gate_cpp_harden(found, _args):
         for directory in sorted(gated_dirs(tracked())):
             for path in sorted(p for p in tracked() if p.startswith(directory + "/") and p.lower().endswith(CPP_SUFFIXES)):
                 if path not in read_by and path not in classes:
-                    found.add(path, "not-built", f"{path}: no package's build reads it; build it there, or list it in {MANIFEST}")
+                    found.add(path, "not-built", "not built", f"{path}: no package's build reads it; build it there, or list it in {MANIFEST}")
 
 
 def merge(found, other):
     for key, count in other.counts.items():
         found.counts[key] += count
+        found.texts[key] = other.texts[key]
         found.details[key] += other.details[key]
 
 
@@ -922,14 +952,14 @@ def tidy_units(found, built, units):
     for unit, report in zip(units, reports, strict=True):
         lines = [line for line in report.stdout.splitlines() if TIDY_LINE.match(line)]
         if report.returncode != 0 and not any("clang-diagnostic-error" in line for line in lines):
-            found.add(unit.name, "tidy-failed", f"{unit.name}: clang-tidy stopped with status {report.returncode} and no compile error to show for it\n{tail(report, built)}")
+            found.add(unit.name, "tidy-failed", "tidy failed", f"{unit.name}: clang-tidy stopped with status {report.returncode} and no compile error to show for it\n{tail(report, built)}")
         for line in lines:
             match = TIDY_LINE.match(line)
             where = built.place(match[1])
             if line in seen or not where:
                 continue
             seen.add(line)
-            found.add(where, match[5], f"{where}:{match[2]}: {match[4]} [{match[5]}]")
+            found.add(where, match[5], source_text(where, int(match[2])) or match[4], f"{where}:{match[2]}: {match[4]} [{match[5]}]")
 
 
 def gate_cpp_tidy(found, _args):
@@ -966,7 +996,7 @@ def sanitize(found, project, *options):
     if result.returncode == 0:
         result = run(["cmake", "--build", build, "--parallel"], env=env)
     if result.returncode != 0:
-        found.add(project, "build-failed", f"{project}: the sanitizer build failed\n{tail(result)}")
+        found.add(project, "build-failed", "sanitizer build failed", f"{project}: the sanitizer build failed\n{tail(result)}")
         return
     for record in records_in(records):
         if not record.get("preprocessed"):
@@ -976,12 +1006,12 @@ def sanitize(found, project, *options):
         source = LINEMARKER.match(read(record["preprocessed"]).split("\n", 1)[0])
         name = os.path.relpath(os.path.realpath(os.path.join(record["cwd"], unescape(source[2])))) if source else project
         if name in tracked() and (not {"address", "undefined"} <= on or recovers):
-            found.add(name, "sanitizer-off", f"{name}: built with sanitizers {sorted(on)}{' that recover' if recovers else ''}")
+            found.add(name, "sanitizer-off", f"{sorted(on)} {recovers}", f"{name}: built with sanitizers {sorted(on)}{' that recover' if recovers else ''}")
     tests = run(["ctest", "--test-dir", build, "--output-on-failure", "--no-tests=error"], env=env)
     if "No tests were found" in tests.stdout + tests.stderr:
-        found.add(project, "no-tests", f"{project}: registers no test with add_test, so nothing ran under the sanitizers")
+        found.add(project, "no-tests", "no tests", f"{project}: registers no test with add_test, so nothing ran under the sanitizers")
     elif tests.returncode != 0:
-        found.add(project, "tests-failed", f"{project}: tests failed under ASan and UBSan\n{tail(tests)}")
+        found.add(project, "tests-failed", "tests failed", f"{project}: tests failed under ASan and UBSan\n{tail(tests)}")
 
 
 def gate_cpp_sanitize(found, _args):
@@ -1009,17 +1039,20 @@ def gate_cpp_selftest(found, _args):
     with concurrent.futures.ThreadPoolExecutor(os.cpu_count()) as pool:
         results = dict(zip(cases, pool.map(lambda entry: caught(*entry), cases), strict=True))
     for case, gate, path, rule in SELFTEST:
-        if (path, rule) not in results[case, gate]:
-            found.add(FIXTURE, f"missed:{case}", f"{gate} did not report {rule} at {path} for the fixture's {case} case; it reported {sorted(results[case, gate])}")
+        if (path, rule) not in {key[:2] for key in results[case, gate]}:
+            found.add(FIXTURE, f"missed:{case}", f"{gate} {path} {rule}", f"{gate} did not report {rule} at {path} for the fixture's {case} case; it reported {sorted(results[case, gate])}")
     for key in results["", "cpp-harden"]:
-        found.add(FIXTURE, "clean-reported", f"cpp-harden reported {key} for the clean fixture, which has none")
+        found.add(FIXTURE, "clean-reported", " ".join(key), f"cpp-harden reported {key} for the clean fixture, which has none")
 
 
 def parse_baseline(text):
     entries = {}
-    for line in text.splitlines():
-        gate, path, rule, count = line.split("\t")
-        entries[gate, path, rule] = int(count)
+    for number, line in enumerate(text.splitlines(), 1):
+        fields = line.split("\t")
+        if len(fields) != 6 or not fields[4].isdigit() or digest(fields[5]) != fields[3]:
+            die(f"{BASELINE}:{number}: expected gate, path, rule, the hash of the text, a count and the text, separated by tabs")
+        gate, path, rule, key, count, text = fields
+        entries[gate, path, rule, key] = (int(count), text)
     return entries
 
 
@@ -1036,7 +1069,8 @@ GATES = {
 
 
 def judge(gate, found, baseline, args):
-    allowed = {key[1:]: count for key, count in baseline.items() if key[0] == gate}
+    allowed = {key[1:]: count for key, (count, _text) in baseline.items() if key[0] == gate}
+    texts = {**{key[1:]: text for key, (_count, text) in baseline.items() if key[0] == gate}, **found.texts}
     failures = 0
     if found.skipped:
         print(f"skipped {gate}: {', '.join(found.skipped)}")
@@ -1047,14 +1081,14 @@ def judge(gate, found, baseline, args):
         if have == limit:
             continue
         if args.update and recorded and (have < limit or args.allow_growth):
-            baseline[gate, *key] = have
+            baseline[gate, *key] = (have, texts[key])
             continue
         failures += 1
         if have > limit:
             print("\n".join(found.details[key]))
-            print(f"FAIL {gate}: {key[0]} {key[1]}: {have} found, the baseline allows {limit}")
+            print(f"FAIL {gate}: {key[0]} {key[1]}: {have} found, the baseline allows {limit}: {texts[key]}")
         else:
-            print(f"FAIL {gate}: {key[0]} {key[1]}: the baseline allows {limit} but only {have} remain; lower it with --update")
+            print(f"FAIL {gate}: {key[0]} {key[1]}: the baseline allows {limit} but only {have} remain; lower it with --update: {texts[key]}")
     if not failures:
         print(f"ok   {gate}: nothing beyond the baseline ({sum(found.counts.values())} recorded)")
     return failures
@@ -1075,7 +1109,7 @@ def main():
         GATES[gate](found, args)
         failures += judge(gate, found, baseline, args)
     if args.update:
-        rows = sorted((*key, count) for key, count in baseline.items() if count)
+        rows = sorted((*key, count, text) for key, (count, text) in baseline.items() if count)
         with open(BASELINE, "w", encoding="utf-8") as f:
             f.writelines("\t".join(map(str, row)) + "\n" for row in rows)
     sys.exit(1 if failures else 0)

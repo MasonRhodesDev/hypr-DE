@@ -14,6 +14,7 @@ dist/libexec/hypr-de-prime-theme	bash
 dist/libexec/hypr-de-reload-sessions	bash
 dist/libexec/hypr-de-restart-session-units	bash
 dist/libexec/hypr-de-sys-setup	bash
+dist/libexec/hypr-de-waitenv	bash
 dist/libexec/hypr-de-wallpaper-sync	bash
 dist/libexec/hypr-de-welcome	bash
 dist/libexec/hypridle-launch	bash
