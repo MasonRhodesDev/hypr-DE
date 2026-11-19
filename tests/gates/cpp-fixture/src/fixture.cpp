@@ -5,6 +5,10 @@
 #include <vector>
 #include <vendor.hpp>
 
+#ifdef FIXTURE_BAD_SIBLING
+#include <sibling.hpp>
+#endif
+
 unsigned fixture::checksum(std::span<const std::byte> bytes) {
     std::array<std::byte, 32> window{};
     std::memcpy(window.data(), bytes.data(), bytes.size() < window.size() ? bytes.size() : window.size());

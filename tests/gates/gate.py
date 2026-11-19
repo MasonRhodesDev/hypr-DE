@@ -1,56 +1,88 @@
 import argparse
 import atexit
 import collections
+import concurrent.futures
 import json
 import os
 import platform
 import re
 import shlex
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
+import urllib.parse
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 BASELINE = "tests/gates/baseline.tsv"
 REQUIREMENTS = "tests/gates/requirements.txt"
+SHELLCHECK_RC = ".shellcheckrc"
+RUFF_CONFIG = "ruff.toml"
+LUACHECK_RC = ".luacheckrc"
 LUACHECK = "1.2.0"
 SAFETY = "plugins/cmake/Safety.cmake"
 TIDY_CONFIG = "plugins/.clang-tidy"
 FIXTURE = "tests/gates/cpp-fixture"
+FIXTURE_SIBLING = "tests/gates/cpp-fixture-sibling/sibling.hpp"
+LABEL = "owner-approved"
 
-SHELL_SHEBANG = re.compile(r"^#!\s*(?:/usr)?/bin/(?:env\s+)?(?:ba|da|a)?sh\b")
+LINTER_CONFIGS = {".shellcheckrc", "shellcheckrc", "ruff.toml", ".ruff.toml", "pyproject.toml", ".clang-tidy", ".luacheckrc"}
+GATE_FILES = re.compile(r"tests/gates/(?!baseline\.tsv$).+|\.github/workflows/(?:safety-gates|gate-guard)\.yml|plugins/cmake/Safety\.cmake")
+# a finding from these gates, or under these rules, is never recorded in the baseline, so it always fails
+UNBASELINED_GATES = {"cpp-selftest", "guard"}
+UNBASELINED_RULES = {"build-failed", "tidy-failed"}
+
+SHELL_SHEBANG = re.compile(r"^#!.*?(?<![\w.-])(?:ba|da|a|k)?sh(?![\w.-])")
+SHELL_SUFFIXES = (".sh", ".bash")
+SHELL_CONTENT = re.compile(r"^\s*(?:export\s+\w+=|set\s+-[a-zA-Z]|\w+\s*\(\)\s*\{|(?:if|while)\s+\[|(?:fi|done|esac)\s*$)", re.MULTILINE)
+# the suffix says what a file is, and a Makefile exports variables the way a shell does
+NAMED_OTHERWISE = re.compile(r"(?:^|/)(?:[^/]*\.[^/]*|Makefile)$")
 PYTHON_SHEBANG = re.compile(r"^#!.*\bpython")
 # makepkg assigns srcdir and pkgdir and reads pkgname and the rest itself, so shellcheck sees neither side
 PKGBUILD_EXCLUDES = "SC2034,SC2154"
-CPP_SUFFIXES = (".cpp", ".hpp", ".cc", ".h", ".inc")
+SHELLCHECK_DIRECTIVE = re.compile(r"#\s*shellcheck\s+([^#\n]*\bdisable=[^#\n]*)(?:#.*)?")
+# written in two parts so that this line is not a suppression by its own rule
+PYTHON_SUPPRESSION = re.compile(r"#.*\b(?:no" + r"qa|ruff\s*:)", re.IGNORECASE)
+LUA_SUPPRESSION = re.compile(r"--.*\bluacheck\s*:")
+CPP_SUFFIXES = (".c", ".cc", ".cpp", ".cxx", ".c++", ".h", ".hh", ".hpp", ".hxx", ".h++", ".inc", ".inl", ".ipp", ".tpp", ".tcc", ".ixx", ".cppm")
+CPP_SUPPRESSION = re.compile(
+    r"NOLINT|(?:#|%:|\?\?=)\s*pragma\s+(?:GCC|clang)\b|_Pragma\b|\bno_sanitize|\bno_stack_protector\b|\bsystem_header\b|^\s*(?:#|%:)\s*(?:line\b|\d)"
+)
 
-REQUIRED_FLAGS = [
-    "-Wall",
-    "-Wextra",
-    "-Wconversion",
-    "-Wshadow",
-    "-Werror",
-    "-fstack-protector-strong",
-    "-fstack-clash-protection",
-    "-D_FORTIFY_SOURCE=3",
-]
-WEAKENING_FLAG = re.compile(r"^(?:-Wno-.+|-w|-fpermissive|-fno-stack-protector|-fno-stack-clash-protection|-fcf-protection=none)$")
+HARDENING_FLAGS = ["-Wall", "-Wextra", "-Wconversion", "-Wshadow", "-fstack-protector-strong", "-fstack-clash-protection", "-D_GLIBCXX_ASSERTIONS"]
+REQUIRED_FLAGS = {
+    "harden": [*HARDENING_FLAGS, "-D_FORTIFY_SOURCE=3"],
+    # fortify hides overflows from AddressSanitizer, so Safety.cmake leaves it out of this build
+    "sanitize": [*HARDENING_FLAGS, "-fsanitize=address,undefined", "-fno-sanitize-recover=all"],
+}
+WEAKENING_FLAG = re.compile(
+    r"-Wno-.+|-w|-fpermissive|-O0|-fno-stack-protector|-fstack-protector(?:-explicit)?|-fno-stack-clash-protection|-fcf-protection=none"
+    r"|-fno-sanitize=.*|-fsanitize-recover(?:=.*)?|-U_GLIBCXX_ASSERTIONS|-D_GLIBCXX_ASSERTIONS=.*"
+)
+COMPILER_WARNING = re.compile(r"^(.+?):(\d+):(\d+): warning: (.*?)(?: \[(-W[^\]]+)\])?$")
 TIDY_LINE = re.compile(r"^(.+?):(\d+):(\d+): (?:warning|error): (.*) \[([\w.,-]+)\]$")
 LUACHECK_LINE = re.compile(r"^(.+?):(\d+):(\d+): \((\w+)\) (.*)$")
-SELFTEST = {
-    "WARNING": ("cpp-harden", "build-failed"),
-    "NOWARN": ("cpp-harden", "flag-weakens:-Wno-conversion"),
-    "OVERFLOW": ("cpp-sanitize", "tests-failed"),
-    "UNDEFINED": ("cpp-sanitize", "tests-failed"),
-    "TIDY": ("cpp-tidy", "cppcoreguidelines-pro-type-reinterpret-cast"),
-}
+SELFTEST = [
+    ("WARNING", "cpp-harden", f"{FIXTURE}/src/fixture.cpp", "-Wconversion"),
+    ("NOWARN", "cpp-harden", FIXTURE, "flag-weakens:-Wno-conversion"),
+    ("WEAKSTACK", "cpp-harden", FIXTURE, "flag-weakens:-fstack-protector"),
+    ("NOASSERT", "cpp-harden", FIXTURE, "flag-weakens:-U_GLIBCXX_ASSERTIONS"),
+    ("NOSAFETY", "cpp-harden", FIXTURE, "safety-not-included"),
+    ("SIBLING", "cpp-harden", FIXTURE_SIBLING, "-Wconversion"),
+    ("OVERFLOW", "cpp-sanitize", FIXTURE, "tests-failed"),
+    ("UNDEFINED", "cpp-sanitize", FIXTURE, "tests-failed"),
+    ("NOSANITIZE", "cpp-sanitize", FIXTURE, "flag-weakens:-fno-sanitize=all"),
+    ("TIDY", "cpp-tidy", f"{FIXTURE}/src/fixture.cpp", "cppcoreguidelines-pro-type-reinterpret-cast"),
+    ("SIBLING", "cpp-tidy", FIXTURE_SIBLING, "bugprone-narrowing-conversions"),
+]
 
 
 class Findings:
     def __init__(self):
         self.counts = collections.Counter()
         self.details = collections.defaultdict(list)
+        self.skipped = []
 
     def add(self, path, rule, detail, weight=1):
         self.counts[path, rule] += weight
@@ -91,37 +123,91 @@ def tracked():
     return files
 
 
-def shebang(path):
+def scratch():
+    root = tempfile.mkdtemp(prefix="hypr-de-gates-")
+    atexit.register(shutil.rmtree, root, ignore_errors=True)
+    return root
+
+
+def without_disable(line):
+    def rest(directive):
+        kept = [word for word in directive[1].split() if not word.startswith("disable=")]
+        # a directive left with nothing in it is a parse error
+        return "# shellcheck " + " ".join(kept) if kept else "#"
+
+    return SHELLCHECK_DIRECTIVE.sub(rest, line)
+
+
+def without_luacheck(line):
+    return LUA_SUPPRESSION.sub(lambda match: match[0].replace("luacheck", "luacheck off"), line)
+
+
+def copies_of(paths, rewrite):
+    copies = scratch()
+    for path in paths:
+        copy = os.path.join(copies, path)
+        os.makedirs(os.path.dirname(copy), exist_ok=True)
+        with open(copy, "w", encoding="utf-8", errors="surrogateescape") as f:
+            f.writelines(rewrite(line) for line in read(path).splitlines(keepends=True))
+    return copies
+
+
+def suppressions(found, paths, directive):
+    for path in paths:
+        for number, line in numbered(path):
+            if directive.search(line):
+                found.add(path, "suppression", f"{path}:{number}: {line.strip()}")
+
+
+def head_of(path):
     with open(path, "rb") as f:
-        return f.readline(200).decode("utf-8", "replace")
+        return f.read(4096).decode("utf-8", "replace")
+
+
+def shell_scripts(files):
+    for path in files:
+        head = head_of(path)
+        first = head.split("\n", 1)[0]
+        if path.endswith(SHELL_SUFFIXES) or SHELL_SHEBANG.match(first):
+            yield path, []
+        elif first.startswith("#!") or "\0" in head or path.endswith(".install") or os.path.basename(path) == "PKGBUILD":
+            continue
+        elif re.search(r"#\s*shellcheck\s+shell=", head):
+            yield path, []
+        elif os.stat(path).st_mode & stat.S_IXUSR or (SHELL_CONTENT.search(head) and not NAMED_OTHERWISE.search(path)):
+            # with no shebang and no suffix a shell runs it or sources it, and every shell reads sh
+            yield path, ["--shell=sh"]
 
 
 def gate_shell(found, _args):
     require("shellcheck", "shellcheck-py")
-    pkgbuilds = [p for p in tracked() if os.path.basename(p) == "PKGBUILD"]
-    install_scripts = [p for p in tracked() if p.endswith(".install")]
-    scripts = [p for p in tracked() if SHELL_SHEBANG.match(shebang(p)) or p.endswith(".sh")]
-    batches = [(scripts, []), (install_scripts, ["--shell=bash"]), (pkgbuilds, ["--shell=bash", f"--exclude={PKGBUILD_EXCLUDES}"])]
-    for paths, options in batches:
+    files = tracked()
+    batches = collections.defaultdict(list)
+    for path, options in shell_scripts(files):
+        batches[tuple(options)].append(path)
+    batches["--shell=bash",] += [p for p in files if p.endswith(".install")]
+    batches["--shell=bash", f"--exclude={PKGBUILD_EXCLUDES}"] += [p for p in files if os.path.basename(p) == "PKGBUILD"]
+    # shellcheck has no switch to ignore its inline directives, so it reads copies that have none
+    copies = copies_of([p for paths in batches.values() for p in paths], without_disable)
+    pinned = [f"--rcfile={os.path.join(ROOT, SHELLCHECK_RC)}", "--format=json1"]
+    for options, paths in batches.items():
         if not paths:
             continue
-        result = run(["shellcheck", "--format=json1", *options, *paths])
+        result = run(["shellcheck", *pinned, *options, *paths], cwd=copies)
         try:
             comments = json.loads(result.stdout)["comments"]
         except (ValueError, KeyError):
             die(f"shellcheck gave no report: {result.stderr.strip()}")
         for c in comments:
             found.add(c["file"], f"SC{c['code']}", f"{c['file']}:{c['line']}: SC{c['code']} {c['message']}")
-        for path in paths:
-            for number, line in numbered(path):
-                if re.search(r"#\s*shellcheck\s+disable=", line):
-                    found.add(path, "inline-disable", f"{path}:{number}: {line.strip()}")
+        suppressions(found, paths, SHELLCHECK_DIRECTIVE)
 
 
 def gate_python(found, _args):
     require("ruff", "ruff")
-    paths = [p for p in tracked() if p.endswith(".py") or PYTHON_SHEBANG.match(shebang(p))]
-    result = run(["ruff", "check", "--no-cache", "--output-format=json", *paths])
+    paths = [p for p in tracked() if p.endswith(".py") or PYTHON_SHEBANG.match(head_of(p))]
+    # one config for every file and no inline suppression, so a nested config or a comment cannot change the result
+    result = run(["ruff", "check", "--no-cache", "--config", RUFF_CONFIG, "--ignore-noqa", "--output-format=json", *paths])
     try:
         diagnostics = json.loads(result.stdout)
     except ValueError:
@@ -130,10 +216,7 @@ def gate_python(found, _args):
         path = os.path.relpath(d["filename"], ROOT)
         code = d["code"] or "invalid-syntax"
         found.add(path, code, f"{path}:{d['location']['row']}: {code} {d['message']}")
-    for path in paths:
-        for number, line in numbered(path):
-            if re.search(r"#\s*noqa\b", line):
-                found.add(path, "inline-noqa", f"{path}:{number}: {line.strip()}")
+    suppressions(found, paths, PYTHON_SUPPRESSION)
 
 
 def gate_lua(found, _args):
@@ -141,39 +224,42 @@ def gate_lua(found, _args):
     if f"Luacheck: {LUACHECK}" not in version:
         die(f"luacheck {LUACHECK} is required; the CI workflow shows where to get it")
     paths = [p for p in tracked() if p.endswith(".lua")]
-    result = run(["luacheck", "--formatter=plain", "--codes", "--no-color", *paths])
+    # luacheck has no switch to ignore inline options, and it applies a config's per-directory rules relative to the config
+    copies = copies_of(paths, without_luacheck)
+    shutil.copy(LUACHECK_RC, copies)
+    result = run(["luacheck", "--config", LUACHECK_RC, "--no-default-config", "--formatter=plain", "--codes", "--no-color", *paths], cwd=copies)
     if result.returncode > 2:
         die(f"luacheck could not run: {result.stdout.strip()} {result.stderr.strip()}")
     for line in result.stdout.splitlines():
         match = LUACHECK_LINE.match(line)
         if match:
             found.add(match[1], match[4], line)
-    for path in paths:
-        for number, line in numbered(path):
-            if re.search(r"--\s*luacheck:", line):
-                found.add(path, "inline-luacheck", f"{path}:{number}: {line.strip()}")
+    suppressions(found, paths, LUA_SUPPRESSION)
 
 
-def cpp_projects():
+def cpp_projects(found):
     plugins = sorted(os.path.dirname(p) for p in tracked() if re.fullmatch(r"plugins/[^/]+/CMakeLists\.txt", p))
-    return [*plugins, FIXTURE]
+    wants_hyprland = re.compile(r"pkg_check_modules\s*\([^)]*\bhyprland\b")
+    have_hyprland = shutil.which("pkg-config") and run(["pkg-config", "--exists", "hyprland"]).returncode == 0
+    for project in [*plugins, FIXTURE]:
+        if have_hyprland or not wants_hyprland.search(read(os.path.join(project, "CMakeLists.txt"))):
+            yield project
+        elif os.environ.get("CI"):
+            die(f"{project} needs Hyprland's headers, and CI may not skip it")
+        else:
+            print(f"skipped: no Hyprland headers, so {project} was not built or checked")
+            found.skipped.append(project)
 
 
-def scratch():
-    root = tempfile.mkdtemp(prefix="hypr-de-gates-")
-    atexit.register(shutil.rmtree, root, ignore_errors=True)
-    return root
-
-
-def configure(project, *options):
+def configure(project, *options, inject=True):
     for tool in ("cmake", "c++"):
         if not shutil.which(tool):
             die(f"{tool} is required for the C++ gates")
-    build = scratch()
-    safety = os.path.join(ROOT, SAFETY)
-    command = ["cmake", "-S", project, "-B", build, "-DCMAKE_BUILD_TYPE=RelWithDebInfo", f"-DCMAKE_PROJECT_INCLUDE={safety}", *options]
-    result = run([*command, "-DHYPR_DE_WERROR=ON"])
-    return build, result
+    # the fixture copies its stand-in for a third-party header next to the build directory, so both go under one scratch
+    build = os.path.join(scratch(), "build")
+    injected = [f"-DCMAKE_PROJECT_INCLUDE={os.path.join(ROOT, SAFETY)}"] if inject else []
+    command = ["cmake", "-S", project, "-B", build, "-DCMAKE_BUILD_TYPE=RelWithDebInfo", "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"]
+    return build, run([*command, *injected, *options])
 
 
 def tail(result):
@@ -182,18 +268,22 @@ def tail(result):
     return "\n".join([*headlines[:10], *lines[-25:]])
 
 
-def translation_units(project, build):
+def in_repo(path):
+    relative = os.path.relpath(os.path.realpath(path), ROOT)
+    return None if relative.startswith("..") else relative
+
+
+def translation_units(build):
     with open(os.path.join(build, "compile_commands.json"), encoding="utf-8") as f:
         units = json.load(f)
-    inside = os.path.join(ROOT, project) + os.sep
-    return [(os.path.relpath(u["file"], ROOT), shlex.split(u["command"])) for u in units if u["file"].startswith(inside)]
+    return [(in_repo(u["file"]), shlex.split(u["command"])) for u in units if in_repo(u["file"])]
 
 
-def check_flags(found, project, build):
-    required = [*REQUIRED_FLAGS, *(["-fcf-protection"] if platform.machine() in ("x86_64", "i686") else [])]
-    units = translation_units(project, build)
+def check_flags(found, project, build, mode):
+    required = [*REQUIRED_FLAGS[mode], *(["-fcf-protection"] if platform.machine() in ("x86_64", "i686") else [])]
+    units = translation_units(build)
     if not units:
-        found.add(project, "no-sources", f"{project}: the build compiles nothing from this directory")
+        found.add(project, "no-sources", f"{project}: the build compiles nothing from this repository")
     for path, flags in units:
         for flag in required:
             if flag not in flags:
@@ -203,8 +293,48 @@ def check_flags(found, project, build):
         fortified = max((i for i, flag in enumerate(flags) if flag == "-D_FORTIFY_SOURCE=3"), default=-1)
         for i, flag in enumerate(flags):
             undone = i > fortified and re.match(r"-[DU]_FORTIFY_SOURCE", flag)
-            if WEAKENING_FLAG.match(flag) or undone:
+            if WEAKENING_FLAG.fullmatch(flag) or undone:
                 found.add(project, f"flag-weakens:{flag}", f"{path}: compiled with {flag}")
+
+
+def check_packaged_flags(found, project, *options):
+    build, result = configure(project, *options, inject=False)
+    if result.returncode != 0:
+        found.add(project, "build-failed", f"{project}: could not configure the way a package builds it\n{tail(result)}")
+        return
+    missing = sorted({flag for _path, flags in translation_units(build) for flag in REQUIRED_FLAGS["harden"] if flag not in flags})
+    if missing:
+        include = os.path.relpath(SAFETY, project)
+        found.add(project, "safety-not-included", f"{project}: its own CMakeLists.txt compiles without {' '.join(missing)}; add include({include}) after project()")
+
+
+def check_warnings(found, project, build, output):
+    seen = set()
+    for line in output.splitlines():
+        match = COMPILER_WARNING.match(line)
+        if not match or match.groups() in seen:
+            continue
+        seen.add(match.groups())
+        path = os.path.join(build, match[1])
+        # a warning in a header outside the repository still comes from code in the project
+        where = in_repo(path) or project
+        found.add(where, match[5] or "warning", f"{in_repo(path) or os.path.normpath(path)}:{match[2]}: {match[4]}")
+
+
+def read_by(build):
+    for directory, _names, files in os.walk(build):
+        for name in files:
+            if name.endswith(".d"):
+                words = read(os.path.join(directory, name)).replace("\\\n", " ").split()
+                yield from filter(None, (in_repo(os.path.join(build, word)) for word in words if not word.endswith(":")))
+
+
+def check_suppressions(found, sources):
+    for path in sorted(sources):
+        for number, line in numbered(path):
+            if CPP_SUPPRESSION.search(line):
+                # the whole line is the rule, so widening a recorded suppression is a new line in the baseline
+                found.add(path, "suppression: " + " ".join(line.split()), f"{path}:{number}: {line.strip()}")
 
 
 def elf_files(build):
@@ -243,23 +373,29 @@ def check_elf(found, project, build):
     return binaries
 
 
-def harden(found, project, *options):
+def built(found, project, mode, *options):
     build, result = configure(project, *options)
     if result.returncode == 0:
+        check_flags(found, project, build, mode)
         result = run(["cmake", "--build", build, "--parallel"])
     if result.returncode != 0:
-        found.add(project, "build-failed", f"{project}: the hardened build with -Werror failed\n{tail(result)}")
-        return []
-    check_flags(found, project, build)
-    return check_elf(found, project, build)
+        found.add(project, "build-failed", f"{project}: the {mode} build failed\n{tail(result)}")
+        return None, result
+    return build, result
+
+
+def harden(found, project, *options):
+    check_packaged_flags(found, project, *options)
+    build, result = built(found, project, "harden", *options)
+    if not build:
+        return [], set()
+    check_warnings(found, project, build, result.stdout + result.stderr)
+    return check_elf(found, project, build), set(read_by(build))
 
 
 def sanitize(found, project, *options):
-    build, result = configure(project, "-DHYPR_DE_SANITIZE=ON", *options)
-    if result.returncode == 0:
-        result = run(["cmake", "--build", build, "--parallel"])
-    if result.returncode != 0:
-        found.add(project, "build-failed", f"{project}: the sanitizer build failed\n{tail(result)}")
+    build, _result = built(found, project, "sanitize", "-DHYPR_DE_SANITIZE=ON", *options)
+    if not build:
         return
     tests = run(["ctest", "--test-dir", build, "--output-on-failure", "--no-tests=error"])
     if "No tests were found" in tests.stdout + tests.stderr:
@@ -274,50 +410,59 @@ def tidy(found, project, *options):
     if result.returncode != 0:
         found.add(project, "build-failed", f"{project}: could not configure for clang-tidy\n{tail(result)}")
         return
+    command = ["clang-tidy", "-p", build, f"--config-file={TIDY_CONFIG}", f"--header-filter=^{re.escape(ROOT)}/", "--quiet"]
+    # the compile commands are GCC's, and clang must not fail on a warning flag only GCC has
+    command += ["--extra-arg=-Wno-unknown-warning-option", "--extra-arg=-Wno-error"]
+    paths = [path for path, _flags in translation_units(build)]
+    with concurrent.futures.ThreadPoolExecutor(os.cpu_count()) as pool:
+        reports = list(pool.map(lambda path: run([*command, path]), paths))
     seen = set()
-    header_filter = "^" + re.escape(os.path.join(ROOT, project)) + "/"
-    for path, _flags in translation_units(project, build):
-        command = ["clang-tidy", "-p", build, f"--config-file={TIDY_CONFIG}", f"--header-filter={header_filter}", "--quiet"]
-        # the compile commands are GCC's, and clang must not fail on a warning flag only GCC has
-        report = run([*command, "--extra-arg=-Wno-unknown-warning-option", "--extra-arg=-Wno-error", path])
-        for line in report.stdout.splitlines():
+    for path, report in zip(paths, reports, strict=True):
+        lines = [line for line in report.stdout.splitlines() if TIDY_LINE.match(line)]
+        if report.returncode != 0 and not any("clang-diagnostic-error" in line for line in lines):
+            found.add(path, "tidy-failed", f"{path}: clang-tidy stopped with status {report.returncode} and no compile error to show for it\n{tail(report)}")
+        for line in lines:
             match = TIDY_LINE.match(line)
-            if not match or line in seen:
+            if line in seen or not in_repo(match[1]):
                 continue
             seen.add(line)
-            where = os.path.relpath(match[1], ROOT)
+            where = in_repo(match[1])
             found.add(where, match[5], f"{where}:{match[2]}: {match[4]} [{match[5]}]")
-    for path in tracked():
-        if path.startswith(project + "/") and path.endswith(CPP_SUFFIXES):
-            for number, line in numbered(path):
-                if "NOLINT" in line:
-                    found.add(path, "inline-nolint", f"{path}:{number}: {line.strip()}")
 
 
 def gate_cpp_harden(found, _args):
-    for project in cpp_projects():
-        harden(found, project)
+    # a file with no C++ suffix still counts once a build reads it
+    sources = {p for p in tracked() if p.lower().endswith(CPP_SUFFIXES)}
+    for project in cpp_projects(found):
+        sources |= harden(found, project)[1]
+    check_suppressions(found, sources)
 
 
 def gate_cpp_sanitize(found, _args):
-    for project in cpp_projects():
+    for project in cpp_projects(found):
         sanitize(found, project)
 
 
 def gate_cpp_tidy(found, _args):
-    for project in cpp_projects():
+    for project in cpp_projects(found):
         tidy(found, project)
 
 
 def gate_cpp_selftest(found, _args):
     runners = {"cpp-harden": harden, "cpp-sanitize": sanitize, "cpp-tidy": tidy}
-    for case, (gate, rule) in SELFTEST.items():
-        caught = Findings()
-        runners[gate](caught, FIXTURE, f"-DFIXTURE_BAD={case}")
-        if not any(rule in key[1] for key in caught.counts):
-            found.add(FIXTURE, f"missed:{case}", f"{gate} did not report {rule} for the fixture's {case} case")
+
+    def caught(case, gate, _path, _rule):
+        findings = Findings()
+        runners[gate](findings, FIXTURE, f"-DFIXTURE_BAD={case}")
+        return findings.counts
+
+    with concurrent.futures.ThreadPoolExecutor(os.cpu_count()) as pool:
+        results = list(pool.map(lambda entry: caught(*entry), SELFTEST))
+    for (case, gate, path, rule), counts in zip(SELFTEST, results, strict=True):
+        if (path, rule) not in counts:
+            found.add(FIXTURE, f"missed:{case}", f"{gate} did not report {rule} at {path} for the fixture's {case} case")
     clean = Findings()
-    for binary in harden(clean, FIXTURE):
+    for binary in harden(clean, FIXTURE)[0]:
         if "__stack_chk_fail" not in run(["readelf", "-sW", "--dyn-syms", binary]).stdout:
             found.add(FIXTURE, "missed:stack-protector", f"{os.path.basename(binary)} has no stack protector")
 
@@ -330,22 +475,97 @@ def parse_baseline(text):
     return entries
 
 
-def gate_baseline(found, args):
-    base = args.base
-    if not base or set(base) == {"0"}:
-        print("baseline: no base revision given, nothing to compare")
+def git(*args):
+    result = run(["git", *args])
+    if result.returncode != 0:
+        die(f"git {' '.join(args)}: {result.stderr.strip()}")
+    return result.stdout
+
+
+def at(revision, path):
+    if revision is None:
+        return read(path) if os.path.isfile(path) else None
+    shown = run(["git", "show", f"{revision}:{path}"])
+    return shown.stdout if shown.returncode == 0 else None
+
+
+def changed(base, head):
+    fields = git("diff", "--name-status", "-z", "--find-renames", base, *([head] if head else [])).split("\0")
+    while len(fields) > 1:
+        status = fields.pop(0)
+        old = fields.pop(0)
+        yield old, fields.pop(0) if status[0] in "RC" else old
+    if head is None:
+        for path in git("ls-files", "--others", "--exclude-standard", "-z").split("\0")[:-1]:
+            yield path, path
+
+
+def needs_approval(base, head):
+    reasons = []
+    for old, new in changed(base, head):
+        for path in dict.fromkeys((old, new)):
+            ruff_section = "[tool.ruff" in (at(base, path) or "") + (at(head, path) or "")
+            if os.path.basename(path) in LINTER_CONFIGS and (os.path.basename(path) != "pyproject.toml" or ruff_section):
+                reasons.append((path, "linter configuration changed"))
+            elif GATE_FILES.fullmatch(path):
+                reasons.append((path, "the gates themselves changed"))
+    before = parse_baseline(at(base, BASELINE) or "")
+    for key, count in parse_baseline(at(head, BASELINE) or "").items():
+        if count > before.get(key, 0):
+            reasons.append((BASELINE, f"{' '.join(key)} grew from {before.get(key, 0)} to {count}"))
+    return reasons
+
+
+def api(path, *options):
+    if not shutil.which("gh"):
+        die("gh is required to read a pull request's approval")
+    result = run(["gh", "api", path, *options])
+    if result.returncode != 0:
+        die(f"gh api {path}: {result.stderr.strip()}")
+    return result.stdout
+
+
+def refusal(pull_request):
+    owner = api("repos/{owner}/{repo}", "--jq", ".owner.login").strip()
+    pull = json.loads(api(f"repos/{{owner}}/{{repo}}/pulls/{pull_request}"))
+    if LABEL not in [label["name"] for label in pull["labels"]]:
+        return f"the pull request does not carry the label {LABEL}"
+    query = f'.[] | select(.label.name == "{LABEL}") | [.event, .actor.login, .created_at] | @tsv'
+    events = api(f"repos/{{owner}}/{{repo}}/issues/{pull_request}/events", "--paginate", "--jq", query).splitlines()
+    event, actor, labelled = events[-1].split("\t") if events else ("", "", "")
+    if event != "labeled" or actor != owner:
+        return f"the label {LABEL} was added by '{actor}', and only the repository owner can approve"
+    if not pull["head"]["repo"]:
+        return "the pull request's branch is gone"
+    branch = urllib.parse.quote(pull["head"]["ref"], safe="")
+    pushed = api(f"repos/{pull['head']['repo']['full_name']}/activity?ref={branch}&per_page=1", "--jq", ".[0].timestamp").strip()
+    if not pushed or labelled <= pushed:
+        return f"the label {LABEL} was added at {labelled}, before the last push at {pushed}; the owner removes it and adds it again"
+    return None
+
+
+def gate_guard(found, args):
+    if run(["git", "rev-parse", "--verify", "--quiet", f"{args.base}^{{commit}}"]).returncode != 0:
+        die(f"base revision {args.base} is not in this clone; fetch it, or pass --base")
+    base = git("merge-base", args.base, args.head or "HEAD").strip()
+    if at(base, "tests/gates/gate.py") is None:
+        print(f"guard: {args.base} has no gates, so this change introduces them")
         return
-    if run(["git", "rev-parse", "--verify", "--quiet", f"{base}^{{commit}}"]).returncode != 0:
-        die(f"base revision {base} is not in this clone; fetch it, or pass --base")
-    old = run(["git", "show", f"{base}:{BASELINE}"])
-    if old.returncode != 0:
-        print(f"baseline: {base} has no {BASELINE}, so this change introduces it")
+    reasons = needs_approval(base, args.head)
+    if not reasons:
         return
-    before = parse_baseline(old.stdout)
-    for (gate, path, rule), count in parse_baseline(read(BASELINE)).items():
-        allowed = before.get((gate, path, rule), 0)
-        if count > allowed:
-            found.add(BASELINE, "grew", f"{gate} {path} {rule}: {allowed} at {base}, {count} here; the baseline only shrinks")
+    print(f"guard: {len(reasons)} changes need the repository owner's approval (the label {LABEL}, added by the owner):")
+    for path, why in reasons:
+        print(f"  {path}: {why}")
+    if not args.pr:
+        print("guard: no pull request given (--pr), so this is a report and not a failure")
+        return
+    refused = refusal(args.pr)
+    if refused is None:
+        print(f"guard: approved, the repository owner added {LABEL} after the last push")
+        return
+    for path, why in reasons:
+        found.add(path, "needs-owner-approval", f"{path}: {why}; {refused}")
 
 
 GATES = {
@@ -356,7 +576,7 @@ GATES = {
     "cpp-sanitize": gate_cpp_sanitize,
     "cpp-tidy": gate_cpp_tidy,
     "cpp-selftest": gate_cpp_selftest,
-    "baseline": gate_baseline,
+    "guard": gate_guard,
 }
 
 
@@ -364,10 +584,13 @@ def judge(gate, found, baseline, args):
     allowed = {key[1:]: count for key, count in baseline.items() if key[0] == gate}
     failures = 0
     for key in sorted(set(found.counts) | set(allowed)):
-        have, limit = found.counts[key], allowed.get(key, 0)
+        if any(key[0] == project or key[0].startswith(project + "/") for project in found.skipped):
+            continue
+        recorded = gate not in UNBASELINED_GATES and key[1] not in UNBASELINED_RULES
+        have, limit = found.counts[key], allowed.get(key, 0) if recorded else 0
         if have == limit:
             continue
-        if args.update and (have < limit or args.allow_growth):
+        if args.update and recorded and (have < limit or args.allow_growth):
             baseline[gate, *key] = have
             continue
         failures += 1
@@ -385,8 +608,10 @@ def main():
     parser = argparse.ArgumentParser(description="Safety gates with a baseline that only shrinks.")
     parser.add_argument("gates", nargs="+", choices=[*GATES, "all"])
     parser.add_argument("--update", action="store_true", help="lower the baseline to what is found now")
-    parser.add_argument("--allow-growth", action="store_true", help="with --update, also record new findings (for a new gate only)")
-    parser.add_argument("--base", default=os.environ.get("GATE_BASE", "origin/main"), help="revision the baseline may not grow against")
+    parser.add_argument("--allow-growth", action="store_true", help="with --update, also record new findings; the guard gate then asks for the owner's approval")
+    parser.add_argument("--base", default=os.environ.get("GATE_BASE", "origin/main"), help="revision the guard gate compares against")
+    parser.add_argument("--head", default=os.environ.get("GATE_HEAD"), help="revision the guard gate judges, the working tree by default")
+    parser.add_argument("--pr", default=os.environ.get("GATE_PR"), help="pull request whose approval the guard gate reads")
     args = parser.parse_args()
     os.chdir(ROOT)
     baseline = parse_baseline(read(BASELINE)) if os.path.exists(BASELINE) else {}

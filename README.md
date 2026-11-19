@@ -369,30 +369,63 @@ or the ones named on its command line:
 
 | Gate | What it refuses |
 |------|-----------------|
-| `shell` | Anything `shellcheck` reports with every optional check on (`.shellcheckrc`), in every shell script in the tree, and inline `shellcheck disable` lines. |
-| `python` | `ruff` with the bandit, bugbear and pylint rules in `ruff.toml`, and inline `noqa` comments. |
+| `shell` | Anything `shellcheck` reports with every optional check on, in every shell script in the tree, and a `shellcheck disable` directive. A script is found by its suffix (`.sh`, `.bash`), by a shebang that names a shell, or by its content when it has neither. |
+| `python` | `ruff` with the bandit, bugbear and pylint rules in `ruff.toml`, and a `noqa` or `ruff:` comment. |
 | `lua` | `luacheck` findings (`.luacheckrc`) and inline `luacheck:` comments. |
-| `cpp-harden` | A plugin that does not build with `-Wall -Wextra -Wconversion -Wshadow -Werror`, a source compiled without a hardening flag or with one that weakens them (`-Wno-...`), and a binary without full RELRO, immediate binding, a non-executable stack, PIE or CET. |
-| `cpp-sanitize` | A plugin whose tests fail under AddressSanitizer and UndefinedBehaviorSanitizer, or that registers no test with `add_test`. |
-| `cpp-tidy` | `clang-tidy` findings from `plugins/.clang-tidy`, and `NOLINT` comments. |
+| `cpp-harden` | In a plugin: a compiler warning under `-Wall -Wextra -Wconversion -Wshadow`, a source compiled without a hardening flag or with one that weakens them, a `CMakeLists.txt` that does not include `plugins/cmake/Safety.cmake`, a `NOLINT` or a diagnostic pragma, and a binary without full RELRO, immediate binding, a non-executable stack, PIE or CET. A build that fails always fails the gate. |
+| `cpp-sanitize` | A plugin whose tests fail under AddressSanitizer and UndefinedBehaviorSanitizer, that registers no test with `add_test`, or that turns a sanitizer off. |
+| `cpp-tidy` | `clang-tidy` findings from `plugins/.clang-tidy`, in the plugin and in every header of this repository it includes. |
 | `cpp-selftest` | The C++ gates themselves, if they stop catching the known-bad cases in `tests/gates/cpp-fixture`. |
-| `baseline` | A baseline that grew since the base revision (`--base REV` or `GATE_BASE`, `origin/main` by default). |
+| `guard` | A change that weakens the gates, unless the repository owner approved it. |
+
+A suppression comment does not change a result. `ruff` runs with
+`--config ruff.toml --ignore-noqa`. `shellcheck` runs with
+`--rcfile=.shellcheckrc` and `luacheck` with `--config .luacheckrc`, both on
+copies that have their inline directives removed. So the finding under a
+suppression is counted, and so is the suppression. A linter configuration file
+in a subdirectory is not read. C++ has no switch for this, so each `NOLINT`,
+diagnostic pragma and `no_sanitize` attribute is counted by its whole line.
 
 The C++ gates build every `plugins/*/CMakeLists.txt` with
 `plugins/cmake/Safety.cmake` injected through `CMAKE_PROJECT_INCLUDE`, so a new
-plugin is covered without naming it anywhere. A plugin's own packaging gets the
-same flags with `include(../cmake/Safety.cmake)` after its `project()` call.
-Include directories outside the plugin's tree are treated as system headers,
-because a plugin cannot fix a warning in a header it does not own.
+plugin is checked without naming it anywhere. They also configure the plugin
+the way its package does, and fail when that build lacks the flags, so a plugin
+has `include(../cmake/Safety.cmake)` after its `project()` call. Include
+directories outside this repository are treated as system headers, because a
+plugin cannot fix a warning in a header the repository does not own. Without
+Hyprland's headers a local run prints `skipped: no Hyprland headers` for the
+plugins that need them and checks the rest. CI may not skip.
 
 What already broke a rule when its gate arrived is counted in
 `tests/gates/baseline.tsv`, one line per gate, file and rule. A count may only
 fall. Finding more than the count fails, and so does finding fewer until the
 line is lowered with `tests/gates/check.sh <gate> --update`.
 
+#### Changes that need the owner
+
+The guard gate lists every change that could weaken the gates:
+
+* a linter configuration file at any depth (`.shellcheckrc`, `ruff.toml`, a
+  `[tool.ruff]` section in `pyproject.toml`, `.clang-tidy`, `.luacheckrc`);
+* `plugins/cmake/Safety.cmake`;
+* the gates themselves: `tests/gates/` and the two gate workflows;
+* a line in `tests/gates/baseline.tsv` that is new or higher. A rename, a new
+  plugin with findings and a linter upgrade need this too
+  (`--update --allow-growth` writes the lines).
+
+On a pull request, the `Gate guard` workflow fails such a change until the
+pull request carries the label `owner-approved`, and GitHub's record of the
+pull request shows that the repository owner added it after the last push.
+The workflow runs on `pull_request_target`, so the gate script and the
+workflow come from the base branch and the pull request cannot change the
+check that judges it. Without a pull request, `tests/gates/check.sh guard`
+prints the list and passes. `tests/gates/check.sh guard --pr N` applies the
+rule to pull request `N`.
+
 The gates need `shellcheck`, `ruff` and `clang-tidy` at the versions pinned in
 `tests/gates/requirements.txt`, `luacheck` 1.2.0, and for C++ `cmake`, a C++
-compiler and `readelf`.
+compiler and `readelf`. The guard needs `gh` only when it is given a pull
+request.
 
 ## License
 

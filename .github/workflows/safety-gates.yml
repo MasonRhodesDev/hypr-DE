@@ -1,0 +1,66 @@
+name: Safety gates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: safety-gates-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scripts:
+    name: Shell, Python and Lua
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          # the guard gate reports against the base revision
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install the pinned linters
+        run: |
+          python3 -m venv "$RUNNER_TEMP/gates"
+          "$RUNNER_TEMP/gates/bin/pip" install --require-hashes -r tests/gates/requirements.txt
+          curl -fsSL -o "$RUNNER_TEMP/gates/bin/luacheck" \
+            https://github.com/lunarmodules/luacheck/releases/download/v1.2.0/luacheck
+          echo "d68da17fca0697d9e2fb04201f3884abd259fa558b3a449bccaed47f1390defc  $RUNNER_TEMP/gates/bin/luacheck" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/gates/bin/luacheck"
+          echo "$RUNNER_TEMP/gates/bin" >>"$GITHUB_PATH"
+      - name: Gates
+        run: tests/gates/check.sh shell python lua guard
+
+  cpp:
+    name: C++ hardening, sanitizers and clang-tidy
+    runs-on: ubuntu-24.04
+    container: archlinux:latest@sha256:b0deabeb3d283da2c7f7dbf0eea051b7b2cd0554e0b737cc457fd21683bdcdd1
+    steps:
+      - name: Install the toolchain
+        run: pacman -Syu --noconfirm --needed base-devel cmake git python
+
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+
+      - name: Trust the checkout (container runs as root)
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Install Hyprland's headers when a plugin is present
+        shell: bash
+        run: |
+          if compgen -G 'plugins/*/CMakeLists.txt' >/dev/null; then
+            pacman -S --noconfirm --needed hyprland
+          fi
+
+      - name: Install the pinned clang-tidy
+        run: |
+          python -m venv /opt/gates
+          /opt/gates/bin/pip install --require-hashes -r tests/gates/requirements.txt
+          echo /opt/gates/bin >>"$GITHUB_PATH"
+
+      - name: C++ gates
+        run: tests/gates/check.sh cpp-harden cpp-sanitize cpp-tidy cpp-selftest
