@@ -248,6 +248,12 @@ frame in which every declared layer is mapped on every output, and Hyprland's
 own wallpaper has loaded when it draws one. Every output fades together over
 0.2 s, and input and the cursor come back on the first faded frame.
 
+`graphical-session.target` waits for uwsm to see the Wayland environment.
+hypr-DE's `/etc/xdg/uwsm/env-hyprland` sets `UWSM_WAIT_VARNAMES_SETTLETIME`
+to 0, because hypr-DE exports the session's variables in one call, and that
+takes uwsm's 0.2 s settle pause off every login. A value set earlier in the environment,
+or in `~/.config/uwsm/env-hyprland`, wins.
+
 Every output there means each output that shows a frame of its own. A mirror,
 an output that is off or disabled, and the `FALLBACK` output Hyprland puts in
 while no real one exists do not count, and the scene never covers `FALLBACK`.
