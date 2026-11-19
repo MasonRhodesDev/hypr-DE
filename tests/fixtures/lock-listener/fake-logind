@@ -1,0 +1,67 @@
+#!/usr/bin/python3 -I
+import os
+import signal
+import sys
+
+from gi.repository import Gio, GLib
+
+try:
+    from gi.repository import GLibUnix
+    signal_add = GLibUnix.signal_add
+except ImportError:
+    signal_add = GLib.unix_signal_add
+
+SESSIONS = {"7": "/org/freedesktop/login1/session/_37", "8": "/org/freedesktop/login1/session/_38"}
+USER_PATH = "/org/freedesktop/login1/user/_1000"
+display = os.environ.get("FAKE_LOGIND_DISPLAY", "7")
+
+XML = """<node>
+<interface name="org.freedesktop.login1.Manager">
+  <method name="GetSession"><arg type="s" direction="in"/><arg type="o" direction="out"/></method>
+  <method name="GetUser"><arg type="u" direction="in"/><arg type="o" direction="out"/></method>
+</interface>
+<interface name="org.freedesktop.login1.User">
+  <property name="Display" type="(so)" access="read"/>
+</interface>
+</node>"""
+info = Gio.DBusNodeInfo.new_for_xml(XML)
+
+
+def method(conn, sender, path, iface, name, params, invocation):
+    if name == "GetSession":
+        (sid,) = params.unpack()
+        if sid not in SESSIONS:
+            invocation.return_dbus_error("org.freedesktop.login1.NoSuchSession", f"No session '{sid}' known")
+            return
+        invocation.return_value(GLib.Variant("(o)", (SESSIONS[sid],)))
+    elif name == "GetUser":
+        invocation.return_value(GLib.Variant("(o)", (USER_PATH,)))
+
+
+def prop(conn, sender, path, iface, name):
+    if not display:
+        return GLib.Variant("(so)", ("", "/"))
+    return GLib.Variant("(so)", (display, SESSIONS[display]))
+
+
+bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+bus.register_object("/org/freedesktop/login1", info.interfaces[0], method, None, None)
+bus.register_object(USER_PATH, info.interfaces[1], None, prop, None)
+
+
+def emit(sid):
+    bus.emit_signal(None, SESSIONS[sid], "org.freedesktop.login1.Session", "Lock", None)
+    bus.flush_sync(None)
+    return GLib.SOURCE_CONTINUE
+
+
+signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR1, emit, "7")
+signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR2, emit, "8")
+
+
+def owned(*_):
+    print("ready", flush=True)
+
+
+Gio.bus_own_name_on_connection(bus, "org.freedesktop.login1", Gio.BusNameOwnerFlags.NONE, owned, lambda *_: sys.exit(1))
+GLib.MainLoop().run()

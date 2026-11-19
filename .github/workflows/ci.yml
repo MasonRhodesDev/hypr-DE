@@ -94,6 +94,10 @@ jobs:
         run: ./tests/power-menu-exit.sh
       - name: Lock policy routing
         run: ./tests/lock-policy.sh
+      - name: A logind Lock request locks the session without hypridle
+        run: |
+          sudo apt-get install -y dbus-daemon python3-gi
+          ./tests/lock-listener.sh
       - name: Per-host idle timeouts
         run: ./tests/hypridle-override.sh
       - name: Screen-share consent scoping

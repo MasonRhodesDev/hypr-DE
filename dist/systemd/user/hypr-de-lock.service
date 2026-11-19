@@ -1,0 +1,13 @@
+[Unit]
+Description=Lock the session whenever logind asks (loginctl lock-session, lid close)
+PartOf=graphical-session.target
+After=graphical-session.target
+ConditionEnvironment=HYPRLAND_INSTANCE_SIGNATURE
+
+[Service]
+Type=simple
+ExecStart=@LIBEXECDIR@/hypr-de-lock-listener
+Restart=always
+RestartSec=1
+# lock-cmd.sh's last-resort retry runs vigil-lock bare, in this cgroup; a restart must not kill a held lock.
+KillMode=process

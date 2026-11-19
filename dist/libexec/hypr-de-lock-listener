@@ -1,0 +1,84 @@
+#!/usr/bin/python3 -I
+import os
+import sys
+
+from gi.repository import Gio, GLib
+
+LOCK_CMD = "@LIBEXECDIR@/lock-cmd.sh"
+LOGIND = "org.freedesktop.login1"
+MANAGER_PATH = "/org/freedesktop/login1"
+MANAGER = "org.freedesktop.login1.Manager"
+SESSION = "org.freedesktop.login1.Session"
+
+
+def log(message):
+    print(f"hypr-de-lock-listener: {message}", file=sys.stderr, flush=True)
+
+
+def call(bus, path, interface, method, signature, args, reply):
+    return bus.call_sync(
+        LOGIND, path, interface, method,
+        GLib.Variant(signature, args), GLib.VariantType(reply),
+        Gio.DBusCallFlags.NONE, -1, None,
+    ).unpack()
+
+
+def own_session(bus):
+    session_id = os.environ.get("XDG_SESSION_ID")
+    if session_id:
+        (path,) = call(bus, MANAGER_PATH, MANAGER, "GetSession", "(s)", (session_id,), "(o)")
+        return session_id, path
+    (user,) = call(bus, MANAGER_PATH, MANAGER, "GetUser", "(u)", (os.getuid(),), "(o)")
+    ((session_id, path),) = call(
+        bus, user, "org.freedesktop.DBus.Properties", "Get", "(ss)",
+        ("org.freedesktop.login1.User", "Display"), "(v)",
+    )
+    if not session_id:
+        raise RuntimeError(f"user {os.getuid()} has no graphical session")
+    return session_id, path
+
+
+class Locker:
+    def __init__(self, session_id):
+        self.launcher = Gio.SubprocessLauncher.new(Gio.SubprocessFlags.NONE)
+        self.launcher.setenv("XDG_SESSION_ID", session_id, True)
+        self.running = False
+
+    def request(self):
+        if self.running:
+            log("a lock is already starting; not starting another")
+            return
+        try:
+            child = self.launcher.spawnv([LOCK_CMD])
+        except GLib.Error as error:
+            log(f"cannot run {LOCK_CMD}: {error.message}")
+            return
+        self.running = True
+        child.wait_async(None, self.finished)
+
+    def finished(self, child, result):
+        child.wait_finish(result)
+        self.running = False
+        if not child.get_successful():
+            log(f"{LOCK_CMD} failed with status {child.get_status()}")
+
+
+def main():
+    bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+    try:
+        session_id, path = own_session(bus)
+    except (GLib.Error, RuntimeError) as error:
+        log(f"cannot find this user's session: {getattr(error, 'message', error)}")
+        return 1
+    locker = Locker(session_id)
+    bus.signal_subscribe(
+        LOGIND, SESSION, "Lock", path, None, Gio.DBusSignalFlags.NONE,
+        lambda *_: locker.request(),
+    )
+    log(f"locking session {session_id} on each logind Lock request")
+    GLib.MainLoop().run()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
