@@ -113,7 +113,7 @@ while :; do
             else
                 echo "All expected variables appeared in activation environment."
             fi
-            [[ $settle =~ ^[0.]*$ ]] || sleep "$settle"
+            [[ $settle =~ ^[0.]*$ ]] || sleep "$settle" || exit 1
             exit 0
         fi
 
