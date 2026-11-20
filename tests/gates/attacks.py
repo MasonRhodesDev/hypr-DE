@@ -472,6 +472,14 @@ printf 'print("ok   ratchet: nothing the gates allow has grown")\\n' >tests/gate
     "h4c": (["shell"], SHELLWRAP, [], {"exact": True}),
     # and a fixed finding beside a new one of its rule fails once, with the one hint that fits
     "h4d": (["shell"], K0, [r"shell: dist/bin/hypr-de-set-wallpaper SC2292"], {"absent": [r"FAIL .*lower it with --update"], "out": [r".*--update --allow-growth"]}),
+    # finding 7: -wrapper is not among the options GCC reports, but the wrapper the build wrote is a program the build user could have written
+    "h7": (CPP, f"""mkdir -p {PLUGIN}/tools
+printf '#!/bin/sh\\nexec "$@"\\n' >{PLUGIN}/tools/wrap.sh
+chmod 755 {PLUGIN}/tools/wrap.sh
+printf '{PLUGIN}/tools/wrap.sh\\tsh\\n' >>tests/gates/classified.tsv
+LC_ALL=C sort -o tests/gates/classified.tsv tests/gates/classified.tsv
+printf '\\ntarget_compile_options(hypr-de-scene-impl PRIVATE "SHELL:-wrapper ${{CMAKE_CURRENT_SOURCE_DIR}}/tools/wrap.sh")\\n' >>{CM}""",
+           [rf"cpp-harden: {SCENE} untrusted-tool"], {"check": False}),
     # finding 8: -Bsymbolic-functions given to the driver is -B and a directory to GCC, and the FAIL says how to give it to the linker
     "h8": (CPP, f"""printf '\\ntarget_link_options(hypr-de-scene-impl PRIVATE -Bsymbolic-functions)\\n' >>{CM}""",
            [rf"cpp-harden: {SCENE} driver-override"], {"out": [r".*-Wl,-Bsymbolic-functions"], "check": False}),
