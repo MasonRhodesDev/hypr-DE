@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.27)
 
 project(hypr-de-scene VERSION 0.1.0 LANGUAGES CXX)
+include(../cmake/Safety.cmake)
 
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

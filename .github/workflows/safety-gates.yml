@@ -1,0 +1,91 @@
+name: Safety gates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: safety-gates-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scripts:
+    name: Shell, Python and Lua
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+          # the ratchet reads the base commit and the pull request's commit messages
+          fetch-depth: 0
+      - name: Install the pinned linters
+        run: |
+          python3 -m venv "$RUNNER_TEMP/gates"
+          "$RUNNER_TEMP/gates/bin/pip" install --require-hashes -r tests/gates/requirements.txt
+          curl -fsSL -o "$RUNNER_TEMP/gates/bin/luacheck" \
+            https://github.com/lunarmodules/luacheck/releases/download/v1.2.0/luacheck
+          echo "d68da17fca0697d9e2fb04201f3884abd259fa558b3a449bccaed47f1390defc  $RUNNER_TEMP/gates/bin/luacheck" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/gates/bin/luacheck"
+          echo "$RUNNER_TEMP/gates/bin" >>"$GITHUB_PATH"
+      - name: Gates
+        run: tests/gates/check.sh classify shell python lua
+
+      # What the gates allow only shrinks: a grown baseline row, a class no gate reads, or a change to a linter
+      # configuration, the gates or the workflows needs a "Gate-change:" line with its reason in a commit or the
+      # pull request body. The base branch's ratchet judges, so a pull request cannot loosen the ratchet itself.
+      - name: The baseline only shrinks
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          GATE_CHANGE_REASONS: ${{ github.event.pull_request.body }}
+        run: |
+          if git cat-file -e "$BASE:tests/gates/ratchet.py" 2>/dev/null; then
+            git show "$BASE:tests/gates/ratchet.py" >"$RUNNER_TEMP/ratchet.py"
+          else
+            echo "::warning::the base branch has no ratchet yet, so this pull request's own copy judges it"
+            cp tests/gates/ratchet.py "$RUNNER_TEMP/ratchet.py"
+          fi
+          python3 -I "$RUNNER_TEMP/ratchet.py" "$BASE"
+
+  cpp:
+    name: C++ packages, sanitizers and clang-tidy
+    runs-on: ubuntu-24.04
+    container: archlinux:latest@sha256:b0deabeb3d283da2c7f7dbf0eea051b7b2cd0554e0b737cc457fd21683bdcdd1
+    env:
+      # GCC, Hyprland and the rest come from this Arch Linux Archive day, so the baseline's counts move only when it does
+      ARCH_SNAPSHOT: 2026/11/18
+    steps:
+      - name: Install the toolchain
+        run: |
+          echo "Server = https://archive.archlinux.org/repos/$ARCH_SNAPSHOT/\$repo/os/\$arch" >/etc/pacman.d/mirrorlist
+          pacman -Syy --noconfirm archlinux-keyring
+          pacman -Suu --noconfirm --needed base-devel cmake git python strace
+
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+
+      - name: Trust the checkout (container runs as root)
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      # the gates build every package with its check(), so each one's makedepends and checkdepends are installed
+      - name: Install what each package needs to build and test
+        shell: bash
+        run: |
+          for pkgbuild in $(awk -F'\t' '$2 == "pkgbuild" { print $1 }' tests/gates/classified.tsv); do
+            setpriv --reuid=65534 --regid=65534 --clear-groups \
+              bash -c 'source "$1" && printf "%s\n" "${makedepends[@]}" "${checkdepends[@]}"' bash "./$pkgbuild"
+          done | sed 's/[<>=].*//' | sort -u | xargs -r pacman -S --noconfirm --needed
+
+      - name: Install the pinned clang-tidy
+        run: |
+          python -m venv /opt/gates
+          /opt/gates/bin/pip install --require-hashes -r tests/gates/requirements.txt
+          echo /opt/gates/bin >>"$GITHUB_PATH"
+
+      - name: C++ gates
+        run: tests/gates/check.sh cpp-harden cpp-sanitize cpp-tidy cpp-selftest

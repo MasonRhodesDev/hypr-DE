@@ -452,6 +452,341 @@ sudo dnf install ~/rpmbuild/RPMS/*/hypr-de-scene-[0-9]*.rpm
 - `hypr-de-scene` is built and checked by the Scene plugin workflow on
   every push. The release workflow does not publish it yet.
 
+### Safety gates
+
+CI refuses unsafe patterns in new code. `tests/gates/check.sh` runs every gate,
+or the ones named on its command line:
+
+| Gate | What it refuses |
+|------|-----------------|
+| `classify` | A file the other gates cannot place that `tests/gates/classified.tsv` does not list: a file with no suffix or a suffix outside the gate's known list, a `CMakeLists.txt` other than a plugin's own, a C or C++ file outside a plugin directory. A `PKGBUILD` not classified `pkgbuild` and a spec not classified `spec`. A committed object file, archive or ELF binary. Opaque data (over 7 bits of entropy per byte in 1 KiB or more, or a long run of base64, hex or escaped bytes) not classified `blob` with a reason. A listed class that a shebang or the executable bit contradicts, and a `cpp-test` row on a file that is not C or C++. A spec that compiles (it asks for a compiler or a C or C++ build system in `BuildRequires`, or names one in its build sections, macros included) and runs anything in `%prep`, `%conf`, `%build` or `%install` but `%autosetup`, `%cmake -S <directory>`, `%cmake_build` and `%cmake_install`, so it can pass no option or flag of its own. A spec that redefines a flags macro, or turns off the annobin notes (`_annotated_build`) the `rpm` gate reads. Never baselined. |
+| `shell` | Anything `shellcheck` reports with every optional check on, in every shell script, `PKGBUILD`, `.install` file and RPM scriptlet (`%post` and the rest), and a `shellcheck disable` directive. An RPM scriptlet that writes into a program or library directory. A script is found by its suffix (`.sh`, `.bash`), by a shebang that names a shell, or by its class in `classified.tsv`. A shebang or scriptlet interpreter that `shellcheck` cannot read, such as `zsh`, fails and is never baselined. |
+| `python` | `ruff` with the bandit, bugbear and pylint rules in `ruff.toml`, and a `noqa` or `ruff:` comment. |
+| `lua` | `luacheck` findings (`.luacheckrc`) and inline `luacheck:` comments. |
+| `cpp-harden` | What the packages ship, described below. |
+| `cpp-sanitize` | A plugin whose tests fail under AddressSanitizer and UndefinedBehaviorSanitizer, that registers no test with `add_test`, or that compiles a source of its own with a sanitizer off. |
+| `cpp-tidy` | `clang-tidy` findings from `plugins/.clang-tidy` in every compile `cpp-harden` checks, in every header of this repository they include and in every file their build writes. |
+| `cpp-selftest` | The C++ gates themselves, if they stop catching a known-bad case of `tests/gates/cpp-fixture` or report anything in its clean build. Never baselined. |
+| `rpm` | Each binary RPM named with `--rpms`, read as it installs: no setuid, setgid, world-writable or non-root file; every ELF file passes the same ELF checks as `cpp-harden`'s; and `annocheck` passes it, reading the notes Fedora's GCC records for each compile from the debuginfo package, so it sees optimisation, the stack protector, stack clash protection, fortify, `_GLIBCXX_ASSERTIONS` and CET per compile. Every ELF file must carry those notes, in it or in its debuginfo, or it fails as `annobin-missing`, since without them `annocheck` has little to read. A run given no binary RPM fails, and so does a package built for an architecture (not `noarch`) that holds no ELF file, since nothing in it was audited. `all` does not run it. The `rpm` job in `.github/workflows/scene-plugin.yml` runs it on the RPM it builds. |
+
+A suppression comment does not change a result. `ruff` runs with
+`--config ruff.toml --ignore-noqa`. `shellcheck` runs with
+`--rcfile=.shellcheckrc` and `luacheck` with `--config .luacheckrc`, both on
+copies that have their inline directives removed. So the finding under a
+suppression is counted, and so is the suppression. A linter configuration file
+in a subdirectory is not read. C++ has no switch for this, so each `NOLINT`
+comment and diagnostic pragma is counted by its whole line.
+
+#### What the C++ gates judge
+
+The C++ gates judge what a package ships and what the compiler saw, not what
+a build file says. `cpp-harden` runs `makepkg` on every `PKGBUILD` that
+`classified.tsv` lists as `pkgbuild`: its own `prepare()`, `build()`,
+`check()` and `package()`, from a tarball of the tracked files with no `.git`,
+with an empty environment, and with the distribution's compiler flags emptied
+so that only what this repository asks for counts. `check()` runs between
+`build()` and `package()`, as it does when the package ships, so what it
+changes in the build is audited too. The CI job installs each package's
+`makedepends` and `checkdepends` for it. Some tests fail under the trace
+described below, as the main package's lock tests do. A package whose build
+fails under it is built again untraced, and that build counts only if it
+ships no ELF file, so none of its compiles is held to the shipping set and
+only its archive, scriptlet and file checks apply. A package that ships an
+ELF file keeps the traced build's `build-failed`. As root it builds as an unprivileged
+user. The tarball stands in for the `PKGBUILD`'s remote source, unpacked as
+`<last part of url>-<pkgver>`, the way a forge's release archive unpacks.
+
+`tests/gates/shim.py` stands in for the GCC drivers on `PATH` during the
+build. For each compile it keeps GCC's own job list (`-###`) and the
+preprocessor's view of the source with the compile's own arguments
+(`-E -dD -C`). For each link it keeps every file the linker read. When the
+call ends it sends that record to the gate over a unix socket, so the build
+can add a record but never change or delete one. A call that compiles and
+links nothing, such as `c++ --version`, sends none; a call with several
+sources sends one without a preprocessed view, so what it makes is
+unattributed if it ships.
+
+The build user owns only the build's source, build, output and home
+directories. The shim, its wrappers and the socket's directory stay the
+gate's. The whole build runs under `strace -f`, which lists every program it
+starts. A compiler, assembler or linker that no shim process started fails as
+`unshimmed`, unless it was a probe that names no input and no output, as CMake
+asks `ld -v`. A record from a process that never ran the shim fails as
+`forged-record`, and one the gate cannot read as `malformed-record`. The
+sanitizer build in `cpp-sanitize` runs the same way, as the build user.
+
+A compile stage comes only from the system. Every program a shim process runs,
+the driver, `cc1plus`, `as`, `collect2`, `ld` and the rest, must be owned by
+root and sit in directories only root can change, outside the gate's work
+directory; anything else fails as `untrusted-tool`. A compile whose driver
+options, after GCC has read every response file, hold `-B`, `-specs`,
+`-fplugin` or `-iplugindir` fails as `driver-override`, since each one
+changes which programs run or what they are told past what `-###` and `-E`
+show. GCC reads a linker option such as `-Bsymbolic-functions` given to the
+driver as `-B` and a directory, so the FAIL names `-Wl,-Bsymbolic-functions`,
+the way to hand it to the linker. GCC does not list `-wrapper` among those
+options, so `driver-override` never names it; the program it runs is
+`untrusted-tool` if the build user could have written it, and what a wrapper
+makes is unattributed if it ships. The wrappers drop `COMPILER_PATH`, `GCC_EXEC_PREFIX`,
+`LIBRARY_PATH`, `GCC_COMPARE_DEBUG` and every `LD_*` variable before the shim
+starts. `CC` and `CXX` name the wrappers, so `tests/run`, which clears the
+environment for each test, keeps them, and a test's compiles in `check()` go
+through the shim too.
+
+Then, for every ELF file in the package:
+
+* It is position independent, has full RELRO and immediate binding, a stack
+  that is not executable, the CET note on x86-64, no `RPATH` or `RUNPATH` and
+  no text relocations.
+* It imports no plain `printf`, `sprintf`, `vsnprintf`, `syslog` or their
+  siblings, which fortify always replaces. A plain `memcpy` or `strcpy` is
+  fortify's own answer when it cannot see a buffer's size, so it counts for
+  nothing.
+* Its build ID matches a link the shim saw, every section it loads, code and
+  data, is what that link wrote (apart from the dynamic section and its
+  strings, which CMake's install rewrites to drop the build tree's `RPATH`),
+  and every object that link read comes from a compile
+  the shim saw, or from a file the build user cannot write. Anything else is
+  `unattributed`, which is never baselined. So is an object built with LTO,
+  since the gate cannot see what LTO makes of it. When two records match one
+  object or one build ID, both are judged.
+* Every library it needs (`DT_NEEDED`) is one the package ships, or one that
+  a package in its declared `depends`, or their dependencies, installs. A
+  library named by a path fails.
+
+Each package archive `makepkg` wrote has no setuid, setgid, world-writable or
+non-root file, read from the archive as it installs. Its install scriptlet
+(`install=`) names a program or library directory, or a directory the package
+ships an ELF file in, only as the command it runs, never as a place it writes.
+
+For every compile behind a shipped ELF file (a test's own compile in
+`check()`, or a library the package builds and never installs, ships
+nothing, so it is not held to this set):
+
+* `_FORTIFY_SOURCE` and glibc's `__USE_FORTIFY_LEVEL` are 3,
+  `_GLIBCXX_ASSERTIONS` is defined and `NDEBUG` is not, at every `#include`
+  and at the end. Once the unit has left glibc's `features.h`, which sets
+  `__USE_FORTIFY_LEVEL`, an undefined level counts as fortify off. The preprocessor's own `#define` and `#undef` lines show
+  where each one changed, so a response file, `-Wp,-U...`, a launcher that
+  drops flags or an `#undef` hidden by a comment or a line splice all show.
+* GCC's own macros show optimisation (`__OPTIMIZE__`), the strong stack
+  protector, position independent code and full CET. Stack clash protection
+  and `-Wall -Wextra -Wconversion -Wshadow` are read from the arguments GCC
+  hands its compiler, after it has expanded response files. A warning turned
+  off there (`-Wno-*`, `-w`) counts once per package.
+* No header in the tree is compiled as a system header, by `SYSTEM`,
+  `-isystem` or `#pragma GCC system_header`, since GCC hides its warnings.
+* In the tree's own lines of the preprocessed source, with comments and
+  strings lexed out and macros expanded: an `optimize`, `target`,
+  `no_stack_protector`, `no_sanitize` or `nocf_check` attribute, a
+  `#pragma GCC optimize`, `push_options` or `target`, a diagnostic pragma that
+  ignores a warning, and a `NOLINT` comment.
+* In the whole unit, headers outside the tree included: a `#pragma GCC
+  optimize` or `target`, or a `push_options`, still in force when the unit
+  ends.
+* No `-mmanual-endbr`, which keeps `__CET__` and the CET note and drops
+  `endbr64` from every function not marked `cf_check`.
+* No object defines `__stack_chk_fail`, `__chk_fail` or `__fortify_fail`,
+  which would turn a failed check into a call that returns.
+
+Compiler warnings are read from what each compile wrote, as the shim saw it,
+so a `build()` that discards its output keeps every count. A call that only
+assembles or preprocesses is not a compile the gate can judge, so what it
+makes is unattributed. A C or C++ file in a
+plugin directory that no compile behind a shipped file read, and that
+`classified.tsv` does not list, fails as `not-built`. `cpp-tidy` runs on the
+compiles `cpp-harden` judges, so it sees what GCC compiled, unity files and
+generated sources included.
+`cpp-sanitize` builds each plugin with `HYPR_DE_SANITIZE=ON` through the same
+shim and runs its tests.
+
+Every reviewed attack on these gates is a case in `tests/gates/attacks.py`,
+which makes each change on a fresh clone of `HEAD`, runs the gates and checks
+for the exact FAIL line. Its C++ cases build only the plugin's package
+(`--pkgbuild`), the one each case changes; CI builds every package. A gate
+that cannot see all the code, because a build
+failed, a tool ran outside the shim or an ELF is unattributed, prints that and
+stays silent about the counts it can no longer check. Run it where the C++ gates run:
+`python3 -I tests/gates/attacks.py [case ...]`. The self-test covers the same
+mechanisms on the fixture in every CI run.
+
+#### What still passes
+
+* The build user can still write into its own processes' memory through
+  `/proc`, so a build step can change what a running shim sends. That is a
+  deliberate attack in the build's own code, which review sees.
+* The wrappers' own shell starts with the build's environment, so an
+  `LD_PRELOAD` library the build exports loads into it before the wrapper
+  drops the variable. Such a library can change what the shim reports, as a
+  `/proc` write can. It is code the build compiles or ships in the tree,
+  which review sees.
+* A compiler copied under a name the trace does not know, such as `mycc`,
+  runs unseen by the trace. What it makes is still unattributed if it ships.
+* A probe as the trace defines it, a tool called with options only, is not
+  judged. `as` with no arguments reads standard input and writes `a.out`;
+  that file is unattributed if it ships.
+* The install scriptlet check reads paths as written. A scriptlet that builds
+  a path at run time, such as `"/usr/l""ib"`, is not caught.
+* Inline assembly, `.incbin` and linker script data are judged only as part of
+  the compile that holds them.
+* Fortify is proven per compile, not per call. A call fortify cannot size
+  stays unchecked by design, and a call through a function pointer to
+  anything but the printf family goes unseen.
+* The build may reach the network. Code it downloads and links is
+  unattributed, but a downloaded script or data file is not judged.
+* Only the compiles behind a shipped ELF file are held to the shipping set,
+  so a CMake probe or a test's own build is not judged. Code the build compiles and ships in another form, such as a compressed
+  or encoded file a program unpacks later, is not judged; `classify` sees
+  it only if it is committed opaque data.
+* A `check()` that fails only under the trace makes the gate judge the
+  untraced build, which counts only if the package ships no ELF file. That
+  build has no trace, so a compile outside the shim (`unshimmed`) and a
+  forged record go unseen there. What it can hide is compiled code shipped
+  in another form, as above. A probe of `TracerPid` in `check()` stands out
+  in review.
+* `-Wl,--wrap=__stack_chk_fail` with a `__wrap___stack_chk_fail` of the
+  package's own is not reported. The guard check looks for the exact names,
+  and with the wrap the library no longer imports `__stack_chk_fail`, so a
+  smashed stack returns instead of aborting. The link option and the
+  function both stand out in review.
+* `-wrapper` is not among the options GCC reports, so `driver-override`
+  never names it. A wrapper the build wrote fails as `untrusted-tool`, and
+  what it makes as unattributed if it ships, but the gate does not say
+  `-wrapper` was the cause.
+* `packaging/` is outside CODEOWNERS and the ratchet's configuration list,
+  since every release bumps the versions there. A spec's build sections,
+  its flag macros and its annobin switch are checked by `classify`, which
+  is under both, and the `rpm` gate requires the notes.
+* The `rpm` cases in `tests/gates/attacks.py` need Fedora's `rpmbuild` and
+  `annocheck`, so a run where the C++ gates run reports them as not run;
+  they run in a container like the `rpm` job's.
+* The gates build with GCC. A compile by another compiler bypasses the shim
+  and shows as unattributed, so it fails rather than passes.
+* The `rpm` gate judges what `annocheck` reads from the compiler's notes and
+  what the ELF checks see. The warnings, pragmas, `NOLINT` comments and
+  source-level checks `cpp-harden` makes are made on the Arch build only. The
+  RPM it audits is the one `scene-plugin.yml` builds from the spec on
+  `fedora:latest` with the COPR's Hyprland, not one a release builds in COPR.
+* A file with a known data suffix that a script sources is linted only once
+  `classified.tsv` lists it as `sh` or `bash`, as `packaging/paths.conf` is.
+* The gates are code in this repository, reviewed like any other. GitHub runs
+  the pull request's own copy of each workflow, so a pull request can remove
+  a step. The ratchet reports that edit, and only branch protection makes it
+  matter; see below.
+
+#### How the audited build differs from the shipped one
+
+* Flags. The gate empties Arch's `CFLAGS`, `CXXFLAGS`, `CPPFLAGS` and
+  `LDFLAGS`, so only what this repository asks for counts. Arch's stock flags
+  harden on their own, so the gate is stricter than an Arch build there.
+* LTO and debug packages. The gate builds with `!lto !debug`. Stock
+  `makepkg` turns both on, so the shipped code is what LTO makes of each
+  compile, which the gate never judges, and the debug symbols are split out.
+* Packages. The gate's compiler and headers come from one Arch Linux Archive
+  day (`ARCH_SNAPSHOT`); a release or a user's build uses what is current.
+* Source. The gate builds a tarball of the files git tracks. A release builds
+  the forge's archive of its tag, which holds the same files while the
+  repository has no `.gitattributes` export rules.
+* Dependencies. The gate builds with `--nodeps`; CI installs each package's
+  `makedepends` and `checkdepends`, not its `depends`.
+* `check()` runs in both.
+
+#### Branch protection the gates need
+
+`.github/CODEOWNERS` names the owner for the gates, the workflows, the
+hardening flags and the linter configurations. Neither CODEOWNERS nor a
+failing check stops a merge until `main` has a branch protection rule (or a
+ruleset) with these settings, which only the repository's owner can set:
+
+* Require a pull request before merging, with 1 approval, "Require review
+  from Code Owners", "Dismiss stale pull request approvals when new commits
+  are pushed" and "Require approval of the most recent reviewable push".
+* Require status checks to pass, with "Require branches to be up to date
+  before merging", and these checks required: `Shell, Python and Lua` and
+  `C++ packages, sanitizers and clang-tidy` (Safety gates),
+  `Build against Hyprland headers, sealed` and `SRPM → RPM (%check) →
+  rpmlint` (Scene plugin), `lint` (CI), and the checks of the `arch` and
+  `rpm` jobs in `package.yml` and the `arch` job in `scene-plugin.yml`,
+  which GitHub names after the reusable workflows' own jobs.
+* "Do not allow bypassing the above settings", so an administrator's merge
+  is held to them too, and no force pushes or deletions.
+
+GitHub does not let anyone approve their own pull request. With one code
+owner, the owner's own pull requests that touch these paths cannot then be
+approved by anyone else who counts. They need a second code owner, or the
+owner turns off "Do not allow bypassing" for that merge, which the audit log
+records. A pull request from anyone else needs the owner's approval.
+
+CI builds C++ with the packages of one Arch Linux Archive day, `ARCH_SNAPSHOT`
+in `.github/workflows/safety-gates.yml`, so a GCC, Clang or Hyprland release
+changes no count until that line moves. To move it, pick a later day under
+`https://archive.archlinux.org/repos/`, run the C++ gates in
+`archlinux:latest` with that day's mirror (the workflow's install step shows
+how), and commit the new day with whatever `--update --allow-growth` writes.
+The pull request names what each new baseline line is, like any baseline
+growth. A local run uses whatever compiler is installed, so its counts can
+differ from CI's. A local run judges only the files git tracks. Without a tool
+the C++ gates need, a run fails with `toolchain cannot-run`, locally as in CI.
+
+What already broke a rule when its gate arrived is counted in
+`tests/gates/baseline.tsv`, one line per gate, file, rule and the text the
+finding names: the source lines for a linter or compiler finding, the rule
+for a whole compile or ELF file. The line carries the text and its hash, so
+fixing one finding and adding another of the same rule in the same file
+fails. A count may only fall. Finding more than the count fails, and so does
+finding fewer until the line is lowered with
+`tests/gates/check.sh <gate> --update`.
+
+A line that moves keeps its text, so its row still counts it. A reformatted
+statement keeps its rows too. When a baselined text is no longer found as a
+finding's text, but is still in the file once whitespace, line breaks, line
+continuations and semicolons are taken out of both, each new finding of the
+same rule whose text shares characters with it takes its share of the count.
+That holds however many lines a formatter wraps, joins or writes the
+statement out over: `clang-format` with `plugins/hypr-de-scene/.clang-format`
+over the plugin's sources, and `shfmt` with its default flags or with
+`-bn -ci` over the baselined scripts, need no change to the baseline. A line
+that is edited keeps its row as well: when the old text is gone from the
+file, and the one to four lines of the file most like it now (by `difflib`,
+at least 0.6 alike) carry a new finding of the same rule, the row's count
+moves to that text. A fixed line and a new line of the same rule elsewhere in
+the file match neither way, since the new line shares no text with the old
+one and the fixed line is still the one most like it. `--update` then writes
+the new text, and the ratchet takes those rewritten rows by the same test, so
+a pure reformat needs no `Gate-change:` reason. When an edit both fixes or
+moves a finding and adds one of the same rule elsewhere, the gate prints one
+FAIL, for the new finding, with the `--update --allow-growth` hint.
+
+The match is by text alone, as the ratchet has no line numbers, and it never
+moves more than a row lost, so a file's count for a rule cannot grow
+unreported. Its limit: when a finding goes away, a new finding of the same
+rule in that file whose text overlaps the old text, in either direction,
+takes the row's count. For example, fixing `[ $# -eq 1 ] || usage` to
+`[[ $# -eq 1 ]] || usage` and adding the line `[ $# -eq 1 ] || usage "$0"`
+passes, since the new line holds the old text as a statement a formatter
+joined onto its neighbour would. The file's SC2292 count stays at one.
+
+A new or higher line in the baseline is an ordinary edit
+(`--update --allow-growth` writes it). On a pull request,
+`tests/gates/ratchet.py` compares the base commit's baseline, file classes and
+configurations with the pull request's. CI runs the base branch's copy of it,
+so a pull request cannot loosen the ratchet itself. A new or higher baseline
+line, a new file in a class no gate reads (a `cpp-test` source excepted,
+since it ships nothing), a changed class, or any change to a linter
+configuration, `plugins/cmake/`, `tests/gates/` (the gates, their fixtures
+and pinned tools) or `.github/` (the workflows and CODEOWNERS) fails, unless
+a commit or the pull request body has a line that starts with `Gate-change:`
+and says why. The step prints each such change beside the reasons, for
+review, and on GitHub it is also a warning on the run and a line in the job's
+summary. GitHub does not rerun a workflow when only the body changes, so a
+reason added to the body later needs a rerun of the `Shell, Python and Lua`
+job.
+
+The gates need `shellcheck`, `ruff` and `clang-tidy` at the versions pinned in
+`tests/gates/requirements.txt`, `luacheck` 1.2.0, and for C++ `makepkg`,
+`fakeroot`, `cmake`, GCC, `readelf`, `strace` and `setpriv`, with each
+`PKGBUILD`'s build dependencies installed.
+
 ## License
 
 MIT

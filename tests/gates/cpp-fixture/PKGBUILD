@@ -1,0 +1,22 @@
+# The gates' self-test builds this package once per known-bad case, named by FIXTURE_BAD.
+pkgname=gate-fixture
+pkgver=1
+pkgrel=1
+pkgdesc="Builds the C++ gates must refuse"
+arch=('x86_64' 'aarch64')
+url="https://example.invalid/hypr-DE"
+license=('MIT')
+depends=('glibc' 'libgcc' 'libstdc++')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+  cd "hypr-DE-$pkgver/tests/gates/cpp-fixture" || return 1
+  cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DFIXTURE_BAD="${FIXTURE_BAD-}"
+  cmake --build build
+}
+
+package() {
+  cd "hypr-DE-$pkgver/tests/gates/cpp-fixture" || return 1
+  DESTDIR="$pkgdir" cmake --install build
+}

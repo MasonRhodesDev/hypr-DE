@@ -1,0 +1,3 @@
+enable=all
+# SC2250 wants braces around every variable reference. It is style and changes no behaviour.
+disable=SC2250

@@ -22,6 +22,8 @@ jobs:
         run: pacman -Syu --noconfirm --needed base-devel cmake git bubblewrap hyprland
 
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
 
       - name: Hyprland headers are present
         shell: bash
@@ -63,9 +65,11 @@ jobs:
     container: fedora:latest@sha256:6c75d5bf57cb0fa5aa4b92c6a83c86c791644496d9ac230de7711f5b8ec3b898
     steps:
       - name: Install build tooling
-        run: dnf -y install git python3 rpm-build rpmlint rpmdevtools dnf-plugins-core
+        run: dnf -y install git python3 rpm-build rpmlint rpmdevtools dnf-plugins-core annobin-annocheck binutils cpio
 
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
 
       - name: Trust the checkout (container runs as root)
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -81,6 +85,11 @@ jobs:
 
       - name: Rebuild binary RPM (runs %check)
         run: rpmbuild --rebuild ~/rpmbuild/SRPMS/hypr-de-scene-*.src.rpm
+
+      # the ELF checks cpp-harden makes on the Arch package, file modes, and annocheck on the notes Fedora's GCC
+      # records for each compile, read from the debuginfo package
+      - name: The RPM keeps its hardening
+        run: tests/gates/check.sh rpm --rpms ~/rpmbuild/RPMS/*/*.rpm
 
       - name: hypr-de loads the plugin from a path this RPM installs
         shell: bash

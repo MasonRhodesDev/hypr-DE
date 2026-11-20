@@ -1,0 +1,13 @@
+# Left out, each for a reason:
+# bugprone-easily-swappable-parameters fires on any two neighbouring parameters of one
+# type, which geometry code (x, y, width, height) cannot avoid.
+# clang-analyzer-optin.performance is about struct padding, not safety.
+Checks: >
+  -*,
+  bugprone-*,
+  cert-*,
+  clang-analyzer-*,
+  cppcoreguidelines-pro-bounds-*,
+  cppcoreguidelines-pro-type-*,
+  -bugprone-easily-swappable-parameters,
+  -clang-analyzer-optin.performance.*

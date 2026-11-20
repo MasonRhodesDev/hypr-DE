@@ -1,0 +1,9 @@
+extern "C" int customProbe(const char* text) {
+    char copy[8] = {};
+    int  n       = 0;
+    while (text[n] != 0 && n < 7) {
+        copy[n] = text[n];
+        ++n;
+    }
+    return copy[0] + n;
+}

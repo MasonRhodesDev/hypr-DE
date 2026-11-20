@@ -1,0 +1,1265 @@
+cpp-harden	packaging/hypr-de-scene/PKGBUILD	warning-off:-Wno-unused-parameter	bf6b528f7069ebea	1	-Wno-unused-parameter
+cpp-harden	plugins/hypr-de-scene/src/FirstFrame.cpp	-Wfloat-conversion	ee27af3279db8712	2	Render::GL::g_pHyprOpenGL->setViewport(0, 0, SIZE.x, SIZE.y);
+cpp-harden	plugins/hypr-de-scene/src/Log.cpp	-Wconversion	b087345ced0c8fe2	2	return now.tv_sec + now.tv_nsec / 1e9;
+cpp-harden	plugins/hypr-de-scene/src/Scene.cpp	-Wfloat-conversion	4034c1da5a699914	1	const int W = buffer->size.x;
+cpp-harden	plugins/hypr-de-scene/src/Scene.cpp	-Wfloat-conversion	6bd0ad1ef6bbfef9	1	const int H = buffer->size.y;
+cpp-sanitize	plugins/hypr-de-scene	no-tests	6b1c87285f3fb77f	1	no tests
+cpp-tidy	plugins/hypr-de-scene/src/FirstFrame.cpp	bugprone-narrowing-conversions	ee27af3279db8712	2	Render::GL::g_pHyprOpenGL->setViewport(0, 0, SIZE.x, SIZE.y);
+cpp-tidy	plugins/hypr-de-scene/src/FirstFrame.cpp	bugprone-narrowing-conversions	f32a74f68b2847ed	3	glClearColor(background[0] / 255.F, background[1] / 255.F, background[2] / 255.F, 1.F);
+cpp-tidy	plugins/hypr-de-scene/src/FirstFrame.cpp	cppcoreguidelines-pro-bounds-avoid-unchecked-container-access	f32a74f68b2847ed	3	glClearColor(background[0] / 255.F, background[1] / 255.F, background[2] / 255.F, 1.F);
+cpp-tidy	plugins/hypr-de-scene/src/Geometry.cpp	bugprone-incorrect-roundings	b314b6b9a4876c65	1	return static_cast<int>(x + 0.5);
+cpp-tidy	plugins/hypr-de-scene/src/Loader.cpp	bugprone-bitwise-pointer-cast	09cb945c61cfebaf	1	return std::bit_cast<Fn>(dlsym(handle, name));
+cpp-tidy	plugins/hypr-de-scene/src/Loader.cpp	cppcoreguidelines-pro-type-vararg	b4fa496709700a2c	1	syslog(LOG_ERR, "%s", line);
+cpp-tidy	plugins/hypr-de-scene/src/Log.cpp	bugprone-narrowing-conversions	b087345ced0c8fe2	2	return now.tv_sec + now.tv_nsec / 1e9;
+cpp-tidy	plugins/hypr-de-scene/src/Log.cpp	cppcoreguidelines-pro-type-vararg	1420634d91d75a1e	1	syslog(LOG_INFO, "%s", line.c_str());
+cpp-tidy	plugins/hypr-de-scene/src/Readiness.cpp	bugprone-unchecked-optional-access	a7e6d2046a2f917c	1	const auto PROGRESS = record.lastWallpaper.value_or(*record.start);
+cpp-tidy	plugins/hypr-de-scene/src/Scene.cpp	bugprone-exception-escape	b8553ce5f6d06de9	1	CScene::~CScene() {
+cpp-tidy	plugins/hypr-de-scene/src/Scene.cpp	bugprone-narrowing-conversions	4034c1da5a699914	1	const int W = buffer->size.x;
+cpp-tidy	plugins/hypr-de-scene/src/Scene.cpp	bugprone-narrowing-conversions	61a40c2c116fe4a8	3	const auto GROUND = CHyprColor(m_spec.background[0] / 255.F, m_spec.background[1] / 255.F, m_spec.background[2] / 255.F, ALPHA);
+cpp-tidy	plugins/hypr-de-scene/src/Scene.cpp	bugprone-narrowing-conversions	6bd0ad1ef6bbfef9	1	const int H = buffer->size.y;
+cpp-tidy	plugins/hypr-de-scene/src/Scene.cpp	cppcoreguidelines-pro-bounds-avoid-unchecked-container-access	61a40c2c116fe4a8	3	const auto GROUND = CHyprColor(m_spec.background[0] / 255.F, m_spec.background[1] / 255.F, m_spec.background[2] / 255.F, ALPHA);
+cpp-tidy	plugins/hypr-de-scene/src/Scene.cpp	cppcoreguidelines-pro-bounds-avoid-unchecked-container-access	643dd75da9e1108f	1	file.write(rc<const char*>(&rgba[i]), 3);
+cpp-tidy	plugins/hypr-de-scene/src/Scene.cpp	cppcoreguidelines-pro-bounds-avoid-unchecked-container-access	9b68f220f8576d14	3	m_spec.background[0], m_spec.background[1], m_spec.background[2], m_settings.bounds.timeout.count(), m_settings.bounds.quiet.count(),
+cpp-tidy	plugins/hypr-de-scene/src/Spec.cpp	bugprone-signed-bitwise	960651621f74cb76	2	spec.background = {static_cast<uint8_t>(RGB >> 16), static_cast<uint8_t>(RGB >> 8), static_cast<uint8_t>(RGB)};
+cpp-tidy	plugins/hypr-de-scene/src/Spec.cpp	cppcoreguidelines-pro-bounds-avoid-unchecked-container-access	27698d9adf7cf9c2	1	spec.refShortSide = std::stoi(match[1].str());
+cpp-tidy	plugins/hypr-de-scene/src/Spec.cpp	cppcoreguidelines-pro-bounds-avoid-unchecked-container-access	90056fbbac7f4795	1	const auto RGB = std::stoul(match[1].str(), nullptr, 16);
+cpp-tidy	plugins/hypr-de-scene/src/main.cpp	cppcoreguidelines-pro-type-vararg	c5018b54c670e86b	1	syslog(LOG_ERR, "%s", REASON.c_str());
+lua	dist/hypr/main.lua	W111	426ab8b8844c3476	1	mon = {}
+lua	dist/hypr/main.lua	W112	3679514edfc0391d	1	function mon.row(entries)
+lua	dist/hypr/main.lua	W112	414198c69605eed6	1	function mon.valid_scale(w, h, target)
+lua	dist/hypr/main.lua	W113	c06931d1e43374be	1	local s = mon.valid_scale(e.w, e.h, e.scale)
+python	dist/bin/hypr-de-help	S607	3facebb4cece6c82	1	["notify-send", "-a", "hypr-DE", "Welcome to hypr-DE", body],
+python	dist/bin/hypr-de-help	S607	ada698a6f1d4b24a	1	["hyprctl", "binds", "-j"], text=True, timeout=3
+python	dist/bin/hypr-de-help	S607	cc7581bcd43a0c2b	1	subprocess.Popen(["uwsm", "app", "--", *argv], start_new_session=True)
+python	dist/bin/hypr-de-help	S607	ebeb4c5ef165bcce	1	subprocess.Popen(["notify-send", summary, body], start_new_session=True)
+python	dist/bin/hypr-de-theme	BLE001	e9dc52bf3963abec	1	except Exception:
+python	dist/bin/hypr-de-theme	PLW1510	3aaf3d64a0038ec1	1	out = subprocess.run(["lmtt", "status"], capture_output=True, text=True, timeout=10).stdout
+python	dist/bin/hypr-de-theme	S607	36529e6eabfc993d	1	subprocess.run(["@BINDIR@/hypr-de-set-wallpaper", expand(wallpaper, themedir)], check=False)
+python	dist/bin/hypr-de-theme	S607	3aaf3d64a0038ec1	1	out = subprocess.run(["lmtt", "status"], capture_output=True, text=True, timeout=10).stdout
+python	dist/bin/hypr-de-theme	S607	7a503ec1a61fa179	2	subprocess.run(["lmtt", "switch", current_mode()], check=False,
+python	dist/bin/hypr-de-theme	SIM115	1221aac322d7f7ae	1	print(open(RECORD).read().strip())
+python	dist/bin/hypr-de-theme	SIM115	88e1b71792e6126f	1	content = open(os.path.join(moddir, f)).read().replace("@THEMEDIR@", themedir)
+python	dist/bin/hypr-de-theme	SIM115	ca52cff5816ae4a7	1	current = open(RECORD).read().split("\n")[0].strip()
+python	dist/bin/hypr-de-theme	SIM115	d961be02103c23e7	1	lines = open(LMTT_CFG).readlines() if os.path.exists(LMTT_CFG) else []
+python	dist/bin/hypr-de-theme	SIM115	f1b7e2653d352976	1	lines = strip_tagged(open(LMTT_CFG).readlines())
+python	dist/gaming/bp-game-focus.py	PLW1510	c5406c78535176ac	1	p = subprocess.run(["hyprctl", *args], capture_output=True, text=True)
+python	dist/gaming/bp-game-focus.py	RUF006	206de28a755df9e2	1	asyncio.create_task(watch_gamepad(sm, dev, watched))
+python	dist/gaming/bp-game-focus.py	RUF006	5fbee60175571811	2	asyncio.create_task(self.focus_fullscreen(addr))
+python	dist/gaming/bp-game-focus.py	RUF006	8f225bcbc2e8ed27	1	asyncio.create_task(self.focus_bp(addr))
+python	dist/gaming/bp-game-focus.py	RUF006	c4657aa9fc6b3a79	1	asyncio.create_task(self.focus_bp(self.bp_addr))
+python	dist/gaming/bp-game-focus.py	S607	3c4f28c0e083d990	1	["bash", "-c", script],
+python	dist/gaming/bp-game-focus.py	S607	c5406c78535176ac	1	p = subprocess.run(["hyprctl", *args], capture_output=True, text=True)
+python	dist/gaming/bp-game-focus.py	S607	c7e3eed7d9ab55b1	1	["uwsm", "app", "--", "steam", "steam://open/bigpicture"],
+python	dist/gaming/bp-game-focus.py	SIM115	1a0eeaf5064b1639	1	_log_file = open(LOG_PATH, "w", buffering=1)
+python	dist/gaming/bp-game-focus.py	SIM115	b6eb89584d107bbb	1	f = open(CEF_LOG)
+python	dist/libexec/hypr-de-lock-listener	BLE001	8d8ee03581deca17	1	except Exception as error: # a retry that stopped on a surprise would leave Lock unanswered
+python	dist/libexec/waybar-mediaplayer.py	ARG001	27f2130b944a11d6	2	def stop(signum, frame):
+python	dist/libexec/waybar-mediaplayer.py	BLE001	cef6159c5a287f9e	1	except Exception as e: # noqa: BLE001 - a bug must not kill the module for the session
+python	dist/libexec/waybar-mediaplayer.py	PLW0603	bc171c54637f4001	1	global child
+python	dist/libexec/waybar-mediaplayer.py	suppression	cef6159c5a287f9e	1	except Exception as e: # noqa: BLE001 - a bug must not kill the module for the session
+python	packaging/declared-units.py	E401	912cc3e69d9b7048	1	import sys, tomllib
+python	plugins/hypr-de-scene/tests/gen-fixtures.py	RUF005	c89dc924ea92c46a	1	OUTPUTS = ( ("3440x1440", 3440, 1440, 0, 1.0), ("3840x2160 rotated at 1.5", 3840, 2160, 1, 1.5), ("1920x1080", 1920, 1080, 0, 1.0), ) + tuple((f"1366x768 transform {t}", 1366, 768, t, 1.0) for t in range(8))
+python	plugins/hypr-de-scene/tests/readback-check.py	B905	7eac58c4834db988	1	for c, ground in zip((r, g, b), bg)
+python	tests/fixtures/lock-listener/fake-logind	ARG001	97b641fc92b194d0	5	def prop(conn, sender, path, iface, name):
+python	tests/fixtures/lock-listener/fake-logind	ARG001	9fb663fe34aefb3f	3	def session_prop(conn, sender, path, iface, name):
+python	tests/fixtures/lock-listener/fake-logind	ARG001	edaad707114f61bd	4	def method(conn, sender, path, iface, name, params, invocation):
+python	tests/fixtures/lock-listener/fake-logind	RUF059	fc46a0e9d5eab381	2	what, who, why, mode = params.unpack()
+python	tests/fixtures/lock-listener/fake-logind	SIM115	79637d1b7e57f4a9	1	events = open(os.environ["FAKE_LOGIND_EVENTS"], "a", buffering=1)
+shell	dist/bin/hypr-de-record	SC2154	48d6975b1d306356	1	echo "$PID" > "$PIDFILE"
+shell	dist/bin/hypr-de-record	SC2292	256e5bf419e6e670	1	if [ -f "$FILENAME" ]; then
+shell	dist/bin/hypr-de-record	SC2292	a891f315777c2119	1	if [ -n "$REGION" ]; then
+shell	dist/bin/hypr-de-set-wallpaper	SC2016	e692478e526d226d	1	printf '$WALLPAPER = %s\n' "$WP" > "$CONFIG/hypr-de/wallpaper.conf"
+shell	dist/bin/hypr-de-set-wallpaper	SC2292	0e7961e05d497eb3	2	if [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ] || [ -n "${XDG_RUNTIME_DIR:-}" ]; then
+shell	dist/bin/hypr-de-set-wallpaper	SC2292	1a06de613d430c21	1	if [ -n "${WAYLAND_DISPLAY:-}" ]; then
+shell	dist/bin/hypr-de-set-wallpaper	SC2292	2105696278346080	1	[ $# -eq 1 ] || usage
+shell	dist/bin/hypr-de-set-wallpaper	SC2292	58c3622a8dfdc99d	1	[ -r "$WP" ] || { echo "hypr-de-set-wallpaper: cannot read $WP" >&2; exit 1; }
+shell	dist/bin/hypr-de-set-wallpaper	SC2292	eeb1a13941c7ac6e	1	if [ ! -e "$LMTT_CFG" ]; then
+shell	dist/bin/hypr-de-setup	SC2249	4e7b91aea56557b9	1	case "$current_icons" in ""|Adwaita|hicolor) if gsettings set org.gnome.desktop.interface icon-theme Papirus 2>/dev/null; then say "icon theme seeded to Papirus (was ${current_icons:-unset})" fi ;; esac
+shell	dist/bin/hypr-de-setup	SC2292	08741d3117129c6a	1	if [ ! -e "$CONFIG/hypr/xdph.conf" ]; then
+shell	dist/bin/hypr-de-setup	SC2292	0ec26b271b9d92eb	1	if [ -d /sys/module/nvidia ]; then
+shell	dist/bin/hypr-de-setup	SC2292	11cb34bf6f8b68a0	1	[ -L "$link" ] || continue
+shell	dist/bin/hypr-de-setup	SC2292	292020786e734adb	1	[ "$hw" = 1 ] || return 0
+shell	dist/bin/hypr-de-setup	SC2292	741377d3bdeaf3a2	1	if [ ! -e "$CONFIG/hypr-de/theme" ]; then
+shell	dist/bin/hypr-de-setup	SC2292	931435100d907dcc	2	if [ "$ADOPT" = 1 ] && [ -e "$CONFIG/hypr/hyprland.lua" ]; then
+shell	dist/bin/hypr-de-setup	SC2292	d15ab2c441895947	1	[ "${1:-}" = "--adopt" ] && ADOPT=1
+shell	dist/bin/hypr-de-setup	SC2292	dd4f68af9f5a9761	1	if [ "$(cat "$v" 2>/dev/null)" = "0x10de" ]; then
+shell	dist/bin/hypr-de-setup	SC2292	e244e4ab1ecd9206	1	[ -f "$v" ] || continue
+shell	dist/bin/hypr-de-setup	SC2292	ef0daeb1c6a4078f	1	if command -v gsettings >/dev/null 2>&1 && [ -d /usr/share/icons/Papirus ]; then
+shell	dist/bin/hypr-de-setup	SC2310	5f36cc1c972d72ab	2	if ! unit_enabled "$u"; then
+shell	dist/bin/hypr-de-setup	SC2310	7b480e129f1973e5	2	if ! unit_exists "$u"; then
+shell	dist/bin/hypr-de-setup	SC2310	8b9c43e6089a0d59	2	if ! user_systemd_ok; then
+shell	dist/bin/hypr-de-setup	SC2310	beef91286b884232	1	unit_exists "$u" && units+=("$u")
+shell	dist/bin/hypr-de-setup	SC2310	c74627bdd2c66669	1	if preset_and_check "${units[@]}"; then
+shell	dist/bin/hypr-de-setup	SC2312	801e156766168932	1	warn "$u is $(systemctl --user is-enabled "$u" 2>/dev/null || echo missing) (expected enabled)"
+shell	dist/bin/hypr-de-setup	SC2312	dd4f68af9f5a9761	1	if [ "$(cat "$v" 2>/dev/null)" = "0x10de" ]; then
+shell	dist/bin/hypr-de-snip	SC2248	e72f93ed470112b7	1	[ $SLURP_EXIT -ne 0 ] && exit 1
+shell	dist/bin/hypr-de-snip	SC2292	4b9fafd62f92af2d	1	[ -n "$FREEZE_PID" ] && kill "$FREEZE_PID" 2>/dev/null
+shell	dist/bin/hypr-de-snip	SC2292	61b8e5c81ef77132	1	[ -z "$SELECTION" ] && exit 1
+shell	dist/bin/hypr-de-snip	SC2292	63fab21680b24d82	1	if [ ! -e "$SWAPPY_CFG" ]; then
+shell	dist/bin/hypr-de-snip	SC2292	e72f93ed470112b7	1	[ $SLURP_EXIT -ne 0 ] && exit 1
+shell	dist/bin/hypr-de-snip	SC2292	f8810fe15ec7b92d	1	if [ -r "@DATADIR@/swappy/config" ]; then
+shell	dist/bin/hypr-de-snip	SC2312	6d5aefae04842b7c	1	hyprctl layers | grep -q "namespace: selection" || break
+shell	dist/gaming/steam-set-launch-options	SC2016	883117ecdb726cad	1	echo "$response" | sed -n '/```json/,/```/p' | sed '1d;$d'
+shell	dist/gaming/steam-set-launch-options	SC2034	6a3e162ed9d9f809	1	DEFAULT_LAUNCH_OPTIONS=$(build_launch_options)
+shell	dist/gaming/steam-set-launch-options	SC2155	0b75870308e739f1	1	local analysis=$(call_claude "$analysis_prompt")
+shell	dist/gaming/steam-set-launch-options	SC2155	0deb985f100128d2	1	local selected_opts=$(echo "$options_json" | jq -r ".options[$idx].launch_options" 2>/dev/null)
+shell	dist/gaming/steam-set-launch-options	SC2155	19f1e341388e91ab	1	local multiplayer=$(echo "$game_data" | jq -r '.multiplayer // "unknown"')
+shell	dist/gaming/steam-set-launch-options	SC2155	1faf91240f1327b1	1	local trending_tier=$(echo "$game_data" | jq -r '.protondb.trendingTier // "unknown"')
+shell	dist/gaming/steam-set-launch-options	SC2155	226fb156eee54928	1	local label=$(echo "$options_json" | jq -r ".options[$i].label" 2>/dev/null)
+shell	dist/gaming/steam-set-launch-options	SC2155	27a931cfe255ed9f	1	local genres=$(echo "$game_data" | jq -r '.genres // "unknown"')
+shell	dist/gaming/steam-set-launch-options	SC2155	2c529d1f3308814e	1	local steam_response=$(curl -s "https://store.steampowered.com/api/appdetails?appids=${appid}" 2>/dev/null)
+shell	dist/gaming/steam-set-launch-options	SC2155	31efc80981dc4165	1	local response=$(claude -p "$prompt" 2>&1)
+shell	dist/gaming/steam-set-launch-options	SC2155	39dc9556e1e4f7dd	1	local option_count=$(echo "$options_json" | jq -r '.options | length' 2>/dev/null)
+shell	dist/gaming/steam-set-launch-options	SC2155	592ae8cf18ef5793	1	local multiplayer=$(echo "$steam_data" | jq -r 'if (.categories[]?.description | contains("Multi-player")) then "yes" else "no" end' 2>/dev/null)
+shell	dist/gaming/steam-set-launch-options	SC2155	5ac239164beb534d	1	local game_data=$(fetch_protondb_data "$appid")
+shell	dist/gaming/steam-set-launch-options	SC2155	6dd51e401de767af	1	local best_tier=$(echo "$game_data" | jq -r '.protondb.bestReportedTier // "unknown"')
+shell	dist/gaming/steam-set-launch-options	SC2155	736899c2f963c453	1	local name=$(grep -E '^\s*"name"' "$manifest" | head -1 | sed 's/.*"\([^"]*\)"[^"]*$/\1/')
+shell	dist/gaming/steam-set-launch-options	SC2155	788bf2000f97b5d8	1	local steam_data=$(echo "$steam_response" | jq -r ".\"${appid}\".data // {}" 2>/dev/null)
+shell	dist/gaming/steam-set-launch-options	SC2155	7a8d70c929bb48b0	1	local desc=$(echo "$options_json" | jq -r ".options[$i].description" 2>/dev/null)
+shell	dist/gaming/steam-set-launch-options	SC2155	7bc99b38116b8975	1	local genres=$(echo "$steam_data" | jq -r '[.genres[]?.description] | join(", ") // "Unknown"' 2>/dev/null)
+shell	dist/gaming/steam-set-launch-options	SC2155	7c81bb06c15dbc97	1	local launch_opts=$(echo "$options_json" | jq -r ".options[$i].launch_options" 2>/dev/null)
+shell	dist/gaming/steam-set-launch-options	SC2155	8521315d630bec72	1	local userid=$(basename "$(dirname "$(dirname "${config_files[$i]}")")")
+shell	dist/gaming/steam-set-launch-options	SC2155	8a597377851ab873	1	local tier=$(echo "$game_data" | jq -r '.protondb.tier // "unknown"')
+shell	dist/gaming/steam-set-launch-options	SC2155	b45d7e3d3b4a111f	1	local appid=$(basename "$manifest" | sed 's/appmanifest_\([0-9]*\)\.acf/\1/')
+shell	dist/gaming/steam-set-launch-options	SC2155	d11f667776d291df	1	local summary=$(curl -s "https://www.protondb.com/api/v1/reports/summaries/${appid}.json" 2>/dev/null)
+shell	dist/gaming/steam-set-launch-options	SC2155	ddb973cc5445a757	1	local total=$(echo "$game_data" | jq -r '.protondb.total // 0')
+shell	dist/gaming/steam-set-launch-options	SC2155	eb491d07ee2e6383	1	local confidence=$(echo "$options_json" | jq -r ".options[$i].confidence // \"unknown\"" 2>/dev/null)
+shell	dist/gaming/steam-set-launch-options	SC2155	edabed1cb52cfd4c	1	local backup="${file}.backup.$(date +%s)"
+shell	dist/gaming/steam-set-launch-options	SC2155	ee3c3e87aeea3be4	1	local confidence=$(echo "$game_data" | jq -r '.protondb.confidence // "unknown"')
+shell	dist/gaming/steam-set-launch-options	SC2155	fc7719a3e20eb62b	1	local summary=$(echo "$analysis" | jq -r '.summary // empty' 2>/dev/null)
+shell	dist/gaming/steam-set-launch-options	SC2155	fe34d7cbda4d40fb	1	local game_name=$(echo "$steam_data" | jq -r '.name // "Unknown"' 2>/dev/null)
+shell	dist/gaming/steam-set-launch-options	SC2249	2bf739ac309b767a	1	case "$1" in LD_*|PATH|ENV|BASH_ENV|IFS|SHELL) return 0 ;; VK_ICD_FILENAMES|VK_DRIVER_FILES|VK_LAYER_PATH|VK_ADD_LAYER_PATH|VK_INSTANCE_LAYERS) return 0 ;; MESA_LOADER_DRIVER_OVERRIDE|LIBGL_DRIVERS_PATH|WINEDLLPATH) return 0 ;; MANGOHUD_CONFIG|MANGOHUD_CONFIGFILE) return 0 ;; esac
+shell	dist/gaming/steam-set-launch-options	SC2249	e0b321676ed3dff8	1	case " $LAUNCH_WRAPPERS " in *" $tok "*) return 0 ;; esac
+shell	dist/gaming/steam-set-launch-options	SC2310	359d79ceb3558563	2	if is_steam_running; then
+shell	dist/gaming/steam-set-launch-options	SC2310	47d0b61345844023	2	if ! reason=$(validate_launch_options "$new_options" 2>&1); then
+shell	dist/gaming/steam-set-launch-options	SC2310	734b26f9179d67ee	2	if ! new_options=$(prompt_launch_options "$current_options" "$protondb_json"); then
+shell	dist/gaming/steam-set-launch-options	SC2310	8b27e4945c83c9b7	2	if ! steam_root=$(find_steam_root); then
+shell	dist/gaming/steam-set-launch-options	SC2310	a2931abd22683465	1	launch_env_name_denied "$name" && return 1
+shell	dist/gaming/steam-set-launch-options	SC2310	b7b7dd5c6febf38b	2	if ! launch_option_token_ok "$tok"; then
+shell	dist/gaming/steam-set-launch-options	SC2310	ba574d64238c3bbf	2	if ! reason=$(validate_launch_options "$launch_opts" 2>&1); then
+shell	dist/gaming/steam-set-launch-options	SC2310	d56803bdf9b6d3d9	2	if ! validate_launch_options "$selected_opts" >/dev/null 2>&1; then
+shell	dist/gaming/steam-set-launch-options	SC2312	b487ebe221ceb574	1	mapfile -t results < <(search_game "$search_term" "$steam_root")
+shell	dist/gaming/steam-set-launch-options	SC2317	470ec89d274fcfc9	1	return 0 2>/dev/null || exit 0
+shell	dist/libexec/dpms-off-if-locked.sh	SC2312	22811612500908e7	1	[ "$(timeout 2 hyprctl locked 2>/dev/null)" = true ] || exit 0
+shell	dist/libexec/hypr-de-reload-sessions	SC2249	6c13845a63075f0e	1	case "$uid" in ''|*[!0-9]*) continue ;; esac
+shell	dist/libexec/hypr-de-reload-sessions	SC2292	012ea5f48e087843	1	[ -S "$sock" ] || continue
+shell	dist/libexec/hypr-de-reload-sessions	SC2292	02a72564d06bde76	1	[ "$reloaded" -gt 0 ] && echo "hypr-DE: reloaded $reloaded live Hyprland session(s)"
+shell	dist/libexec/hypr-de-reload-sessions	SC2292	34fe29a95f8f7d6e	1	[ "$(stat -c %u "$sock" 2>/dev/null)" = "$uid" ] || continue
+shell	dist/libexec/hypr-de-reload-sessions	SC2312	34fe29a95f8f7d6e	1	[ "$(stat -c %u "$sock" 2>/dev/null)" = "$uid" ] || continue
+shell	dist/libexec/hypr-de-restart-session-units	SC2016	349056e6e0b9dfa4	1	case "$(run_as "$user" "$run" "" sh -c ' unit=$1 before=$(systemctl --user show "$unit" -p ExecMainStartTimestampMonotonic --value 2>/dev/null) systemctl --user try-restart "$unit" >/dev/null 2>&1 after=$(systemctl --user show "$unit" -p ExecMainStartTimestampMonotonic --value 2>/dev/null) if [ -n "$after" ] && [ "$after" != "$before" ] && [ "$after" != 0 ] && systemctl --user is-active "$unit" >/dev/null 2>&1; then echo restarted elif systemctl --user is-failed "$unit" >/dev/null 2>&1; then echo failed else echo untouched fi ' _ "$unit" 2>/dev/null)" in
+shell	dist/libexec/hypr-de-restart-session-units	SC2249	30a8c6cc5d336759	1	case "$(run_as "$user" "$run" "" sh -c ' unit=$1 before=$(systemctl --user show "$unit" -p ExecMainStartTimestampMonotonic --value 2>/dev/null) systemctl --user try-restart "$unit" >/dev/null 2>&1 after=$(systemctl --user show "$unit" -p ExecMainStartTimestampMonotonic --value 2>/dev/null) if [ -n "$after" ] && [ "$after" != "$before" ] && [ "$after" != 0 ] && systemctl --user is-active "$unit" >/dev/null 2>&1; then echo restarted elif systemctl --user is-failed "$unit" >/dev/null 2>&1; then echo failed else echo untouched fi ' _ "$unit" 2>/dev/null)" in restarted) restarted=$((restarted + 1)) ;; failed) echo "hypr-DE: $user has $unit in a failed state; it is not running" ;; esac
+shell	dist/libexec/hypr-de-restart-session-units	SC2249	6c13845a63075f0e	1	case "$uid" in ''|*[!0-9]*) continue ;; esac
+shell	dist/libexec/hypr-de-restart-session-units	SC2292	012ea5f48e087843	1	[ -S "$sock" ] || continue
+shell	dist/libexec/hypr-de-restart-session-units	SC2292	45c7b2ab00bd6c0d	1	[ -d "$run/systemd" ] || continue
+shell	dist/libexec/hypr-de-restart-session-units	SC2292	4f464746db34218a	1	[ "$(stat -c %u "$run" 2>/dev/null)" = "$uid" ] || continue
+shell	dist/libexec/hypr-de-restart-session-units	SC2292	6eef5d710eb1669f	1	[ "$restarted" -gt 0 ] && echo "hypr-DE: restarted $restarted session unit(s) onto the new config"
+shell	dist/libexec/hypr-de-restart-session-units	SC2292	78a1211bc3f2c241	1	if [ "${#RETIRED[@]}" -gt 0 ]; then
+shell	dist/libexec/hypr-de-restart-session-units	SC2292	cffe79eae3b7610f	1	[ -n "$3" ] && envs+=(HYPRLAND_INSTANCE_SIGNATURE="$3")
+shell	dist/libexec/hypr-de-restart-session-units	SC2312	4f464746db34218a	1	[ "$(stat -c %u "$run" 2>/dev/null)" = "$uid" ] || continue
+shell	dist/libexec/hypr-de-sys-setup	SC2292	34c5f5b928b57614	1	if [ -n "${HYPR_DE_SYS_SETUP_LIB:-}" ]; then
+shell	dist/libexec/hypr-de-sys-setup	SC2292	786c62cd27194adc	1	if [ ! -s "$tmp" ]; then
+shell	dist/libexec/hypr-de-sys-setup	SC2292	932ff766bf47b1ec	1	if [ "${added:-0}" -eq 0 ]; then
+shell	dist/libexec/hypr-de-sys-setup	SC2292	9a06694e6309f704	1	[ -f "$pam" ] || return 0
+shell	dist/libexec/hypr-de-sys-setup	SC2317	470ec89d274fcfc9	1	return 0 2>/dev/null || exit 0
+shell	dist/libexec/hypr-de-waitenv	SC2249	25abda671d291691	1	case $v in _|SHELL|PWD|OLDWD) continue ;; esac
+shell	dist/libexec/hypr-de-waitenv	SC2292	0061e7c17a44f118	1	if [ "${#appeared[@]}" -gt 0 ]; then
+shell	dist/libexec/hypr-de-waitenv	SC2292	29ccd4fb03208723	1	elif [ "$warned" = 0 ] && (( now >= warn_at )); then
+shell	dist/libexec/hypr-de-waitenv	SC2292	4d2cefa6b7c39337	1	if [ -z "$failing_since" ]; then
+shell	dist/libexec/hypr-de-waitenv	SC2292	8fb3fdfd4267483b	1	if [ -z "${present[$v]-}" ]; then
+shell	dist/libexec/hypr-de-waitenv	SC2292	abce7f4f8eb0c84b	1	elif [ -z "${reported[$v]-}" ]; then
+shell	dist/libexec/hypr-de-waitenv	SC2292	d3edc163045707fb	1	if [ "${#missing[@]}" -eq 0 ]; then
+shell	dist/libexec/hypr-de-waitenv	SC2292	d5da8c74b91c972f	1	elif [ "$attempt" -eq 1 ]; then
+shell	dist/libexec/hypr-de-waitenv	SC2292	daa4d6dc038902f3	1	if [ -z "$timeout" ]; then
+shell	dist/libexec/hypr-de-waitenv	SC2292	ddef24420afad005	1	[ -n "${listed[$v]-}" ] && continue
+shell	dist/libexec/hypr-de-waitenv	SC2292	e3d2cfa3899c7e14	1	if [ "$attempt" -eq 1 ]; then
+shell	dist/libexec/hypr-de-wallpaper-sync	SC2292	195559ca65ae997d	1	[ -n "$wallpaper" ] && echo "hypr-de-wallpaper-sync: $wallpaper unreadable; using default" >&2
+shell	dist/libexec/hypr-de-wallpaper-sync	SC2292	216c73be732009bb	3	[ -n "$pid" ] && [ "$pid" != 0 ] && [ -r "/proc/$pid/cmdline" ] || exit 0
+shell	dist/libexec/hypr-de-wallpaper-sync	SC2292	2bc696221a95eb1b	1	if [ "$showing" != "$wallpaper" ]; then
+shell	dist/libexec/hypr-de-wallpaper-sync	SC2292	5cec047cf61577af	1	if [ -r "$registry" ]; then
+shell	dist/libexec/hypr-de-wallpaper-sync	SC2292	8cb245a9c19e1224	1	[ -n "${WAYLAND_DISPLAY:-}" ] || exit 0
+shell	dist/libexec/hypr-de-wallpaper-sync	SC2292	9429ec1167239ce1	1	[ "$(cat "$file" 2>/dev/null)" = "$want" ] && return 0
+shell	dist/libexec/hypr-de-wallpaper-sync	SC2292	e128bb9563435ee2	2	if [ -z "$wallpaper" ] || [ ! -r "$wallpaper" ]; then
+shell	dist/libexec/hypr-de-wallpaper-sync	SC2312	9429ec1167239ce1	1	[ "$(cat "$file" 2>/dev/null)" = "$want" ] && return 0
+shell	dist/libexec/hypr-de-welcome	SC2292	276e9a0d547b286e	1	[ -e "$MARKER" ] && exit 0
+shell	dist/libexec/hypr-de-welcome	SC2292	765f9d27c4f93119	1	if [ "${1:-}" = "--adopt" ]; then
+shell	dist/libexec/hyprctl-reload-wrapper.sh	SC2248	960a58983aae8782	1	if [ $exit_code -eq 0 ]; then
+shell	dist/libexec/hyprctl-reload-wrapper.sh	SC2248	cf995399468a4190	1	exit $exit_code
+shell	dist/libexec/hyprctl-reload-wrapper.sh	SC2292	960a58983aae8782	1	if [ $exit_code -eq 0 ]; then
+shell	dist/libexec/hypridle-launch	SC2249	0c0bd233f1d935c0	1	case "$value" in ''|*[!0-9]*) log "$OVERRIDE:$n: \$$name must be a whole number of seconds; dropped: $line" continue ;; esac
+shell	dist/libexec/hypridle-launch	SC2292	15eddd2113c925f9	3	if [ "${#value}" -gt "${#MAX_TIMEOUT}" ] || [ "$value" -lt 1 ] || [ "$value" -gt "$MAX_TIMEOUT" ]; then
+shell	dist/libexec/hypridle-launch	SC2292	2586695c8c58ff39	1	[ -f "$OVERRIDE" ] || run_hypridle "$POLICY"
+shell	dist/libexec/hypridle-launch	SC2292	2e7de408668c6596	1	if [ -z "$marker_line" ]; then
+shell	dist/libexec/hypridle-launch	SC2292	3ceea96834d614d9	1	if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
+shell	dist/libexec/hypridle-launch	SC2292	5244f59448fb0032	1	while IFS= read -r line || [ -n "$line" ]; do
+shell	dist/libexec/hypridle-launch	SC2292	bbc3752ce324cd72	1	[ -x "$h" ] && exec "$h" -c "$1"
+shell	dist/libexec/hypridle-launch	SC2292	f635ed9f9231adf3	1	[ -n "$accepted" ] || run_hypridle "$POLICY"
+shell	dist/libexec/hypridle-launch	SC2292	f77f234966f9c45c	1	[ -z "$body" ] && continue
+shell	dist/libexec/hypridle-launch	SC2312	31b7d9198cfe589c	2	marker_line=$(grep -nxF -- "$MARKER" "$POLICY" | head -n1 | cut -d: -f1)
+shell	dist/libexec/hypridle-launch	SC2312	36e1606615b14fd6	1	log "host timeouts from $OVERRIDE: $(printf '%s' "$accepted" | tr '\n' ' ')"
+shell	dist/libexec/hypridle-launch	SC2312	3c4ff1e256c202e6	1	head -n "$1" "$POLICY" | sed -n 's/^\$\([A-Za-z_][A-Za-z0-9_]*\)[[:space:]]*=.*/\1/p'
+shell	dist/libexec/hypridle-launch	SC2312	96257dbdcf13c689	1	log "$OVERRIDE:$n: no such knob \$$name (the policy declares: $(printf '%s' "$known" | tr '\n' ' ')); dropped"
+shell	dist/libexec/hyprland-configreload-listener.sh	SC2249	58133a84f07a752f	1	case "$line" in monitoraddedv2*) name=$(printf '%s' "${line#*>>}" | cut -d, -f2);; esac
+shell	dist/libexec/hyprland-configreload-listener.sh	SC2249	db63ec40a3979e27	1	case "$line" in "configreloaded>>") echo "$(date '+%Y-%m-%d %H:%M:%S') - Config reloaded, restarting waybar..." (sleep 1 && systemctl --user restart waybar) & ;; monitoradded\>\>*|monitoraddedv2\>\>*) echo "$(date '+%Y-%m-%d %H:%M:%S') - Monitor change: $line" if [[ -x "$XWAYLAND_PRIMARY_SCRIPT" ]]; then (sleep 1 && "$XWAYLAND_PRIMARY_SCRIPT") & fi name="${line#*>>}"; name="${name%%,*}" case "$line" in monitoraddedv2*) name=$(printf '%s' "${line#*>>}" | cut -d, -f2);; esac (sleep 2 && "@LIBEXECDIR@/blank-guard.sh" "$name") & check_bar ;; monitorremoved\>\>*) echo "$(date '+%Y-%m-%d %H:%M:%S') - Monitor change: $line" if [[ -x "$XWAYLAND_PRIMARY_SCRIPT" ]]; then (sleep 1 && "$XWAYLAND_PRIMARY_SCRIPT") & fi check_bar ;; esac
+shell	dist/libexec/hyprland-configreload-listener.sh	SC2312	794698f70307b7ad	2	echo "$(date '+%Y-%m-%d %H:%M:%S') - Monitor change: $line"
+shell	dist/libexec/hyprland-configreload-listener.sh	SC2312	a8843d2477fe920d	1	echo "$(date '+%Y-%m-%d %H:%M:%S') - Config reloaded, restarting waybar..."
+shell	dist/libexec/lock-cmd.sh	SC2015	2c0ef8e5a8ff88e7	2	[ "$#" -gt 0 ] && command -v "$1" >/dev/null 2>&1 || continue
+shell	dist/libexec/lock-cmd.sh	SC2086	2f44055a24d50531	1	printf '%s\n' $names | cut -c1-15 | sort -u | paste -sd'|'
+shell	dist/libexec/lock-cmd.sh	SC2086	3a05f326ddedf8a8	2	set -- ${entry%&}
+shell	dist/libexec/lock-cmd.sh	SC2086	53390eed4829f4ab	1	set -- $entry
+shell	dist/libexec/lock-cmd.sh	SC2181	2ddd01b893a72095	1	[ "$?" -eq 0 ] || exit 0
+shell	dist/libexec/lock-cmd.sh	SC2249	1e51eadc577cce3b	1	case $hypr_pid in ''|*[!0-9]*) return 0 ;; esac
+shell	dist/libexec/lock-cmd.sh	SC2249	3d1c6bf3bcef6916	1	case $(timeout 2 hyprctl locked 2>/dev/null) in true) return 0 ;; false) return 1 ;; esac
+shell	dist/libexec/lock-cmd.sh	SC2249	59cc72b1e869ea00	1	case $(sed -n 's/^State:[[:space:]]*\([A-Z]\).*/\1/p' "/proc/$1/status" 2>/dev/null) in Z|X) return 0 ;; esac
+shell	dist/libexec/lock-cmd.sh	SC2249	8e6d2afe7000df2f	1	case "$warn" in ''|*[!0-9]*) log "ignoring VIGIL_IDLE_WARNING_SECONDS='$warn': not a whole number of seconds" warn=10 ;; esac
+shell	dist/libexec/lock-cmd.sh	SC2249	af373a1370528612	1	case $(timeout 2 hyprctl getoption misc:allow_session_lock_restore 2>/dev/null | sed -n 1p) in 'int: 0'|'bool: false'|'bool: 0') return 0 ;; esac
+shell	dist/libexec/lock-cmd.sh	SC2249	d36f305d05e1b71a	1	case $at in ''|*[!0-9]*) continue ;; esac
+shell	dist/libexec/lock-cmd.sh	SC2249	e1069c63eda4b05d	1	case "$key" in ''|\#*) continue ;; failsafe) case "$value" in terminate|warn|none) FAILSAFE=$value ;; esac ;; fallbacks) FALLBACKS=$value ;; verify_tries) case "$value" in ''|*[!0-9]*) ;; *) VERIFY_TRIES=$value ;; esac ;; esac
+shell	dist/libexec/lock-cmd.sh	SC2249	ec1bec66a8ba08e6	1	failsafe) case "$value" in terminate|warn|none) FAILSAFE=$value ;; esac ;;
+shell	dist/libexec/lock-cmd.sh	SC2312	451d86bf8edb565a	2	pids=$(timeout 2 pgrep -u "$(id -u)" -x "$(locker_names)" 2>/dev/null)
+shell	dist/libexec/lock-cmd.sh	SC2312	9a08ddf20745f54b	1	loginctl terminate-user "$(id -u)"
+shell	dist/libexec/lock-cmd.sh	SC2312	e4767f3c509eaa25	1	while [ "$tries" -gt 0 ] && [ "$(now)" -lt "$give_up" ]; do
+shell	dist/libexec/lock-cmd.sh	SC2312	f0b7a97287860043	1	if journal_ok && [ "$(stat -L -c '%d:%i' "/proc/$$/fd/2" 2>/dev/null)" != "${JOURNAL_STREAM:-}" ]; then
+shell	dist/libexec/lock-cmd.sh	suppression	7dbaa227626428e9	1	# shellcheck disable=SC2086 # deliberate: one name per word
+shell	dist/libexec/lock-cmd.sh	suppression	9e669f46bc5b169b	3	# shellcheck disable=SC2086 # deliberate: entry is a command line
+shell	dist/libexec/no-keep-awake.sh	SC2292	0c505e2f2111ec76	1	[ -n "$holder" ] && { printf 'wayland:%s\n' "$holder"; exit 1; }
+shell	dist/libexec/no-keep-awake.sh	SC2292	435958c196a527bb	1	[ "$(timeout 2 logind-idle-control status 2>/dev/null)" = 1 ] && { echo toggle; exit 1; }
+shell	dist/libexec/no-keep-awake.sh	SC2312	05643e624805b79f	1	if timeout 2 systemd-inhibit --list --no-pager 2>/dev/null \
+shell	dist/libexec/no-keep-awake.sh	SC2312	435958c196a527bb	1	[ "$(timeout 2 logind-idle-control status 2>/dev/null)" = 1 ] && { echo toggle; exit 1; }
+shell	dist/libexec/no-keep-awake.sh	SC2312	6ee859012a47b6e8	1	holder=$(timeout 2 hyprctl -j clients 2>/dev/null \
+shell	dist/libexec/osd/brightness-osd.sh	SC2248	dca46a1e09dd4c8f	1	notify-send -t 2000 -a "osd-brightness" -h string:x-canonical-private-synchronous:brightness -h int:value:$brightness_percent "☀️ $brightness_percent%" ""
+shell	dist/libexec/osd/brightness-osd.sh	SC2249	56de0a3dd2bd35d3	1	case $1 in "up") brightnessctl set +5% ;; "down") brightnessctl set 5%- ;; esac
+shell	dist/libexec/osd/media-osd.sh	SC2249	51363b8546fef776	1	case $1 in "play-pause") playerctl play-pause sleep 0.1 status=$(playerctl status 2>/dev/null) if [[ $status == "Playing" ]]; then notify-send -t 2000 -a "osd-media" -h string:x-canonical-private-synchronous:media "▶️ Playing" "" elif [[ $status == "Paused" ]]; then notify-send -t 2000 -a "osd-media" -h string:x-canonical-private-synchronous:media "⏸️ Paused" "" elif [[ $status == "Stopped" ]]; then notify-send -t 2000 -a "osd-media" -h string:x-canonical-private-synchronous:media "⏹️ Stopped" "" else notify-send -t 2000 -a "osd-media" -h string:x-canonical-private-synchronous:media "🎵 Media" "Toggle" fi ;; "stop") playerctl stop notify-send -t 2000 -a "osd-media" -h string:x-canonical-private-synchronous:media "⏹️ Stopped" "" ;; "next") playerctl next sleep 0.1 title=$(playerctl metadata title 2>/dev/null) artist=$(playerctl metadata artist 2>/dev/null) if [[ -n "$title" ]] && ! locked; then notify-send -t 3000 -a "osd-media" -h string:x-canonical-private-synchronous:media "⏭️ Next Track" "$artist - $title" else notify-send -t 2000 -a "osd-media" -h string:x-canonical-private-synchronous:media "⏭️ Next" "" fi ;; "previous") playerctl previous sleep 0.1 title=$(playerctl metadata title 2>/dev/null) artist=$(playerctl metadata artist 2>/dev/null) if [[ -n "$title" ]] && ! locked; then notify-send -t 3000 -a "osd-media" -h string:x-canonical-private-synchronous:media "⏮️ Previous Track" "$artist - $title" else notify-send -t 2000 -a "osd-media" -h string:x-canonical-private-synchronous:media "⏮️ Previous" "" fi ;; esac
+shell	dist/libexec/osd/volume-osd.sh	SC2086	4c3c742c90181456	1	vol_percent=$(echo $volume | awk '{print int($2*100)}')
+shell	dist/libexec/osd/volume-osd.sh	SC2086	b1d6f6dd61351119	1	notify-send -t 2000 -a "osd-volume" -h string:x-canonical-private-synchronous:volume -h int:value:$vol_percent "🔊 $vol_percent%" ""
+shell	dist/libexec/osd/volume-osd.sh	SC2249	af12dbe406501282	1	case $1 in "up") wpctl set-volume -l 1.5 @DEFAULT_AUDIO_SINK@ 1%+ ;; "down") wpctl set-volume -l 1.5 @DEFAULT_AUDIO_SINK@ 1%- ;; "mute") wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle ;; esac
+shell	dist/libexec/power-menu.sh	SC2249	d0fcbf3147707319	1	case "$selection" in Logout) "$exit_cmd" ;; Reboot) "$exit_cmd" -p 'systemctl reboot' ;; Shutdown) "$exit_cmd" -p 'systemctl poweroff -i' ;; Lock) @LIBEXECDIR@/lock-cmd.sh ;; esac
+shell	dist/libexec/screen-recorder/modules/base.sh	SC2015	4027767a5b1937fa	1	mkdir -p "$RECORDER_STATE_DIR" && chmod 700 "$RECORDER_STATE_DIR" || {
+shell	dist/libexec/screen-recorder/modules/base.sh	SC2249	1cab0eaf9743d48a	1	case "$comm" in gpu-screen-reco*) return 0 ;; esac
+shell	dist/libexec/screen-recorder/modules/base.sh	SC2292	3ceea96834d614d9	1	if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
+shell	dist/libexec/screen-recorder/waybar-module.sh	SC1091	c1cb89b93fa64e3d	1	source "$SCRIPT_DIR/modules/base.sh"
+shell	dist/libexec/session-locked.sh	SC2312	5599dd2465d7b752	1	[ "$(timeout 2 hyprctl locked 2>/dev/null)" = true ] || exit 1
+shell	dist/libexec/set-xwayland-primary.sh	SC2312	218a8f369b00ec38	1	MODEL=$(head -n1 "$CONFIG" | tr -d '[:space:]')
+shell	dist/libexec/set-xwayland-primary.sh	SC2312	3b6664261a5c39b6	1	echo "$(date): XWayland-primary monitor (model ~ $MODEL) not connected"
+shell	dist/libexec/set-xwayland-primary.sh	SC2312	651cb654391d7ed0	1	echo "$(date): Set $OUTPUT as XWayland primary"
+shell	dist/libexec/set-xwayland-primary.sh	SC2312	e66b9faf62fd68f9	1	OUTPUT=$(hyprctl monitors -j | jq -r --arg m "$MODEL" '.[] | select(.model | contains($m)) | .name')
+shell	dist/libexec/share-picker-cached	SC2292	1025ac5e07d1ad44	2	if [ "$ec" -eq 0 ] && [ -n "$sel" ]; then
+shell	dist/libexec/share-picker-cached	SC2292	34148e785b2e27ea	1	if [ -f "$CACHE" ]; then
+shell	dist/libexec/share-picker-cached	SC2292	39c116caa82d8686	1	[ -n "$then" ] || return 1
+shell	dist/libexec/share-picker-cached	SC2292	70a8d5861ec1d258	1	[ -x "$c" ] && { printf '%s' "$c"; return 0; }
+shell	dist/libexec/share-picker-cached	SC2292	937f9cfeae91e7b4	1	&& [ "$(($(date +%s) - ${ts:-0}))" -le "$TTL" ] \
+shell	dist/libexec/share-picker-cached	SC2292	a4b4adbe16a29f77	1	if [ -n "$sel" ] \
+shell	dist/libexec/share-picker-cached	SC2292	f07a3b16d9848762	2	[ -n "$now" ] && [ "$now" != "," ] || return 1
+shell	dist/libexec/share-picker-cached	SC2312	11fa4d9b768b0d13	1	| sort -u \
+shell	dist/libexec/share-picker-cached	SC2312	1eecdf3a93c9badc	1	| sed 's|/session/||' \
+shell	dist/libexec/share-picker-cached	SC2312	2f046b2f856a9966	1	"$BUSCTL" --user tree org.freedesktop.portal.Desktop 2>/dev/null \
+shell	dist/libexec/share-picker-cached	SC2312	451c0405deb57ca8	1	sel=$(printf '%s\n' "$out" | grep -o '\[SELECTION\].*' | tail -1)
+shell	dist/libexec/share-picker-cached	SC2312	6a428f5998cb6176	1	| tr '\n' ',' \
+shell	dist/libexec/share-picker-cached	SC2312	937f9cfeae91e7b4	1	&& [ "$(($(date +%s) - ${ts:-0}))" -le "$TTL" ] \
+shell	dist/libexec/share-picker-cached	SC2312	e3a63077f3212c2a	1	| grep -oE '/session/[^/ ]+' \
+shell	dist/libexec/share-picker-cached	SC2312	e4d9f47382ea051f	1	printf '%s\n%s\n%s\n' "$(date +%s)" "$clients" "$sel" > "$CACHE"
+shell	dist/libexec/swaybg-launch	SC2292	5cec047cf61577af	1	if [ -r "$registry" ]; then
+shell	dist/libexec/swaybg-launch	SC2292	96b9c554f576e8f3	1	[ -n "$wallpaper" ] && echo "swaybg-launch: $wallpaper unreadable; using default" >&2
+shell	dist/libexec/swaybg-launch	SC2292	e128bb9563435ee2	2	if [ -z "$wallpaper" ] || [ ! -r "$wallpaper" ]; then
+shell	dist/libexec/swaync-focus-sender.sh	SC2249	11551f44e35d776a	1	case "$needle" in ""|.|..|*..*) exit 0 ;; esac
+shell	dist/libexec/swaync-focus-sender.sh	SC2292	5b5868eaf9170193	1	[ -z "$needle" ] && exit 0
+shell	dist/libexec/swaync-focus-sender.sh	SC2292	7ccbdb8ee8157123	1	if [ -n "${address:-}" ]; then
+shell	dist/libexec/swaync-focus-sender.sh	SC2292	87ca9146d047561d	1	if [ -f "$plugin" ]; then
+shell	dist/libexec/swaync-focus-sender.sh	SC2292	90648ccf9006c5e6	1	[ -z "$needle_raw" ] && exit 0
+shell	dist/libexec/swaync-focus-sender.sh	SC2292	90f1370019b8a27e	1	if [ -f "$ctx" ]; then
+shell	dist/libexec/swaync-focus-sender.sh	SC2292	f2ba112e2c9b3023	1	if [ "$active_special" != "$workspace" ]; then
+shell	dist/libexec/swaync-focus-sender.sh	SC2292	f8db8b092016c750	1	[ -n "${address:-}" ] && break
+shell	dist/libexec/swaync-focus-sender.sh	SC2312	2137515e6d8429e5	1	dispatch_toggle_special() { hyprctl dispatch "hl.dsp.workspace.toggle_special($(lua_str "$1"))" >/dev/null; }
+shell	dist/libexec/swaync-focus-sender.sh	SC2312	5063b1c2d8391dc9	1	lua_str() { printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"; }
+shell	dist/libexec/swaync-focus-sender.sh	SC2312	99449bdfcf085ec2	1	dispatch_focus_window() { hyprctl dispatch "hl.dsp.focus({ window = $(lua_str "address:$1") })" >/dev/null; }
+shell	dist/libexec/swaync-focus-sender.sh	SC2312	a50bb13a720677b4	1	jq -r --arg n "$n" ' [ .[] | select( (.class // "" | ascii_downcase | contains($n)) or (.initialClass // "" | ascii_downcase | contains($n)) or (.initialTitle // "" | ascii_downcase | contains($n)) ) ] | .[0] | if . then "\(.address) \(.workspace.name)" else "" end ' <<< "$clients_json"
+shell	dist/libexec/swaync-focus-sender.sh	SC2312	c35e597322378811	1	| tr '[:upper:]' '[:lower:]' \
+shell	dist/libexec/swaync-focus-sender.sh	SC2312	cfa4c17d5f7955e4	1	active_special=$(hyprctl -j monitors | jq -r '.[] | select(.focused) | .specialWorkspace.name')
+shell	dist/libexec/swaync-store-context.sh	SC2292	3023e4580be8bd57	1	[ -z "$raw" ] && continue
+shell	dist/libexec/swaync-store-context.sh	SC2292	87ca9146d047561d	1	if [ -f "$plugin" ]; then
+shell	dist/libexec/swaync-store-context.sh	SC2292	9a028df329efebff	1	[ -n "${SWAYNC_ID:-}" ] || exit 0
+shell	dist/libexec/swaync-store-context.sh	SC2312	3023e4580be8bd57	2	[ -z "$raw" ] && continue
+shell	dist/libexec/swaync-store-context.sh	SC2312	c338b828a9155c1c	1	done < <(candidates)
+shell	dist/libexec/waybar-colorpicker.sh	SC2292	09ed0e588d0ef925	1	[ -d "$loc" ] || mkdir -p "$loc"
+shell	dist/libexec/waybar-colorpicker.sh	SC2292	de6e9f1f36ac810d	1	[ -f "$loc/colors" ] || touch "$loc/colors"
+shell	dist/libexec/waybar-colorpicker.sh	SC2312	22b2b2d38842ec33	1	echo "$color" | sed -z 's/\n//g' | wl-copy
+shell	dist/libexec/waybar-colorpicker.sh	SC2312	98854ae4d681dae0	1	mapfile -t allcolors < <(tail -n +2 "$loc/colors")
+shell	dist/libexec/waybar-reload-guard.sh	SC2249	6dfadb04066dd85b	1	case "$entered_us" in ''|*[!0-9]*) exit 0 ;; esac
+shell	dist/libexec/waybar-reload-guard.sh	SC2292	1b7ec03cd60f40b3	1	if [ "$age_s" -lt "$grace_s" ]; then
+shell	dist/libexec/waybar-reload-guard.sh	SC2292	3a4123bf26819f68	1	[ "$state" = "active" ] || exit 0
+shell	dist/libexec/waybar-reload-guard.sh	SC2292	4a14a9af60977150	1	if [ "$state" = "activating" ]; then
+shell	dist/libexec/waybar-updates-check	SC2016	b23adf6f81e0c7a2	1	exec "$term" sh -c ' printf "About to run:\n\n %s\n\n" "$1" printf "This will ask for your password. Press enter to continue, Ctrl-C to abort: " read -r _ sh -c "$1" echo "Done - Press enter to exit" read -r _ ' sh "$1"
+shell	dist/libexec/waybar-updates-check	SC2249	0084d41f84723bb0	1	case "$candidate" in */*) continue ;; esac
+shell	dist/libexec/waybar-updates-check	SC2292	94adc78a77f1ca67	1	if [ -x "$dir/$candidate" ]; then
+shell	dist/libexec/waybar-updates-check	SC2292	967787d95fcbc7b9	1	[ -n "$candidate" ] || continue
+shell	dist/libexec/waybar-updates-check	SC2312	080610b6953f2c13	1	out=$(timeout 30 dnf list --upgradable 2>/dev/null | tail -n +2)
+shell	dist/libexec/waybar-watchdog.sh	SC2292	1cc9f9a2ca3fb1b2	1	if [ -z "$pid" ]; then
+shell	dist/libexec/waybar-watchdog.sh	SC2292	1cf95cd9d8f1c052	1	if [ ${#waybar_pids[@]} -eq 0 ]; then
+shell	dist/libexec/waybar-watchdog.sh	SC2292	225a0bbf1effe120	1	[ -n "$cmdline" ] && echo " Cmdline: $cmdline"
+shell	dist/libexec/waybar-watchdog.sh	SC2292	7c09fe2a2d9ba308	1	if [ -r "/proc/$pid/cmdline" ]; then
+shell	dist/libexec/waybar-watchdog.sh	SC2292	8552135541de9ed4	1	if [ "$state" = "Z" ]; then
+shell	dist/libexec/waybar-watchdog.sh	SC2292	a6c47af41cfd5967	1	if [ "$has_zombie" = true ]; then
+shell	dist/libexec/wayland-env-guard	SC2292	1d49d2c4aedd4355	1	[ -n "$sig" ] && vars+=("HYPRLAND_INSTANCE_SIGNATURE=$sig")
+shell	dist/libexec/wayland-env-guard	SC2292	2780118cce7d6845	1	[ -z "$sock" ] && exit 0
+shell	dist/libexec/wayland-env-guard	SC2292	37eae09dbf011284	1	[ -n "$sig" ] && heal_portals 1
+shell	dist/libexec/wayland-env-guard	SC2292	3807aa66c050efa6	1	if [ "$fix" = 1 ]; then
+shell	dist/libexec/wayland-env-guard	SC2292	58f2cfbd04998451	1	[ -n "$(env_get HYPRLAND_INSTANCE_SIGNATURE)" ] && heal_portals 0
+shell	dist/libexec/wayland-env-guard	SC2292	5be43d5f78769f64	2	if [ ${#xsocks[@]} -eq 1 ] && [ -e "${xsocks[0]}" ]; then
+shell	dist/libexec/wayland-env-guard	SC2292	7aa790b72b44f3ba	1	if [ "$(env_get XDG_CURRENT_DESKTOP)" != "Hyprland" ]; then
+shell	dist/libexec/wayland-env-guard	SC2292	b0b1c5dfde17a231	1	if [ "$(env_get WAYLAND_DISPLAY)" != "$sock" ]; then
+shell	dist/libexec/wayland-env-guard	SC2292	cb71d71f402985c1	1	if [ "$repointed" = 1 ]; then
+shell	dist/libexec/wayland-env-guard	SC2292	cf7c40b9fabf91b6	1	if [ -z "${sock:-}" ] || ! probe "$RUN/$sock"; then
+shell	dist/libexec/wayland-env-guard	SC2292	e1c4d12dfc6b0211	1	if [ -n "$cur" ] && probe "$RUN/$cur"; then
+shell	dist/libexec/wayland-env-guard	SC2312	5069dc6793a5884e	1	read -r sig sock < <(hyprctl instances -j 2>/dev/null | python3 -c '
+shell	dist/libexec/wayland-env-guard	SC2312	58f2cfbd04998451	1	[ -n "$(env_get HYPRLAND_INSTANCE_SIGNATURE)" ] && heal_portals 0
+shell	dist/libexec/wayland-env-guard	SC2312	7aa790b72b44f3ba	1	if [ "$(env_get XDG_CURRENT_DESKTOP)" != "Hyprland" ]; then
+shell	dist/libexec/wayland-env-guard	SC2312	7e1a63d0c4d100a2	1	systemctl --user show-environment 2>/dev/null | sed -n "s/^$1=//p"
+shell	dist/libexec/wayland-env-guard	SC2312	95389097637ef0a8	1	read -r sig sock < <(hyprctl instances -j 2>/dev/null | python3 -c ' import json, os, sys try: insts = json.load(sys.stdin) except Exception: sys.exit(0) live = [i for i in insts if i.get("pid") and os.path.exists("/proc/%s" % i["pid"])] if live: live.sort(key=lambda i: i.get("time", 0)) i = live[-1] print(i.get("instance", ""), i.get("wl_socket", "")) ')
+shell	dist/libexec/wayland-env-guard	SC2312	b0b1c5dfde17a231	1	if [ "$(env_get WAYLAND_DISPLAY)" != "$sock" ]; then
+shell	dist/uwsm/env	SC2086	884ba1a9a85cf01f	1	export GNOME_KEYRING_CONTROL=${XDG_RUNTIME_DIR}/keyring
+shell	dist/uwsm/env	SC2154	884ba1a9a85cf01f	1	export GNOME_KEYRING_CONTROL=${XDG_RUNTIME_DIR}/keyring
+shell	dist/uwsm/env-hyprland	SC2249	59db84d984e6054f	1	case "$_aq" in /dev/dri/card*) export AQ_DRM_DEVICES="$_aq" ;; esac
+shell	dist/uwsm/env-hyprland	SC2249	63cf1053b269268d	1	case "$_aq" in *[!/:.A-Za-z0-9_-]*) _aq="" ;; esac
+shell	get-hypr-de.sh	SC1091	6f61dbc3641259be	1	. /etc/os-release
+shell	get-hypr-de.sh	SC2154	65b64518fe88eebf	1	case "$ID" in
+shell	get-hypr-de.sh	SC2292	0ec8726c7e723180	1	if [ -n "$repofile" ]; then
+shell	get-hypr-de.sh	SC2292	1c74cb8391fa2d82	2	if [ -n "$user" ] && [ "$user" != root ] && command -v hypr-de-setup >/dev/null 2>&1; then
+shell	get-hypr-de.sh	SC2292	4b3099891e3b19ee	2	[ "$GAMING" = 1 ] && pkgs+=(hypr-de-gaming)
+shell	get-hypr-de.sh	SC2292	80a15ab224e7088b	1	if [ -n "${HYPR_DE_INSTALLER_LIB:-}" ]; then
+shell	get-hypr-de.sh	SC2292	8d7ba4a38680b95a	1	[ "$rc" -eq 0 ] && return 0
+shell	get-hypr-de.sh	SC2292	ae649c197cf83ed5	1	[ "$got" = "$KEY_FPR" ] || die "mason repo key fingerprint mismatch (got $got)"
+shell	get-hypr-de.sh	SC2292	b6e673c9c8c991fc	1	if [ "$(id -u)" -ne 0 ]; then
+shell	get-hypr-de.sh	SC2292	bb14fabbe0de56b0	1	if [ "$SETUP" = 1 ]; then
+shell	get-hypr-de.sh	SC2292	d7d6f72f373c5f9b	1	if [ "$got" != "$want" ]; then
+shell	get-hypr-de.sh	SC2292	f2aaa21f9c9701d3	1	if [ "$DISTRO" = arch ]; then
+shell	get-hypr-de.sh	SC2292	fbd3c492bcbe0eb6	1	if [ "$i" -eq "$tries" ]; then
+shell	get-hypr-de.sh	SC2310	6a617faaaf838ab2	1	fetch "https://download.copr.fedorainfracloud.org/results/$owner/$project/pubkey.gpg" "$tmp" \
+shell	get-hypr-de.sh	SC2312	b6e673c9c8c991fc	1	if [ "$(id -u)" -ne 0 ]; then
+shell	get-hypr-de.sh	SC2317	470ec89d274fcfc9	1	return 0 2>/dev/null || exit 0
+shell	get-hypr-de.sh	suppression	d20da7b4dc5a1a21	1	# shellcheck disable=SC2153
+shell	packaging/PKGBUILD	SC2164	403a3e8af791ff49	8	cd "$srcdir"; cd "hypr-DE-$pkgver" 2>/dev/null || cd "$pkgbase-$pkgver"
+shell	packaging/build-srpm.sh	SC2292	8dcec01fe149809c	1	if [ "${1:-}" = "--copr" ]; then
+shell	packaging/build-srpm.sh	SC2292	c854b2d5b79a5a47	1	if [ "$PKGBUILD_VER" != "$VER" ]; then
+shell	packaging/build-srpm.sh	SC2292	ead3855107ff683f	1	if [ "${1:-}" = "--head" ]; then
+shell	packaging/check-units.sh	SC2249	c2a3e0d6d30ff687	1	case "$line" in *'command -v '*|*'which '*) bad "$(basename "$(dirname "$f")")/$(basename "$f"): resolves an executable through \$PATH ($line). Name an absolute path -- the user manager's PATH includes ~/.local/bin." continue ;; esac
+shell	packaging/check-units.sh	SC2292	06e197328d6189be	1	[ "$fail" = 0 ] && echo "units in sync (${#shipped[@]} shipped, ${#preset[@]} preset, ${#declared[@]} declared)"
+shell	packaging/check-units.sh	SC2292	1ed29f0245f88eec	1	[ -n "$u" ] || continue
+shell	packaging/check-units.sh	SC2292	2e18ce2f9a60baec	2	if [ -f "$TOML" ]; then
+shell	packaging/check-units.sh	SC2292	42e679c14a702cba	1	[ -n "${UNMANAGED[$u]:-}" ] && continue
+shell	packaging/check-units.sh	SC2292	806d16bce41770e7	1	[ -f "$f" ] || continue
+shell	packaging/check-units.sh	SC2292	87a45434bb562c6d	1	[ -d "$UNITDIR" ] || { echo "no unit dir at $UNITDIR" >&2; exit 2; }
+shell	packaging/check-units.sh	SC2292	96290ce3999db8df	1	in_list() { local n="$1"; shift; local x; for x in "$@"; do [ "$x" = "$n" ] && return 0; done; return 1; }
+shell	packaging/check-units.sh	SC2292	99071fd247728713	1	[ -f "$PRESET" ] || { echo "no preset at $PRESET" >&2; exit 2; }
+shell	packaging/check-units.sh	SC2292	ae13e859ccf45d44	1	[ -e "$f" ] && basename "$f"
+shell	packaging/check-units.sh	SC2292	e6d28cc1c10e946d	1	if [ -f "$SETUP" ] && ! grep -q "$u" "$SETUP"; then
+shell	packaging/check-units.sh	SC2292	fdd5f0fefa67c27a	1	[ -z "$cmd" ] && continue
+shell	packaging/check-units.sh	SC2312	28a31704630c59c4	3	mapfile -t preset < <(grep -oE '^(enable|disable)[[:space:]]+\S+' "$PRESET" | awk '{print $2}' | sort -u)
+shell	packaging/check-units.sh	SC2312	965d451a6207e7f9	1	done < <(grep -hE '^Exec(Start|Stop|StartPre|StartPost|StopPost|Reload)=' "$f" 2>/dev/null)
+shell	packaging/check-units.sh	SC2312	ae13e859ccf45d44	1	[ -e "$f" ] && basename "$f"
+shell	packaging/check-units.sh	SC2312	e36af6e4cf94e3ed	1	mapfile -t declared < <(python3 "$REPO/packaging/declared-units.py" "$TOML")
+shell	packaging/check-units.sh	SC2312	e639c7f07143df33	1	done | sort
+shell	packaging/gen-deps.sh	SC2292	2eb6eb693a148353	1	[ "$fail" = 0 ] && echo "deps in sync"
+shell	packaging/gen-deps.sh	SC2292	40f30e9efeaa6f20	1	var=$([ "$part" = main ] && echo "_depends_main" || echo "_depends_gaming")
+shell	packaging/gen-deps.sh	SC2292	e89c7f04d7c8dbda	1	if [ "$part" = main ]; then
+shell	packaging/hypr-de-scene/PKGBUILD	SC2164	21d433da6325693f	6	cd "$srcdir"; cd "hypr-DE-$pkgver" 2>/dev/null || cd "$pkgname-$pkgver"
+shell	packaging/install.sh	SC1091	123eed21ab89e925	1	. "$(dirname "$0")/paths.conf"
+shell	packaging/install.sh	SC2154	1d7f567c4f0053ec	1	inst "$STAGE/systemd/user/$f" "$UNITDIR/${f#./}"
+shell	packaging/install.sh	SC2154	2023f3d8f1fe75dd	1	inst "$STAGE/greetd/vigil.toml" "$GREETDDIR/vigil.toml"
+shell	packaging/install.sh	SC2154	54e5c3b86b035c73	1	inst "$STAGE/nvim/site/plugin/hypr-de-defaults.lua" "$NVIMSITE/plugin/hypr-de-defaults.lua"
+shell	packaging/install.sh	SC2154	6150dcf324e78d0e	1	inst "$STAGE/environment.d/60-hypr-de.conf" "$ENVGENDIR/60-hypr-de.conf"
+shell	packaging/install.sh	SC2154	6fd5ca573b44410f	1	instx "$STAGE/libexec/$f" "$LIBEXECDIR/${f#./}"
+shell	packaging/install.sh	SC2154	9b2acb4ae37c87ea	1	inst "$f" "$MANDIR/man${sec}/$(basename "$f")"
+shell	packaging/install.sh	SC2154	a47974787610e8ef	1	inst "$STAGE/systemd/user-preset/90-hypr-de.preset" "$PRESETDIR/90-hypr-de.preset"
+shell	packaging/install.sh	SC2154	b7c1e908aecabec6	1	for f in "$STAGE"/hypr/*; do inst "$f" "$DATADIR/hypr/$(basename "$f")"; done
+shell	packaging/install.sh	SC2154	dc3bb9baf726c00b	1	inst "$STAGE/uwsm/env" "$XDGCONFDIR/uwsm/env"
+shell	packaging/install.sh	SC2154	f45287c0356ebfae	1	instx "$f" "$BINDIR/$(basename "$f")"
+shell	packaging/install.sh	SC2292	536e737cd871f260	1	if [ -d "$STAGE/matugen" ]; then
+shell	packaging/install.sh	SC2292	7450fe49f25fc3f3	1	if [ -d "$STAGE/man" ]; then
+shell	packaging/install.sh	SC2292	806d16bce41770e7	1	[ -f "$f" ] || continue
+shell	packaging/install.sh	SC2292	b40bb39b1b4ecbf7	1	if [ -d "$STAGE/lmtt" ]; then
+shell	packaging/install.sh	SC2292	e569c8587e21c613	1	if [ -d "$STAGE/themes" ]; then
+shell	packaging/substitute.sh	SC1091	123eed21ab89e925	1	. "$(dirname "$0")/paths.conf"
+shell	packaging/substitute.sh	SC2154	0068a1e5bd0f5af1	1	-e "s|@BINDIR@|$BINDIR|g" \
+shell	packaging/substitute.sh	SC2154	16b16ad9c005cf8c	1	-e "s|@SCENE_PLUGIN@|$SCENE_PLUGIN|g" \
+shell	packaging/substitute.sh	SC2154	3feb49fb25857447	1	-e "s|@WAYBAR_CFFI@|$WAYBAR_CFFI|g" \
+shell	packaging/substitute.sh	SC2154	72e004c77ca0d242	1	-e "s|@LIBEXECDIR@|$LIBEXECDIR|g" \
+shell	packaging/substitute.sh	SC2154	a34d99734e991e73	1	-e "s|@DATADIR@|$DATADIR|g" \
+shell	packaging/substitute.sh	SC2292	78248cb6af5b7675	1	if LEFT=$(grep -rn "@\(BINDIR\|DATADIR\|LIBEXECDIR\|WAYBAR_CFFI\|SCENE_PLUGIN\|UNITDIR\|PRESETDIR\|ENVGENDIR\|XDGCONFDIR\)@" "$STAGE" -l 2>/dev/null | head -5) && [ -n "$LEFT" ]; then
+shell	plugins/hypr-de-scene/tests/nested-inner.sh	SC2154	1a611dba4309b795	1	WLR_BACKENDS=headless WLR_RENDERER=gles2 WLR_LIBINPUT_NO_DEVICES=1 WLR_RENDER_DRM_DEVICE=$RENDER_NODE \
+shell	plugins/hypr-de-scene/tests/nested-inner.sh	SC2154	40458d03d513a331	1	chmod 700 "$XDG_RUNTIME_DIR"
+shell	plugins/hypr-de-scene/tests/nested-inner.sh	SC2154	a07c8dfe2d612688	1	sleep "$SCENE_RUN_SECONDS"
+shell	plugins/hypr-de-scene/tests/nested-inner.sh	SC2154	a3c849c349c90f44	1	readback) export HYPR_DE_SCENE_TIMEOUT=$SCENE_TIMEOUT HYPR_DE_SCENE_QUIET=$SCENE_TIMEOUT ;;
+shell	plugins/hypr-de-scene/tests/nested-inner.sh	SC2154	e482e7d064e262a7	1	sleep "$SCENE_AFTER_UNLOAD"
+shell	plugins/hypr-de-scene/tests/nested-inner.sh	SC2154	f30540a8c22763ec	1	if [[ "$SCENE_UNLOAD" = 1 ]]; then
+shell	plugins/hypr-de-scene/tests/nested-readback.sh	SC2292	23582736b38b7d31	1	if [ -n "${NESTED_LIB_DIR-}" ]; then
+shell	plugins/hypr-de-scene/tests/nested-readback.sh	SC2292	36aa43209d0759b6	1	if [ -z "$node" ]; then
+shell	plugins/hypr-de-scene/tests/nested-readback.sh	SC2292	4b93bd700026cef2	1	if [ -L "$d" ]; then
+shell	plugins/hypr-de-scene/tests/nested-readback.sh	SC2292	50ad2ab227d80327	1	elif [ -d "$d" ]; then
+shell	plugins/hypr-de-scene/tests/nested-readback.sh	SC2292	a508362a95f58eb1	1	[ $# -ge 4 ] || usage
+shell	plugins/hypr-de-scene/tests/nested-readback.sh	SC2292	dd6ef3d9b614283f	1	[ -n "$node" ] || { echo "nested-readback: no DRM render node" >&2; exit 2; }
+shell	plugins/hypr-de-scene/tests/nested-readback.sh	SC2292	f2701d637e411e3a	1	[ -c "$n" ] && { node=$n; break; }
+shell	tests/blank-guard.sh	SC2015	293bb165e1673b33	1	[ "$(run 0 - HDMI-A-1)" = 1 ] && ok "disabled output ignored" || bad "counted a disabled output as blanked"
+shell	tests/blank-guard.sh	SC2015	39eef3f541473792	1	[ "$(run 0 - HDMI-A-1)" = 1 ] && ok "self does not justify a blank" || bad "the re-added output justified its own blank"
+shell	tests/blank-guard.sh	SC2015	511aa523efa04839	1	[ "$(run 0 - HDMI-A-1)" = 0 ] && ok "blanked" || bad "did not blank during an active blank"
+shell	tests/blank-guard.sh	SC2015	be00f77a8f3cac8a	1	[ "$(run 1 - HDMI-A-1)" = 1 ] && ok "unlocked leaves it alone" || bad "blanked an unlocked desktop"
+shell	tests/blank-guard.sh	SC2015	e4b3ee8be40fb496	1	[ "$(run 0 - HDMI-A-1)" = 1 ] && ok "left lit" || bad "blanked a lit lock screen"
+shell	tests/blank-guard.sh	SC2016	e2e6259b7df9fe52	1	printf '#!/bin/sh\nexit "${LOCKED_OK:-1}"\n' > "$work/libexec/session-locked.sh"
+shell	tests/blank-guard.sh	SC2248	f48a2ebf33e7dd92	1	exit $fail
+shell	tests/blank-guard.sh	SC2292	293bb165e1673b33	1	[ "$(run 0 - HDMI-A-1)" = 1 ] && ok "disabled output ignored" || bad "counted a disabled output as blanked"
+shell	tests/blank-guard.sh	SC2292	39eef3f541473792	1	[ "$(run 0 - HDMI-A-1)" = 1 ] && ok "self does not justify a blank" || bad "the re-added output justified its own blank"
+shell	tests/blank-guard.sh	SC2292	3a2ad5754ca6c9de	1	run() { rm -f "$work/blanked"; LOCKED_OK=$1 "$work/libexec/blank-guard.sh" "$3" >/dev/null 2>&1; [ -f "$work/blanked" ]; echo $?; }
+shell	tests/blank-guard.sh	SC2292	511aa523efa04839	1	[ "$(run 0 - HDMI-A-1)" = 0 ] && ok "blanked" || bad "did not blank during an active blank"
+shell	tests/blank-guard.sh	SC2292	be00f77a8f3cac8a	1	[ "$(run 1 - HDMI-A-1)" = 1 ] && ok "unlocked leaves it alone" || bad "blanked an unlocked desktop"
+shell	tests/blank-guard.sh	SC2292	c825131a023e12e6	3	[ -e /run/tripwire/hits ] || { [ "${HYPR_DE_SEALED-}" = build-root ] && [ ! -e /run/systemd/private ]; } || exec "$(dirname -- "$0")/run" "$0"
+shell	tests/blank-guard.sh	SC2292	e4b3ee8be40fb496	1	[ "$(run 0 - HDMI-A-1)" = 1 ] && ok "left lit" || bad "blanked a lit lock screen"
+shell	tests/blank-guard.sh	SC2312	253050dda957bebc	2	printf '[%s,%s]' "$(mon DP-1 false true)" "$(mon HDMI-A-1 true false)" > "$work/monitors.json"
+shell	tests/blank-guard.sh	SC2312	293bb165e1673b33	1	[ "$(run 0 - HDMI-A-1)" = 1 ] && ok "disabled output ignored" || bad "counted a disabled output as blanked"
+shell	tests/blank-guard.sh	SC2312	39eef3f541473792	1	[ "$(run 0 - HDMI-A-1)" = 1 ] && ok "self does not justify a blank" || bad "the re-added output justified its own blank"
+shell	tests/blank-guard.sh	SC2312	511aa523efa04839	1	[ "$(run 0 - HDMI-A-1)" = 0 ] && ok "blanked" || bad "did not blank during an active blank"
+shell	tests/blank-guard.sh	SC2312	9daaad00e9b7b727	2	printf '[%s,%s]' "$(mon DP-1 true false)" "$(mon HDMI-A-1 false false)" > "$work/monitors.json"
+shell	tests/blank-guard.sh	SC2312	afa4babde16b2425	2	printf '[%s,%s]' "$(mon DP-1 false false)" "$(mon HDMI-A-1 true false)" > "$work/monitors.json"
+shell	tests/blank-guard.sh	SC2312	b597182b5f700195	3	printf '[%s,%s,%s]' "$(mon DP-1 true false)" "$(mon DP-2 true false)" "$(mon HDMI-A-1 true false)" > "$work/monitors.json"
+shell	tests/blank-guard.sh	SC2312	be00f77a8f3cac8a	1	[ "$(run 1 - HDMI-A-1)" = 1 ] && ok "unlocked leaves it alone" || bad "blanked an unlocked desktop"
+shell	tests/blank-guard.sh	SC2312	e4b3ee8be40fb496	1	[ "$(run 0 - HDMI-A-1)" = 1 ] && ok "left lit" || bad "blanked a lit lock screen"
+shell	tests/blank-guard.sh	SC2312	f9bcf5efd0c931c1	3	printf '[%s,%s,%s]' "$(mon DP-1 false false)" "$(mon DP-2 false false)" "$(mon HDMI-A-1 true false)" > "$work/monitors.json"
+shell	tests/command-construction.sh	SC2015	1c077a25db7b2072	1	[ -z "$raw" ] && ok "every interpolating dispatch goes through lua_str" \
+shell	tests/command-construction.sh	SC2015	1e8e923a98404800	1	[ -z "$hits" ] && ok "no three-argument match()" || { printf '%s\n' "$hits"; bad "gawk-only match()"; }
+shell	tests/command-construction.sh	SC2015	6f01cd0b64754832	1	[ -z "$hits" ] && ok "no shell=True in dist/" || { printf '%s\n' "$hits"; bad "shell=True in dist/"; }
+shell	tests/command-construction.sh	SC2292	1c077a25db7b2072	1	[ -z "$raw" ] && ok "every interpolating dispatch goes through lua_str" \
+shell	tests/command-construction.sh	SC2292	1e8e923a98404800	1	[ -z "$hits" ] && ok "no three-argument match()" || { printf '%s\n' "$hits"; bad "gawk-only match()"; }
+shell	tests/command-construction.sh	SC2292	24a48df0319a9352	1	if [ "$(printf '%s\n' "$py" | grep -c .)" -ne 4 ]; then
+shell	tests/command-construction.sh	SC2292	60d78bfdcba19b61	1	elif [ "$(printf '%s\n' "$sh_out" | grep -c .)" -ne 4 ]; then
+shell	tests/command-construction.sh	SC2292	633be272984c405f	1	[ "$fail" -eq 0 ] && { echo "command construction is safe"; exit 0; }
+shell	tests/command-construction.sh	SC2292	6f01cd0b64754832	1	[ -z "$hits" ] && ok "no shell=True in dist/" || { printf '%s\n' "$hits"; bad "shell=True in dist/"; }
+shell	tests/command-construction.sh	SC2292	91da0a8406ef2a44	1	elif [ "$py" = "$sh_out" ]; then
+shell	tests/command-construction.sh	SC2292	c825131a023e12e6	3	[ -e /run/tripwire/hits ] || { [ "${HYPR_DE_SEALED-}" = build-root ] && [ ! -e /run/systemd/private ]; } || exec "$(dirname -- "$0")/run" "$0"
+shell	tests/command-construction.sh	SC2292	cade38ec95a86a35	1	if [ -z "$inner" ]; then
+shell	tests/command-construction.sh	SC2312	1a207a4ecc9eb61e	1	bad "the shell quoter produced $(printf '%s\n' "$sh_out" | grep -c .) of 4 lines -- is lua_str present?"
+shell	tests/command-construction.sh	SC2312	24a48df0319a9352	1	if [ "$(printf '%s\n' "$py" | grep -c .)" -ne 4 ]; then
+shell	tests/command-construction.sh	SC2312	60d78bfdcba19b61	1	elif [ "$(printf '%s\n' "$sh_out" | grep -c .)" -ne 4 ]; then
+shell	tests/command-construction.sh	SC2312	89e349f9ee823a13	2	eval "$(grep -m1 '^\s*lua_str()' "$root/dist/libexec/swaync-focus-sender.sh" | sed 's/^[[:space:]]*//')"
+shell	tests/command-construction.sh	SC2312	cbe2a79608c60e19	1	bad "the python quoter produced $(printf '%s\n' "$py" | grep -c .) of 4 lines -- is lua_str present?"
+shell	tests/env-guard.sh	SC2292	234c872c1101ed8a	2	while [ ! -S "$work/run/wayland-1" ] && [ "$n" -lt 200 ]; do sleep 0.01; n=$(( n + 1 )); done
+shell	tests/env-guard.sh	SC2292	c825131a023e12e6	3	[ -e /run/tripwire/hits ] || { [ "${HYPR_DE_SEALED-}" = build-root ] && [ ! -e /run/systemd/private ]; } || exec "$(dirname -- "$0")/run" "$0"
+shell	tests/env-guard.sh	SC2312	2177ed9d283c1f53	1	check "$(cat "$work/broken/rc")" 1 "the guard exits 1" "the guard ignored a failed export"
+shell	tests/env-guard.sh	SC2312	2952de80f52c8f11	1	check "$(cat "$work/stale/rc")" 0 "the guard exits 0" "the guard failed on a stale socket"
+shell	tests/env-guard.sh	SC2312	3e5df3c49ff87ba4	2	check "$(writes stale | head -n1)" \
+shell	tests/env-guard.sh	SC2312	41891891688cc4fb	2	check "$(writes broken | grep -vc '^dbus-update-activation-environment --systemd WAYLAND_DISPLAY=')" 0 \
+shell	tests/env-guard.sh	SC2312	6798a7c6d06862df	3	check "$(cat "$work/live/rc"):$(writes live | wc -l)" "0:0" "the guard exits 0 and writes nothing" \
+shell	tests/env-guard.sh	SC2312	6f80b06fadbd74c6	2	check "$(writes stale | grep -c -e 'set-environment' -e 'import-environment')" 0 \
+shell	tests/env-guard.sh	SC2312	98a6049904fd02d7	2	check "$(writes unreached | grep -vc '^dbus-update-activation-environment --systemd WAYLAND_DISPLAY=')" 0 \
+shell	tests/env-guard.sh	SC2312	a8f93705acb5700a	2	check "$(writes stale | grep -c 'WAYLAND_DISPLAY\|HYPRLAND_INSTANCE_SIGNATURE')" 1 \
+shell	tests/env-guard.sh	SC2312	e861c773c3e2a340	1	check "$(cat "$work/unreached/rc")" 1 "the guard exits 1" "the guard trusted an export the manager never got"
+shell	tests/fixtures/hypridle-override/hypridle	SC2154	7545a0c75847e8c9	1	cp "$2" "$HYPRIDLE_CONF_COPY"
+shell	tests/fixtures/hypridle-override/hypridle	SC2154	e7d4602a0b4a084b	1	printf '%s\n' "$*" >> "$HYPRIDLE_LOG"
+shell	tests/fixtures/lock-policy-fallback/swaylock	SC2154	030dbef62f3fdf89	1	printf 'swaylock:refused\n' >> "$LOCK_POLICY_LOG"
+shell	tests/fixtures/lock-policy-fallback/swaylock	SC2154	4f19ae7138bdc911	1	echo $! >> "$LOCK_POLICY_HOLDERS"
+shell	tests/fixtures/lock-policy-fallback/swaylock	SC2312	4ffa1f1cf217987e	1	while [ "$(wc -l < "$LOCK_POLICY_SWAYLOCK_BARRIER")" -lt 2 ] && [ "$i" -lt 15 ]; do
+shell	tests/fixtures/lock-policy/hyprctl	SC2154	4310c7566503fa3e	1	echo "Couldn't connect to $XDG_RUNTIME_DIR/hypr/${HYPRLAND_INSTANCE_SIGNATURE:-}/.socket.sock. (3)"
+shell	tests/fixtures/lock-policy/hyprctl	SC2154	a586164e4c91728f	1	printf 'hyprctl:%s\n' "$*" >> "$LOCK_POLICY_LOG"
+shell	tests/fixtures/lock-policy/hyprctl	SC2249	79b06bcdf80dcc83	1	case "${1:-}" in locked|getoption) if [ -n "${LOCK_POLICY_HYPRCTL_GONE:-}" ] && [ -e "$LOCK_POLICY_HYPRCTL_GONE" ]; then echo "Couldn't connect to $XDG_RUNTIME_DIR/hypr/${HYPRLAND_INSTANCE_SIGNATURE:-}/.socket.sock. (3)" exit 1 fi [ -n "${LOCK_POLICY_HYPRCTL_SLOW:-}" ] && [ -e "$LOCK_POLICY_HYPRCTL_SLOW" ] && sleep 4 ;; esac
+shell	tests/fixtures/lock-policy/hyprctl	SC2249	f9ebf33d2effac5b	1	case "${1:-}" in -j) if [ "${2:-}" = clients ]; then [ "${LOCK_POLICY_COMPOSITOR_HANG:-0}" = 1 ] && sleep 30 if [ -n "${LOCK_POLICY_INHIBIT_CLIENT:-}" ]; then printf '[{"class":"%s","inhibitingIdle":true}]\n' "$LOCK_POLICY_INHIBIT_CLIENT" else printf '[]\n' fi exit 0 fi ;; locked) [ "${LOCK_POLICY_COMPOSITOR_HANG:-0}" = 1 ] && sleep 30 if [ -n "${LOCK_POLICY_LOCK_FILE:-}" ] && [ -e "$LOCK_POLICY_LOCK_FILE" ]; then echo true else printf '%s\n' "${LOCK_POLICY_COMPOSITOR_LOCKED:-false}" fi exit 0 ;; getoption) [ "${2:-}" = misc:allow_session_lock_restore ] || { echo "no such option"; exit 0; } printf 'bool: %s\nset: true\n' "${LOCK_POLICY_RESTORE:-false}" exit 0 ;; esac
+shell	tests/fixtures/lock-policy/hyprstate	SC2154	5abce0eab414adf8	1	printf 'hyprstate:%s\n' "$*" >> "$LOCK_POLICY_LOG"
+shell	tests/fixtures/lock-policy/loginctl	SC2154	fda97abe00d6c18f	1	printf 'loginctl:%s\n' "$*" >> "$LOCK_POLICY_LOG"
+shell	tests/fixtures/lock-policy/loginctl	SC2249	4a569ff5d20d26a9	1	case "${2:-}" in self) echo "Failed to get path for session 'self': Caller does not belong to any known session." >&2 exit 1 ;; esac
+shell	tests/fixtures/lock-policy/loginctl	SC2249	e3a2e79ca56925d4	1	case "$*" in *LockedHint*) printf '%s\n' "${LOCK_POLICY_LOCKED_HINT:-no}" ;; *Id*) printf '%s\n' "${LOCK_POLICY_SESSION_ID:-7}" ;; esac
+shell	tests/fixtures/lock-policy/loginctl	SC2249	f155d974ad15e36a	1	case "${1:-}" in show-session) case "${2:-}" in self) echo "Failed to get path for session 'self': Caller does not belong to any known session." >&2 exit 1 ;; esac case "$*" in *LockedHint*) printf '%s\n' "${LOCK_POLICY_LOCKED_HINT:-no}" ;; *Id*) printf '%s\n' "${LOCK_POLICY_SESSION_ID:-7}" ;; esac ;; terminate-session|terminate-user) printf 'loginctl:%s\n' "$*" >> "$LOCK_POLICY_LOG" ;; esac
+shell	tests/fixtures/lock-policy/logind-idle-control	SC2154	2c4871d400df3fcb	1	printf 'logind-idle-control:%s\n' "$*" >> "$LOCK_POLICY_LOG"
+shell	tests/fixtures/lock-policy/logind-idle-control	SC2249	a694c75093d2a1ec	1	case "${1:-}" in status) [ "${LOCK_POLICY_INHIBIT_HANG:-0}" = 1 ] && sleep 30 printf '%s\n' "${LOCK_POLICY_INHIBIT_ENABLED:-0}" exit 0 ;; esac
+shell	tests/fixtures/lock-policy/notify-send	SC2154	fd2def27c1760310	1	printf 'notify-send:%s\n' "$*" >> "$LOCK_POLICY_LOG"
+shell	tests/fixtures/lock-policy/pgrep	SC2154	bd6be75883d034bb	1	grep -qx "$pid" "$LOCK_POLICY_HOLDERS" 2>/dev/null || continue
+shell	tests/fixtures/lock-policy/pgrep	SC2249	39892d51f4e4fbb6	1	case "${2:-}" in gameoverlayui) [ "${LOCK_POLICY_GAME:-}" = steam ] && exit 0 ;; gamescope) [ "${LOCK_POLICY_GAME:-}" = gamescope ] && exit 0 ;; esac
+shell	tests/fixtures/lock-policy/systemd-cat	SC2154	dc2be619da8f759d	1	printf '%s: %s\n' "$ident" "$line" >> "$LOCK_POLICY_JOURNAL"
+shell	tests/fixtures/lock-policy/systemd-run	SC2154	240f965ac83ace51	1	printf 'systemd-run:scope-failed\n' >> "$LOCK_POLICY_LOG"
+shell	tests/fixtures/lock-policy/systemd-run	SC2249	7bd0bac930743114	1	case " $* " in *" --watch "*) if [ "${LOCK_POLICY_WATCH_SCOPE_STATUS:-0}" -ne 0 ]; then echo 'Failed to start transient scope unit: Unit already exists' >&2 exit "$LOCK_POLICY_WATCH_SCOPE_STATUS" fi ;; *" vigil-lock "*) if [ "${LOCK_POLICY_SCOPE_STATUS:-0}" -ne 0 ]; then printf 'systemd-run:scope-failed\n' >> "$LOCK_POLICY_LOG" exit "$LOCK_POLICY_SCOPE_STATUS" fi ;; esac
+shell	tests/fixtures/lock-policy/vigil-lock	SC2154	4f19ae7138bdc911	1	echo $! >> "$LOCK_POLICY_HOLDERS"
+shell	tests/fixtures/lock-policy/vigil-lock	SC2154	f62fcaed8c406438	1	printf 'vigil-lock:%s\n' "$*" >> "$LOCK_POLICY_LOG"
+shell	tests/fixtures/media-stream/playerctl	SC2154	95decabaa81fe20a	1	echo $$ > "$MEDIA_PIDFILE"
+shell	tests/fixtures/media-stream/playerctl	SC2154	fe34125ea68fdc88	1	printf '%s\n' "$*" >> "$MEDIA_ARGV_LOG"
+shell	tests/fixtures/media-stream/playerctl	SC2292	6941058c4883ad71	2	if [ -n "${MEDIA_SCRIPT:-}" ] && [ -f "$MEDIA_SCRIPT" ]; then
+shell	tests/fixtures/media-stream/playerctl	SC2292	8257f7a134af8eb9	1	if [ -n "${MEDIA_EXIT:-}" ]; then
+shell	tests/hypridle-override.sh	SC2015	03e735a865e51217	1	[ "$dropped" -eq 11 ] && ok "eleven lines reported with file:line" || { cat "$work/err"; bad "expected 11 dropped reports, got $dropped"; }
+shell	tests/hypridle-override.sh	SC2015	069b3d03238e520c	1	[ "$uses" -eq 3 ] && ok "three listeners, three knobs" || bad "expected 3 knob uses, found $uses"
+shell	tests/hypridle-override.sh	SC2015	1096098c6ee5816c	1	[ "$(handed)" = "-c $policy" ] && ok "hypridle got -c $policy" || bad "hypridle got: $(handed)"
+shell	tests/hypridle-override.sh	SC2015	157c81868aa8ccb3	1	grep -q "4294967 seconds" "$work/err" && ok "the range is stated" || bad "no range in the out-of-range report"
+shell	tests/hypridle-override.sh	SC2015	198409f424f4b87a	1	[ "$(grep -c 'dropped' "$work/err")" -eq 0 ] && ok "nothing dropped" || { cat "$work/err"; bad "a valid line was dropped"; }
+shell	tests/hypridle-override.sh	SC2015	24ee98e6fa8c8b6f	1	grep -q 'ten minutes\|this laptop' "$assembled" && bad "override comments leaked into the config" || ok "override comments are not copied"
+shell	tests/hypridle-override.sh	SC2015	2a45df6c11d01ed3	1	[ -e /tmp/hypr-de/hypridle.conf ] && bad "wrote under /tmp" || ok "nothing under /tmp"
+shell	tests/hypridle-override.sh	SC2015	318c8a096a688465	1	printf '%s\n' "${knobs[@]}" | grep -qx 'suspend_timeout=900' && ok "\$suspend_timeout defaults to 900" || bad "\$suspend_timeout default: ${knobs[*]}"
+shell	tests/hypridle-override.sh	SC2015	3bc0351a9cd8b8bc	1	grep -qF -- "$needle" "$assembled" && bad "'$needle' reached the config" || ok "'$needle' dropped"
+shell	tests/hypridle-override.sh	SC2015	47ff0113d09ec624	1	cmp -s "$assembled" "$HYPRIDLE_CONF_COPY" && ok "the copy handed over is the one assembled" || bad "handed file differs from the assembled one"
+shell	tests/hypridle-override.sh	SC2015	494c1ba8896cc0ac	2	[ "$(handed)" = "-c $policy" ] && ok "packaged policy" || bad "hypridle got: $(handed)"
+shell	tests/hypridle-override.sh	SC2015	4a18455c779e1b68	1	&& ok "the launcher pins PATH to root-owned directories" \
+shell	tests/hypridle-override.sh	SC2015	4b26feb66dc42b8a	1	[ "$(handed)" = "-c $policy" ] && ok "every line dropped: packaged policy" || bad "hypridle got: $(handed)"
+shell	tests/hypridle-override.sh	SC2015	50abf27c139f8e2e	1	[ "$(handed)" = "-c $policy" ] && ok "comments only: packaged policy" || bad "hypridle got: $(handed)"
+shell	tests/hypridle-override.sh	SC2015	590e4002639f273f	1	&& bad "the launcher resolves something through \$PATH" \
+shell	tests/hypridle-override.sh	SC2015	60ef4a82927c88f3	1	grep -v '^[[:space:]]*#' "$dropin" | grep -q 'command -v\|which ' && bad "the drop-in resolves through \$PATH" || ok "nothing in the drop-in resolves through \$PATH"
+shell	tests/hypridle-override.sh	SC2015	67e943a789b4b526	1	grep -q "XDG_RUNTIME_DIR is unset" "$work/err" && ok "warned" || bad "no warning"
+shell	tests/hypridle-override.sh	SC2015	69ec285f50edba47	1	[ "$(stat -c %a "$XDG_RUNTIME_DIR/hypr-de")" = 700 ] && ok "runtime dir is 0700" || bad "runtime dir mode $(stat -c %a "$XDG_RUNTIME_DIR/hypr-de")"
+shell	tests/hypridle-override.sh	SC2015	715f3e2f2b028ea7	1	policy_intact "$assembled" "$work/accepted" && ok "every policy line reaches hypridle byte for byte" \
+shell	tests/hypridle-override.sh	SC2015	744fecc35950ca55	1	[ -s "$work/err" ] && { cat "$work/err"; bad "noise on stderr with no override"; } || ok "silent"
+shell	tests/hypridle-override.sh	SC2015	916e01268a27ddd2	1	[ -z "$raw" ] && ok "no listener carries a literal timeout" || { printf '%s\n' "$raw"; bad "a listener timeout bypasses the knobs"; }
+shell	tests/hypridle-override.sh	SC2015	91f8e2bdb213c0f7	1	grep -q '^ExecStart=@LIBEXECDIR@/hypridle-launch$' "$dropin" && ok "ExecStart is the launcher" || { grep ExecStart "$dropin"; bad "ExecStart is not the launcher"; }
+shell	tests/hypridle-override.sh	SC2015	9657b416c92b5f15	1	policy_intact "$assembled" "$work/accepted" && ok "nothing but the two accepted knobs was added" \
+shell	tests/hypridle-override.sh	SC2015	9cffce4ae6eb26d7	1	grep -q "hypridle.conf:8: \$blank_timeout must be a whole number" "$work/err" && ok "a non-number names its line" || bad "line 8 report missing"
+shell	tests/hypridle-override.sh	SC2015	a420418092cf9d9e	1	grep -q dropped "$work/err" && ok "...and said so" || bad "silent drop"
+shell	tests/hypridle-override.sh	SC2015	a47352f8361ff939	1	[ "$(handed)" = "-c $assembled" ] && ok "hypridle got the assembled copy" || bad "hypridle got: $(handed)"
+shell	tests/hypridle-override.sh	SC2015	a8bf19de961e770e	1	printf '%s\n' "${knobs[@]}" | grep -qx 'blank_timeout=30' && ok "\$blank_timeout defaults to 30" || bad "\$blank_timeout default: ${knobs[*]}"
+shell	tests/hypridle-override.sh	SC2015	ab8e98e9aaddccc1	1	grep -q "hypridle.conf:12: no such knob \$not_a_knob (the policy declares: lock_timeout blank_timeout suspend_timeout)" "$work/err" && ok "an unknown knob names the known ones" || bad "line 12 report missing"
+shell	tests/hypridle-override.sh	SC2015	adc84d67551436c1	1	[ "${#knobs[@]}" -eq 3 ] && ok "exactly three knobs" || bad "knob set changed: ${knobs[*]}"
+shell	tests/hypridle-override.sh	SC2015	b2a6e8987e1f9943	1	[ -e "$XDG_RUNTIME_DIR/hypr-de/hypridle.conf" ] && bad "a runtime copy was made with nothing to splice" || ok "no runtime copy made"
+shell	tests/hypridle-override.sh	SC2015	b89eb4c2a9f89ebc	1	[ "$marker_at" -lt "$first_use" ] && ok "defaults and marker come before the first use (line $marker_at < $first_use)" \
+shell	tests/hypridle-override.sh	SC2015	c89b5434e92d9302	1	grep -qxF "$marker" "$policy" && ok "the splice marker is present" || bad "no splice marker in hypridle.conf"
+shell	tests/hypridle-override.sh	SC2015	d2cbc89fc39d83fb	1	printf '%s\n' "${knobs[@]}" | grep -qx 'lock_timeout=180' && ok "\$lock_timeout defaults to 180" || bad "\$lock_timeout default: ${knobs[*]}"
+shell	tests/hypridle-override.sh	SC2015	d6d34725d1a0b905	1	[ "$(handed)" = "-c $assembled" ] && ok "the good lines still produced a copy" || bad "hypridle got: $(handed)"
+shell	tests/hypridle-override.sh	SC2015	dd879ea521b7edc0	1	grep -q "no override marker" "$work/err" && ok "warned" || bad "no warning"
+shell	tests/hypridle-override.sh	SC2015	e15665740bd471f3	1	grep -q 'host timeouts from' "$work/err" && ok "the journal says which values were applied" || bad "no applied-values line on stderr"
+shell	tests/hypridle-override.sh	SC2016	00642cf1987db3c2	1	h=$(grep -nxF '$lock_timeout = 600' "$assembled" | cut -d: -f1 | head -n1)
+shell	tests/hypridle-override.sh	SC2016	1f035f8371b5305c	1	printf '$lock_timeout = 300\n$suspend_timeout = 4294967\n' > "$work/accepted"
+shell	tests/hypridle-override.sh	SC2016	212b27548d1ad112	1	u=$(grep -nE '^[[:space:]]*timeout[[:space:]]*=[[:space:]]*\$lock_timeout' "$assembled" | cut -d: -f1 | head -n1)
+shell	tests/hypridle-override.sh	SC2016	21ad39e7f15bdc0a	1	d=$(grep -nE '^\$lock_timeout[[:space:]]*=[[:space:]]*180([[:space:]]|$)' "$assembled" | cut -d: -f1 | head -n1)
+shell	tests/hypridle-override.sh	SC2016	3672cfd73ee3e683	1	printf '$lock_timeout = 600\n$suspend_timeout = 1800\n' > "$work/accepted"
+shell	tests/hypridle-override.sh	SC2016	8b5e66bf31be2f52	3	for needle in 'rm -rf' 'evil' 'not_a_knob' '$blank_timeout = abc' '$blank_timeout = 0' '99999999999' '$suspend_timeout = -5'; do
+shell	tests/hypridle-override.sh	SC2016	b882905312797e8d	1	printf '$lock_timeout = 600\n' > "$override"
+shell	tests/hypridle-override.sh	SC2016	c8c29ee8f8d9fd59	1	first_use=$(grep -nE '\$(lock|blank|suspend)_timeout' "$policy" | grep -v '^[0-9]*:\$' | head -n1 | cut -d: -f1)
+shell	tests/hypridle-override.sh	SC2016	f286c3408dd6e735	1	uses=$(grep -cE '^[[:space:]]*timeout[[:space:]]*=[[:space:]]*\$(lock|blank|suspend)_timeout' "$policy")
+shell	tests/hypridle-override.sh	SC2292	03e735a865e51217	1	[ "$dropped" -eq 11 ] && ok "eleven lines reported with file:line" || { cat "$work/err"; bad "expected 11 dropped reports, got $dropped"; }
+shell	tests/hypridle-override.sh	SC2292	069b3d03238e520c	1	[ "$uses" -eq 3 ] && ok "three listeners, three knobs" || bad "expected 3 knob uses, found $uses"
+shell	tests/hypridle-override.sh	SC2292	1096098c6ee5816c	1	[ "$(handed)" = "-c $policy" ] && ok "hypridle got -c $policy" || bad "hypridle got: $(handed)"
+shell	tests/hypridle-override.sh	SC2292	198409f424f4b87a	1	[ "$(grep -c 'dropped' "$work/err")" -eq 0 ] && ok "nothing dropped" || { cat "$work/err"; bad "a valid line was dropped"; }
+shell	tests/hypridle-override.sh	SC2292	28b2fdfc859c0e48	3	if [ "$d" -gt 0 ] && [ "$h" -gt "$d" ] && [ "$u" -gt "$h" ]; then
+shell	tests/hypridle-override.sh	SC2292	2a45df6c11d01ed3	1	[ -e /tmp/hypr-de/hypridle.conf ] && bad "wrote under /tmp" || ok "nothing under /tmp"
+shell	tests/hypridle-override.sh	SC2292	494c1ba8896cc0ac	2	[ "$(handed)" = "-c $policy" ] && ok "packaged policy" || bad "hypridle got: $(handed)"
+shell	tests/hypridle-override.sh	SC2292	4b26feb66dc42b8a	1	[ "$(handed)" = "-c $policy" ] && ok "every line dropped: packaged policy" || bad "hypridle got: $(handed)"
+shell	tests/hypridle-override.sh	SC2292	50abf27c139f8e2e	1	[ "$(handed)" = "-c $policy" ] && ok "comments only: packaged policy" || bad "hypridle got: $(handed)"
+shell	tests/hypridle-override.sh	SC2292	69ec285f50edba47	1	[ "$(stat -c %a "$XDG_RUNTIME_DIR/hypr-de")" = 700 ] && ok "runtime dir is 0700" || bad "runtime dir mode $(stat -c %a "$XDG_RUNTIME_DIR/hypr-de")"
+shell	tests/hypridle-override.sh	SC2292	744fecc35950ca55	1	[ -s "$work/err" ] && { cat "$work/err"; bad "noise on stderr with no override"; } || ok "silent"
+shell	tests/hypridle-override.sh	SC2292	916e01268a27ddd2	1	[ -z "$raw" ] && ok "no listener carries a literal timeout" || { printf '%s\n' "$raw"; bad "a listener timeout bypasses the knobs"; }
+shell	tests/hypridle-override.sh	SC2292	a47352f8361ff939	1	[ "$(handed)" = "-c $assembled" ] && ok "hypridle got the assembled copy" || bad "hypridle got: $(handed)"
+shell	tests/hypridle-override.sh	SC2292	adc84d67551436c1	1	[ "${#knobs[@]}" -eq 3 ] && ok "exactly three knobs" || bad "knob set changed: ${knobs[*]}"
+shell	tests/hypridle-override.sh	SC2292	b2a6e8987e1f9943	1	[ -e "$XDG_RUNTIME_DIR/hypr-de/hypridle.conf" ] && bad "a runtime copy was made with nothing to splice" || ok "no runtime copy made"
+shell	tests/hypridle-override.sh	SC2292	b89eb4c2a9f89ebc	1	[ "$marker_at" -lt "$first_use" ] && ok "defaults and marker come before the first use (line $marker_at < $first_use)" \
+shell	tests/hypridle-override.sh	SC2292	c825131a023e12e6	3	[ -e /run/tripwire/hits ] || { [ "${HYPR_DE_SEALED-}" = build-root ] && [ ! -e /run/systemd/private ]; } || exec "$(dirname -- "$0")/run" "$0"
+shell	tests/hypridle-override.sh	SC2292	d6d34725d1a0b905	1	[ "$(handed)" = "-c $assembled" ] && ok "the good lines still produced a copy" || bad "hypridle got: $(handed)"
+shell	tests/hypridle-override.sh	SC2292	fe54bb5915e6fc06	1	[ "$fail" -eq 0 ] && { echo "per-host idle timeouts work"; exit 0; }
+shell	tests/hypridle-override.sh	SC2312	0ac9bea3c3bb081c	2	mapfile -t knobs < <(sed -n "1,/^$marker\$/p" "$policy" | sed -n 's/^\$\([A-Za-z_][A-Za-z0-9_]*\)[[:space:]]*=[[:space:]]*\([0-9]*\).*/\1=\2/p')
+shell	tests/hypridle-override.sh	SC2312	1096098c6ee5816c	2	[ "$(handed)" = "-c $policy" ] && ok "hypridle got -c $policy" || bad "hypridle got: $(handed)"
+shell	tests/hypridle-override.sh	SC2312	198409f424f4b87a	1	[ "$(grep -c 'dropped' "$work/err")" -eq 0 ] && ok "nothing dropped" || { cat "$work/err"; bad "a valid line was dropped"; }
+shell	tests/hypridle-override.sh	SC2312	494c1ba8896cc0ac	4	[ "$(handed)" = "-c $policy" ] && ok "packaged policy" || bad "hypridle got: $(handed)"
+shell	tests/hypridle-override.sh	SC2312	4b26feb66dc42b8a	2	[ "$(handed)" = "-c $policy" ] && ok "every line dropped: packaged policy" || bad "hypridle got: $(handed)"
+shell	tests/hypridle-override.sh	SC2312	50abf27c139f8e2e	2	[ "$(handed)" = "-c $policy" ] && ok "comments only: packaged policy" || bad "hypridle got: $(handed)"
+shell	tests/hypridle-override.sh	SC2312	69ec285f50edba47	2	[ "$(stat -c %a "$XDG_RUNTIME_DIR/hypr-de")" = 700 ] && ok "runtime dir is 0700" || bad "runtime dir mode $(stat -c %a "$XDG_RUNTIME_DIR/hypr-de")"
+shell	tests/hypridle-override.sh	SC2312	8a5d5d29bc10c9ce	2	|| { diff <(grep -vxF -f "$work/accepted" "$assembled" | sed 1d) "$policy" | head; bad "a rejected line reached hypridle"; }
+shell	tests/hypridle-override.sh	SC2312	a47352f8361ff939	2	[ "$(handed)" = "-c $assembled" ] && ok "hypridle got the assembled copy" || bad "hypridle got: $(handed)"
+shell	tests/hypridle-override.sh	SC2312	d37c3d28f12c65c1	2	|| { diff <(grep -vxF -f "$work/accepted" "$assembled" | sed 1d) "$policy" | head; bad "the policy text was altered"; }
+shell	tests/hypridle-override.sh	SC2312	d6d34725d1a0b905	2	[ "$(handed)" = "-c $assembled" ] && ok "the good lines still produced a copy" || bad "hypridle got: $(handed)"
+shell	tests/installer-trust.sh	SC2015	466bc4975450df14	1	[ "$rc" -eq 0 ] && ok "the pinned key is accepted" || bad "the pinned key was rejected (rc=$rc)"
+shell	tests/installer-trust.sh	SC2015	54456abb02edd2d3	1	[ "$(cat "$work/rc")" != 0 ] && ok "refusal exits non-zero" || bad "refusal exited 0"
+shell	tests/installer-trust.sh	SC2015	d7dba9c53c2e4e2a	1	[ "$(cat "$work/rc")" = 0 ] && ok "success exits 0" || bad "success exited non-zero"
+shell	tests/installer-trust.sh	SC2015	d846699b4e68ab42	1	[ "$n" -eq 11 ] && ok "$n COPRs pinned" || bad "expected 11 pinned COPRs, got $n"
+shell	tests/installer-trust.sh	SC2154	12194940cbe7b0f1	1	n=${#COPR_KEYS[@]}
+shell	tests/installer-trust.sh	SC2249	1a6b5d0983245823	1	case " $seen " in *" $fpr "*) bad "$copr reuses a pinned fingerprint" ;; esac
+shell	tests/installer-trust.sh	SC2292	466bc4975450df14	1	[ "$rc" -eq 0 ] && ok "the pinned key is accepted" || bad "the pinned key was rejected (rc=$rc)"
+shell	tests/installer-trust.sh	SC2292	54456abb02edd2d3	1	[ "$(cat "$work/rc")" != 0 ] && ok "refusal exits non-zero" || bad "refusal exited 0"
+shell	tests/installer-trust.sh	SC2292	97ed9739c5bac022	1	if [ "$n" -eq "$want" ]; then
+shell	tests/installer-trust.sh	SC2292	a19f158c9a411ea3	1	[ "$fail" -eq 0 ] && { echo "installer trust behaviour is correct"; exit 0; }
+shell	tests/installer-trust.sh	SC2292	ac2860e2a70276a2	1	if [ "$rc" -ne 0 ] && printf '%s' "$msg" | grep -q "not signed by the key this installer pins"; then
+shell	tests/installer-trust.sh	SC2292	c825131a023e12e6	3	[ -e /run/tripwire/hits ] || { [ "${HYPR_DE_SEALED-}" = build-root ] && [ ! -e /run/systemd/private ]; } || exec "$(dirname -- "$0")/run" "$0"
+shell	tests/installer-trust.sh	SC2292	d7dba9c53c2e4e2a	1	[ "$(cat "$work/rc")" = 0 ] && ok "success exits 0" || bad "success exited non-zero"
+shell	tests/installer-trust.sh	SC2292	d846699b4e68ab42	1	[ "$n" -eq 11 ] && ok "$n COPRs pinned" || bad "expected 11 pinned COPRs, got $n"
+shell	tests/installer-trust.sh	SC2310	466bc4975450df14	1	[ "$rc" -eq 0 ] && ok "the pinned key is accepted" || bad "the pinned key was rejected (rc=$rc)"
+shell	tests/installer-trust.sh	SC2310	54456abb02edd2d3	1	[ "$(cat "$work/rc")" != 0 ] && ok "refusal exits non-zero" || bad "refusal exited 0"
+shell	tests/installer-trust.sh	SC2310	d7dba9c53c2e4e2a	1	[ "$(cat "$work/rc")" = 0 ] && ok "success exits 0" || bad "success exited non-zero"
+shell	tests/installer-trust.sh	SC2310	d846699b4e68ab42	1	[ "$n" -eq 11 ] && ok "$n COPRs pinned" || bad "expected 11 pinned COPRs, got $n"
+shell	tests/installer-trust.sh	SC2312	54456abb02edd2d3	1	[ "$(cat "$work/rc")" != 0 ] && ok "refusal exits non-zero" || bad "refusal exited 0"
+shell	tests/installer-trust.sh	SC2312	d7dba9c53c2e4e2a	1	[ "$(cat "$work/rc")" = 0 ] && ok "success exits 0" || bad "success exited non-zero"
+shell	tests/installer-trust.sh	SC2329	4174805299016d20	1	emit() { echo x >> "$attempts" printf '%s\n' "$2" return "$1" }
+shell	tests/installer-trust.sh	SC2329	bd107799afb6e32a	1	fetch() { cp "$fixture" "$2"; }
+shell	tests/lock-listener.sh	SC2015	05fe5b6b3cd21866	1	[ "$(locks)" = 4 ] && ok "sleep during a running lock joins it instead of starting another" || bad "sleep started a second lock-cmd.sh"
+shell	tests/lock-listener.sh	SC2015	0ec2c6db007aa1c1	1	wait_for '[ "$(locks)" = 6 ]' && ok "without XDG_SESSION_ID it follows the user's graphical session" || bad "no lock without XDG_SESSION_ID"
+shell	tests/lock-listener.sh	SC2015	1daaae8cf3c4f5e3	1	wait_for '[ "$(locks)" = 2 ]' && ok "a Lock after the first lock finished runs lock-cmd.sh again" || bad "a later Lock was dropped"
+shell	tests/lock-listener.sh	SC2015	24b8760e3dcb4b6c	1	&& ok "the start limit never gives up on the listener" || bad "systemd's default start limit can leave Lock unanswered"
+shell	tests/lock-listener.sh	SC2015	2a85ace4f7ee4403	1	wait_for '[ "$(locks)" = 9 ]' && ok "a Lock after a stuck lock-cmd.sh runs lock-cmd.sh again" || bad "a stuck lock-cmd.sh swallowed later Lock requests"
+shell	tests/lock-listener.sh	SC2015	30904afde3873b46	1	grep -q "waiting" "$work/listener.err" && ok "and says what it is waiting for" || bad "the wait is silent: $(cat "$work/listener.err")"
+shell	tests/lock-listener.sh	SC2015	334c237d868ec52e	1	[ "$(events)" = "inhibit sleep delay," ] && ok "sleep waits while lock-cmd.sh is still locking" || bad "the delay was released before the lock finished"
+shell	tests/lock-listener.sh	SC2015	39def8af102da692	1	[ "$(locks)" = 2 ] && ok "a Lock for another session is ignored" || bad "a Lock for another session locked this one"
+shell	tests/lock-listener.sh	SC2015	4168efc0bbb1738f	1	grep -qx 'KillMode=process' "$unit" && ok "restarting the unit leaves a bare locker running" || bad "a unit restart would kill a bare locker that holds the lock"
+shell	tests/lock-listener.sh	SC2015	4d87c1a51a8ba027	1	wait_for 'grep -q "locking session 7" "$work/listener.err"' && ok "the listener binds once the session appears" || bad "the listener never bound: $(cat "$work/listener.err")"
+shell	tests/lock-listener.sh	SC2015	51c6eafc46cf78d5	1	wait_for '! kill -0 "$stuck" 2>/dev/null' && ok "the stuck lock-cmd.sh is killed at the deadline" || bad "the stuck lock-cmd.sh is still running after the deadline"
+shell	tests/lock-listener.sh	SC2015	58e536b260488aee	1	&& ok "only the not-Hyprland exit stops the restarts" || bad "the not-Hyprland exit would restart every second"
+shell	tests/lock-listener.sh	SC2015	60aeb3c4b441ad77	1	wait_for '[ "$(events)" = "inhibit sleep delay,released," ]' && ok "the delay is released once lock-cmd.sh returns" || bad "the delay was never released: $(events)"
+shell	tests/lock-listener.sh	SC2015	62f13dd40ec7ba85	1	&& ok "every graphical session pulls the listener in, upgraded installs included" \
+shell	tests/lock-listener.sh	SC2015	690f3befed8a77ad	1	wait_for '[ "$(locks)" = 12 ]' && ok "and then answers Lock" || bad "no lock after a late bind"
+shell	tests/lock-listener.sh	SC2015	6ca1f237d8283393	1	[ "$(cat "$LOCKS")" = "lock-cmd.sh session=7 " ] && ok "lock-cmd.sh runs for our session id" || bad "unexpected run: $(cat "$LOCKS")"
+shell	tests/lock-listener.sh	SC2015	6dc71112d01cc991	1	wait_for '[ "$(locks)" = 1 ]' && ok "a logind Lock on our session runs lock-cmd.sh" || bad "no lock-cmd.sh run for a logind Lock"
+shell	tests/lock-listener.sh	SC2015	8081983e4d2dc258	1	&& ok "outside Hyprland the listener says so and exits 78, which the unit does not restart" \
+shell	tests/lock-listener.sh	SC2015	83be83ddf6b9e853	1	&& ok "a lock-cmd.sh that never returns still releases the sleep delay at the deadline" \
+shell	tests/lock-listener.sh	SC2015	8cddf81c6eb00739	1	[ -e "$NOTES.planted" ] && bad "the listener ran a notify-send from the session's PATH" || ok "notify-send runs from the pinned PATH, not the session's"
+shell	tests/lock-listener.sh	SC2015	8db69d8ed5a259fb	1	wait_for '[ "$(locks)" = 3 ]' && ok "PrepareForSleep runs lock-cmd.sh --sleep" || bad "no lock before sleep"
+shell	tests/lock-listener.sh	SC2015	9220ab24099bc16a	1	command -v dbus-daemon >/dev/null && python3 -I -c 'from gi.repository import Gio' 2>/dev/null || {
+shell	tests/lock-listener.sh	SC2015	92c9a771d0b7de88	1	wait_for '[ "$(events)" = "inhibit sleep delay,released,inhibit sleep delay," ]' && ok "after resume the listener takes a new delay" || bad "no new delay after resume: $(events)"
+shell	tests/lock-listener.sh	SC2015	9634e5de03220f9c	1	' "$root/deps.toml" && ok "the lock-idle group declares PyGObject" || bad "the lock-idle group does not declare PyGObject"
+shell	tests/lock-listener.sh	SC2015	a948ee723c906ec2	1	&& ok "a stale XDG_SESSION_ID loses to the session Hyprland itself runs in" \
+shell	tests/lock-listener.sh	SC2015	aaa20431e6ca9f70	1	&& ok "a lock that returns after resume still leaves a delay held for the next sleep" \
+shell	tests/lock-listener.sh	SC2015	c50f0cefee24ad66	1	grep -q '^ConditionEnvironment=' "$unit" && bad "a ConditionEnvironment skip is silent" || ok "no silent start condition"
+shell	tests/lock-listener.sh	SC2015	d095a46682ab2cc1	1	&& ok "an XDG_SESSION_ID naming a non-wayland session is passed over" \
+shell	tests/lock-listener.sh	SC2015	d4078a3b7c292176	1	wait_for 'grep -q . "$NOTES"' && ok "a stuck lock-cmd.sh posts a visible failure" || bad "no notification for a stuck lock-cmd.sh"
+shell	tests/lock-listener.sh	SC2015	da401208be6843cd	1	wait_for '[ "$(events)" = "inhibit sleep delay,released,inhibit sleep delay,released," ]' && ok "and releases the delay when that lock returns" || bad "the delay was not released after the joined lock: $(events)"
+shell	tests/lock-listener.sh	SC2015	da61cb72f0ca2777	1	&& ok "logind's own session for Hyprland's pid comes first" \
+shell	tests/lock-listener.sh	SC2015	db8be2d813946a37	1	grep -qx 'Restart=always' "$unit" && ok "any exit or signal restarts the listener" || bad "a SIGTERM or clean exit would leave the listener dead"
+shell	tests/lock-listener.sh	SC2015	eaab2c4707c27899	1	[ "$(locks)" = 2 ] && ok "a Lock not sent by logind is ignored" || bad "a Lock from a non-logind sender ran lock-cmd.sh"
+shell	tests/lock-listener.sh	SC2015	f09aa2bdbbc0831f	1	[ "$(locks)" = 1 ] && ok "a second Lock while the first lock is starting starts no second locker" || bad "a second Lock started another lock-cmd.sh"
+shell	tests/lock-listener.sh	SC2015	f6064325b2109339	1	[ "$(events)" = "inhibit sleep delay," ] && ok "the listener holds a sleep delay from the start" || bad "no sleep delay held: $(events)"
+shell	tests/lock-listener.sh	SC2015	f68bcaa6f6daea6b	1	[ -s "$NOTES" ] && bad "a failure notification for locks that returned in time: $(cat "$NOTES")" || ok "locks that return in time post no failure"
+shell	tests/lock-listener.sh	SC2015	f70e84ade75b3389	1	&& ok "at the deadline the listener runs lock-cmd.sh's failsafe" \
+shell	tests/lock-listener.sh	SC2015	fd2b39a4ee18748c	1	grep -qx 'ExecStart=@LIBEXECDIR@/hypr-de-lock-listener' "$unit" && ok "the unit runs the listener" || bad "the unit does not run the listener"
+shell	tests/lock-listener.sh	SC2016	0278b0d01309f128	1	wait_for 'grep -q "locking session" "$work/listener.err"'
+shell	tests/lock-listener.sh	SC2016	0ec2c6db007aa1c1	1	wait_for '[ "$(locks)" = 6 ]' && ok "without XDG_SESSION_ID it follows the user's graphical session" || bad "no lock without XDG_SESSION_ID"
+shell	tests/lock-listener.sh	SC2016	1da76cedd52bcc07	1	wait_for '[ "$(events)" = "inhibit sleep delay,released,inhibit sleep delay,released,inhibit sleep delay," ]' || bad "no delay after the second resume: $(events)"
+shell	tests/lock-listener.sh	SC2016	1daaae8cf3c4f5e3	1	wait_for '[ "$(locks)" = 2 ]' && ok "a Lock after the first lock finished runs lock-cmd.sh again" || bad "a later Lock was dropped"
+shell	tests/lock-listener.sh	SC2016	2a85ace4f7ee4403	1	wait_for '[ "$(locks)" = 9 ]' && ok "a Lock after a stuck lock-cmd.sh runs lock-cmd.sh again" || bad "a stuck lock-cmd.sh swallowed later Lock requests"
+shell	tests/lock-listener.sh	SC2016	4d87c1a51a8ba027	1	wait_for 'grep -q "locking session 7" "$work/listener.err"' && ok "the listener binds once the session appears" || bad "the listener never bound: $(cat "$work/listener.err")"
+shell	tests/lock-listener.sh	SC2016	51c6eafc46cf78d5	1	wait_for '! kill -0 "$stuck" 2>/dev/null' && ok "the stuck lock-cmd.sh is killed at the deadline" || bad "the stuck lock-cmd.sh is still running after the deadline"
+shell	tests/lock-listener.sh	SC2016	60aeb3c4b441ad77	1	wait_for '[ "$(events)" = "inhibit sleep delay,released," ]' && ok "the delay is released once lock-cmd.sh returns" || bad "the delay was never released: $(events)"
+shell	tests/lock-listener.sh	SC2016	6247bae890d1dc48	1	wait_for '[ "$(events)" = "inhibit sleep delay,released,inhibit sleep delay,released,inhibit sleep delay,released,inhibit sleep delay," ]' \
+shell	tests/lock-listener.sh	SC2016	68078bd7975535f7	1	wait_for '[ "$(locks)" = 5 ]' || bad "no lock before the third sleep"
+shell	tests/lock-listener.sh	SC2016	690f3befed8a77ad	1	wait_for '[ "$(locks)" = 12 ]' && ok "and then answers Lock" || bad "no lock after a late bind"
+shell	tests/lock-listener.sh	SC2016	6dc71112d01cc991	1	wait_for '[ "$(locks)" = 1 ]' && ok "a logind Lock on our session runs lock-cmd.sh" || bad "no lock-cmd.sh run for a logind Lock"
+shell	tests/lock-listener.sh	SC2016	6f44d9b1c4176add	1	wait_for '[ "$(locks)" = 8 ]' || bad "no lock-cmd.sh run for a logind Lock"
+shell	tests/lock-listener.sh	SC2016	7a6800704b521d8f	1	wait_for '[ "$(locks)" = 4 ]' || bad "no lock-cmd.sh run for a logind Lock"
+shell	tests/lock-listener.sh	SC2016	85d89324ee33d6aa	1	wait_for '[ "$(locks)" = 7 ]' && [ "$(tail -n1 "$LOCKS")" = "lock-cmd.sh session=7 " ] \
+shell	tests/lock-listener.sh	SC2016	8db69d8ed5a259fb	1	wait_for '[ "$(locks)" = 3 ]' && ok "PrepareForSleep runs lock-cmd.sh --sleep" || bad "no lock before sleep"
+shell	tests/lock-listener.sh	SC2016	92c9a771d0b7de88	1	wait_for '[ "$(events)" = "inhibit sleep delay,released,inhibit sleep delay," ]' && ok "after resume the listener takes a new delay" || bad "no new delay after resume: $(events)"
+shell	tests/lock-listener.sh	SC2016	b54e3023a7869ee6	1	wait_for '[ "$(locks)" = 10 ]' && [ "$(tail -n1 "$LOCKS")" = "lock-cmd.sh session=7 " ] \
+shell	tests/lock-listener.sh	SC2016	b60b9a0ec7313662	1	wait_for '[ "$(locks)" = 11 ]' && [ "$(tail -n1 "$LOCKS")" = "lock-cmd.sh session=7 " ] \
+shell	tests/lock-listener.sh	SC2016	bc002553b0fb946b	1	if wait_for '! kill -0 "$listener" 2>/dev/null'; then
+shell	tests/lock-listener.sh	SC2016	d4078a3b7c292176	1	wait_for 'grep -q . "$NOTES"' && ok "a stuck lock-cmd.sh posts a visible failure" || bad "no notification for a stuck lock-cmd.sh"
+shell	tests/lock-listener.sh	SC2016	da401208be6843cd	1	wait_for '[ "$(events)" = "inhibit sleep delay,released,inhibit sleep delay,released," ]' && ok "and releases the delay when that lock returns" || bad "the delay was not released after the joined lock: $(events)"
+shell	tests/lock-listener.sh	SC2016	ee55280b724e9f75	1	wait_for 'grep -q ready "$work/logind.out"' || { echo "fake logind did not start" >&2; exit 1; }
+shell	tests/lock-listener.sh	SC2016	f9822a89fe23767a	1	wait_for '[ "$(released)" = $((before + 1)) ]' \
+shell	tests/lock-listener.sh	SC2016	fcfe454886659a76	1	wait_for 'grep -qx "lock-cmd.sh session=7 --failsafe" "$LOCKS"' \
+shell	tests/lock-listener.sh	SC2034	a3169bf36160a55a	1	stuck=$(tail -n1 "$STUB_PIDS")
+shell	tests/lock-listener.sh	SC2034	b6dc66113e38949a	1	before=$(released)
+shell	tests/lock-listener.sh	SC2292	05fe5b6b3cd21866	1	[ "$(locks)" = 4 ] && ok "sleep during a running lock joins it instead of starting another" || bad "sleep started a second lock-cmd.sh"
+shell	tests/lock-listener.sh	SC2292	2afe5234f6935a35	1	[ "$rc" = 78 ] && grep -q "not a Hyprland session" "$work/listener.err" \
+shell	tests/lock-listener.sh	SC2292	334c237d868ec52e	1	[ "$(events)" = "inhibit sleep delay," ] && ok "sleep waits while lock-cmd.sh is still locking" || bad "the delay was released before the lock finished"
+shell	tests/lock-listener.sh	SC2292	39def8af102da692	1	[ "$(locks)" = 2 ] && ok "a Lock for another session is ignored" || bad "a Lock for another session locked this one"
+shell	tests/lock-listener.sh	SC2292	3dedcab340050e37	1	[ "$(sed -n '/^\[Unit\]/,/^\[/{/^StartLimitIntervalSec=/p}' "$unit")" = StartLimitIntervalSec=0 ] \
+shell	tests/lock-listener.sh	SC2292	6ca1f237d8283393	1	[ "$(cat "$LOCKS")" = "lock-cmd.sh session=7 " ] && ok "lock-cmd.sh runs for our session id" || bad "unexpected run: $(cat "$LOCKS")"
+shell	tests/lock-listener.sh	SC2292	85d89324ee33d6aa	1	wait_for '[ "$(locks)" = 7 ]' && [ "$(tail -n1 "$LOCKS")" = "lock-cmd.sh session=7 " ] \
+shell	tests/lock-listener.sh	SC2292	8cddf81c6eb00739	1	[ -e "$NOTES.planted" ] && bad "the listener ran a notify-send from the session's PATH" || ok "notify-send runs from the pinned PATH, not the session's"
+shell	tests/lock-listener.sh	SC2292	9a7940a546af1472	1	for _ in $(seq 50); do [ -S "$work/bus" ] && break; sleep 0.1; done
+shell	tests/lock-listener.sh	SC2292	b2faeb59a61c751c	1	[ "$(tail -n1 "$LOCKS")" = "lock-cmd.sh session=7 --sleep" ] || bad "unexpected sleep lock: $(tail -n1 "$LOCKS")"
+shell	tests/lock-listener.sh	SC2292	b54e3023a7869ee6	1	wait_for '[ "$(locks)" = 10 ]' && [ "$(tail -n1 "$LOCKS")" = "lock-cmd.sh session=7 " ] \
+shell	tests/lock-listener.sh	SC2292	b60b9a0ec7313662	1	wait_for '[ "$(locks)" = 11 ]' && [ "$(tail -n1 "$LOCKS")" = "lock-cmd.sh session=7 " ] \
+shell	tests/lock-listener.sh	SC2292	c825131a023e12e6	3	[ -e /run/tripwire/hits ] || { [ "${HYPR_DE_SEALED-}" = build-root ] && [ ! -e /run/systemd/private ]; } || exec "$(dirname -- "$0")/run" "$0"
+shell	tests/lock-listener.sh	SC2292	eaab2c4707c27899	1	[ "$(locks)" = 2 ] && ok "a Lock not sent by logind is ignored" || bad "a Lock from a non-logind sender ran lock-cmd.sh"
+shell	tests/lock-listener.sh	SC2292	f09aa2bdbbc0831f	1	[ "$(locks)" = 1 ] && ok "a second Lock while the first lock is starting starts no second locker" || bad "a second Lock started another lock-cmd.sh"
+shell	tests/lock-listener.sh	SC2292	f6064325b2109339	1	[ "$(events)" = "inhibit sleep delay," ] && ok "the listener holds a sleep delay from the start" || bad "no sleep delay held: $(events)"
+shell	tests/lock-listener.sh	SC2292	f68bcaa6f6daea6b	1	[ -s "$NOTES" ] && bad "a failure notification for locks that returned in time: $(cat "$NOTES")" || ok "locks that return in time post no failure"
+shell	tests/lock-listener.sh	SC2312	05fe5b6b3cd21866	1	[ "$(locks)" = 4 ] && ok "sleep during a running lock joins it instead of starting another" || bad "sleep started a second lock-cmd.sh"
+shell	tests/lock-listener.sh	SC2312	0950ebbaf1fd937e	1	|| bad "the deadline skipped the failsafe: $(cat "$LOCKS")"
+shell	tests/lock-listener.sh	SC2312	133e935400d2b5e3	2	|| bad "the listener followed a stale XDG_SESSION_ID: $(tail -n2 "$LOCKS" | tr '\n' ' ')"
+shell	tests/lock-listener.sh	SC2312	1da76cedd52bcc07	1	wait_for '[ "$(events)" = "inhibit sleep delay,released,inhibit sleep delay,released,inhibit sleep delay," ]' || bad "no delay after the second resume: $(events)"
+shell	tests/lock-listener.sh	SC2312	25d5a4aa3c8bb829	1	|| bad "a stuck lock-cmd.sh kept the sleep delay: $(events)"
+shell	tests/lock-listener.sh	SC2312	2f004649d2e0c05c	1	|| bad "the listener bound to a tty session: $(tail -n1 "$LOCKS")"
+shell	tests/lock-listener.sh	SC2312	30904afde3873b46	1	grep -q "waiting" "$work/listener.err" && ok "and says what it is waiting for" || bad "the wait is silent: $(cat "$work/listener.err")"
+shell	tests/lock-listener.sh	SC2312	334c237d868ec52e	1	[ "$(events)" = "inhibit sleep delay," ] && ok "sleep waits while lock-cmd.sh is still locking" || bad "the delay was released before the lock finished"
+shell	tests/lock-listener.sh	SC2312	39def8af102da692	1	[ "$(locks)" = 2 ] && ok "a Lock for another session is ignored" || bad "a Lock for another session locked this one"
+shell	tests/lock-listener.sh	SC2312	3dedcab340050e37	1	[ "$(sed -n '/^\[Unit\]/,/^\[/{/^StartLimitIntervalSec=/p}' "$unit")" = StartLimitIntervalSec=0 ] \
+shell	tests/lock-listener.sh	SC2312	4a7f3671ea7ed6e8	1	|| bad "GetSessionByPID on Hyprland was not preferred: $(tail -n1 "$LOCKS")"
+shell	tests/lock-listener.sh	SC2312	4d87c1a51a8ba027	1	wait_for 'grep -q "locking session 7" "$work/listener.err"' && ok "the listener binds once the session appears" || bad "the listener never bound: $(cat "$work/listener.err")"
+shell	tests/lock-listener.sh	SC2312	60aeb3c4b441ad77	1	wait_for '[ "$(events)" = "inhibit sleep delay,released," ]' && ok "the delay is released once lock-cmd.sh returns" || bad "the delay was never released: $(events)"
+shell	tests/lock-listener.sh	SC2312	6ca1f237d8283393	2	[ "$(cat "$LOCKS")" = "lock-cmd.sh session=7 " ] && ok "lock-cmd.sh runs for our session id" || bad "unexpected run: $(cat "$LOCKS")"
+shell	tests/lock-listener.sh	SC2312	78fb280aebe61111	1	|| bad "a late lock left no delay held: $(events)"
+shell	tests/lock-listener.sh	SC2312	85d89324ee33d6aa	1	wait_for '[ "$(locks)" = 7 ]' && [ "$(tail -n1 "$LOCKS")" = "lock-cmd.sh session=7 " ] \
+shell	tests/lock-listener.sh	SC2312	92c9a771d0b7de88	1	wait_for '[ "$(events)" = "inhibit sleep delay,released,inhibit sleep delay," ]' && ok "after resume the listener takes a new delay" || bad "no new delay after resume: $(events)"
+shell	tests/lock-listener.sh	SC2312	b2faeb59a61c751c	2	[ "$(tail -n1 "$LOCKS")" = "lock-cmd.sh session=7 --sleep" ] || bad "unexpected sleep lock: $(tail -n1 "$LOCKS")"
+shell	tests/lock-listener.sh	SC2312	b54e3023a7869ee6	1	wait_for '[ "$(locks)" = 10 ]' && [ "$(tail -n1 "$LOCKS")" = "lock-cmd.sh session=7 " ] \
+shell	tests/lock-listener.sh	SC2312	b60b9a0ec7313662	1	wait_for '[ "$(locks)" = 11 ]' && [ "$(tail -n1 "$LOCKS")" = "lock-cmd.sh session=7 " ] \
+shell	tests/lock-listener.sh	SC2312	ce87a9f816a08abd	1	|| bad "outside Hyprland: exit $rc, $(cat "$work/listener.err")"
+shell	tests/lock-listener.sh	SC2312	da401208be6843cd	1	wait_for '[ "$(events)" = "inhibit sleep delay,released,inhibit sleep delay,released," ]' && ok "and releases the delay when that lock returns" || bad "the delay was not released after the joined lock: $(events)"
+shell	tests/lock-listener.sh	SC2312	eaab2c4707c27899	1	[ "$(locks)" = 2 ] && ok "a Lock not sent by logind is ignored" || bad "a Lock from a non-logind sender ran lock-cmd.sh"
+shell	tests/lock-listener.sh	SC2312	f09aa2bdbbc0831f	1	[ "$(locks)" = 1 ] && ok "a second Lock while the first lock is starting starts no second locker" || bad "a second Lock started another lock-cmd.sh"
+shell	tests/lock-listener.sh	SC2312	f6064325b2109339	2	[ "$(events)" = "inhibit sleep delay," ] && ok "the listener holds a sleep delay from the start" || bad "no sleep delay held: $(events)"
+shell	tests/lock-listener.sh	SC2312	f68bcaa6f6daea6b	1	[ -s "$NOTES" ] && bad "a failure notification for locks that returned in time: $(cat "$NOTES")" || ok "locks that return in time post no failure"
+shell	tests/lock-listener.sh	SC2329	a7535206f59469e7	1	cleanup() { kill "${pids[@]}" 2>/dev/null; wait 2>/dev/null; rm -rf "$work"; }
+shell	tests/lock-policy.sh	SC2015	7418a506d920d013	1	[ -n "$second" ] && ! gone "$second" || { echo "no respawned locker is alive" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2016	218a19328c6ae8d8	1	for want in 'timeout=$suspend_timeout' 'ignore_inhibit=true' \
+shell	tests/lock-policy.sh	SC2016	ba46031b151d916c	1	for want in 'timeout=$lock_timeout' 'condition_cmd=@LIBEXECDIR@/no-keep-awake.sh' 'condition_retry='; do
+shell	tests/lock-policy.sh	SC2016	cdcc6c00423549eb	1	for want in 'timeout=$blank_timeout' 'condition_cmd=@LIBEXECDIR@/session-locked.sh' 'condition_retry=' \
+shell	tests/lock-policy.sh	SC2086	6fae1933ba883a5b	1	env -u XDG_SESSION_ID WAYLAND_DISPLAY="$display" LOCK_POLICY_LOCK_FILE=$lockfile \
+shell	tests/lock-policy.sh	SC2086	b7c14520be2af3fe	1	env -u XDG_SESSION_ID WAYLAND_DISPLAY="$display" $lock_shell "$work/lock-cmd.sh" "$@" 2>>"$work/stderr" || status=$?
+shell	tests/lock-policy.sh	SC2086	c5c817b4d9fb48a4	1	set -- $case
+shell	tests/lock-policy.sh	SC2248	d270b80cd8fb3fd4	1	LOCK_POLICY_COMPOSITOR_LOCKED=true run_lock $mode
+shell	tests/lock-policy.sh	SC2249	649822f167589da0	1	case $(sed -n 's/^State:[[:space:]]*\([A-Z]\).*/\1/p' "/proc/$1/status" 2>/dev/null) in ''|Z|X) return 0 ;; esac
+shell	tests/lock-policy.sh	SC2310	08810140919f41ed	1	[ "$(knob blank_timeout)" = 30 ] || {
+shell	tests/lock-policy.sh	SC2310	08d478478240638c	3	while ! gone "$pid" && [ "$i" -lt 50 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2310	0c90552776f773b0	1	out=$(run_restarter FIXTURE_LOCKED=false || true)
+shell	tests/lock-policy.sh	SC2310	0ef82862de6fb009	2	[ "$(watchers)" = 0 ] || { echo "the watcher outlived an unlocked session" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2310	1508ec8c6fd436e0	1	[ "$(watchers)" = 1 ] || { echo "a second watcher for the same display kept running" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2310	27d0187a6cfc81df	2	until [ -s "$work/zombie" ] && gone "$(cat "$work/zombie")" || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2310	2cc0ae0dc5f764f1	1	[ "$(watchers)" = 0 ] || { echo "a watcher outlived an unlocked session" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2310	3e4a4f92544c077b	1	run_restarter FIXTURE_LOCKED=false FIXTURE_HYPRCTL_BROKEN=1 >/dev/null || true
+shell	tests/lock-policy.sh	SC2310	3f6142fa31806856	1	[ "$(knob lock_timeout)" = 180 ] || {
+shell	tests/lock-policy.sh	SC2310	48154e6d00a6f43b	1	[ "$(knob suspend_timeout)" = 900 ] || {
+shell	tests/lock-policy.sh	SC2310	4abb9b3a07b755d8	1	[ "$(watchers)" = 1 ] || { echo "expected exactly one watcher after the respawn, got $(watchers)" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2310	4da773e72022a653	1	has_line "$sblock" "$want" || {
+shell	tests/lock-policy.sh	SC2310	500e9af616dd1ccf	1	[ "$(watchers)" = 0 ] || { echo "the plain-process watcher outlived an unlocked session" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2310	54288a7fa7d66519	6	until [ "$(watchers)" = 0 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2310	562df410bb4f5ade	2	until [ "$(watchers)" = 2 ] || [ "$i" -ge 100 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2310	71be34d10c2f6973	1	[ "$(watchers)" = 2 ] || { echo "a second session on another display got no watcher of its own" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2310	7418a506d920d013	2	[ -n "$second" ] && ! gone "$second" || { echo "no respawned locker is alive" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2310	7a1d7371bd483769	1	[ "$(watchers)" = 1 ] || { echo "a request on a locked session did not restart a lost watcher" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2310	8546a31ec0fc9aa7	4	until [ "$(watchers)" = 1 ] || [ "$i" -ge 100 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2310	8603a6a480ce54c4	16	until [ "$(watchers)" = 1 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2310	8851ccf8a9f514d3	14	until [ "$(watchers)" = 0 ] || [ "$i" -ge 100 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2310	a7e2f6b09aba22a2	1	[ "$(watchers)" = 0 ] || { echo "the watcher kept running after Hyprland exited" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2310	aaf1d25e7e2c324a	1	[ "$(watchers)" = 1 ] || { echo "expected exactly one plain-process watcher, got $(watchers)" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2310	b95763faeb3f1bae	2	if ! run_restarter FIXTURE_LOCKED=true >/dev/null 2>&1; then
+shell	tests/lock-policy.sh	SC2310	c1f0cc44d5ea975e	1	run_restarter FIXTURE_LOCKED=false >/dev/null || true
+shell	tests/lock-policy.sh	SC2310	c36199b16e5ca6bd	1	[ "$(watchers)" = 1 ] || { echo "with no user manager a lock started no watcher for its locker" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2310	cd4ff3d5fbaf125b	1	out=$(run_restarter FIXTURE_LOCKED=false FIXTURE_ACTIVE=1 FIXTURE_FAILED=0 || true)
+shell	tests/lock-policy.sh	SC2310	e29bd14e15183297	1	has_line "$block" "$want" || {
+shell	tests/lock-policy.sh	SC2310	e3bd778c0055fd3a	1	[ "$(watchers)" = 1 ] || { echo "a scoped watcher launch that failed left no watcher" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2310	f1fb0c1c83856359	1	run_restarter FIXTURE_LOCKED=true >/dev/null || true
+shell	tests/lock-policy.sh	SC2310	fe6efc0391813334	1	has_line "$lblock" "$want" || {
+shell	tests/lock-policy.sh	SC2310	fee859973281562e	3	[ "$(watchers)" = 1 ] || { echo "a lock started no watcher for its locker" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2312	05f885f67423fbfa	1	JOURNAL_STREAM=$(stat -L -c '%d:%i' "$work/stderr") LOCK_POLICY_SCOPE_STATUS=1 run_lock
+shell	tests/lock-policy.sh	SC2312	08810140919f41ed	1	[ "$(knob blank_timeout)" = 30 ] || {
+shell	tests/lock-policy.sh	SC2312	0ef82862de6fb009	2	[ "$(watchers)" = 0 ] || { echo "the watcher outlived an unlocked session" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2312	1508ec8c6fd436e0	1	[ "$(watchers)" = 1 ] || { echo "a second watcher for the same display kept running" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2312	2383f865a9a25b6f	1	[ "$(grep -cE '^[[:space:]]*ignore_inhibit=true$' "$conf")" = 2 ] || {
+shell	tests/lock-policy.sh	SC2312	27d0187a6cfc81df	1	until [ -s "$work/zombie" ] && gone "$(cat "$work/zombie")" || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2312	28c5368fdcbb7788	6	[ "$(grep -c '^vigil-lock:' "$LOCK_POLICY_LOG")" = 2 ] || {
+shell	tests/lock-policy.sh	SC2312	2cc0ae0dc5f764f1	1	[ "$(watchers)" = 0 ] || { echo "a watcher outlived an unlocked session" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2312	38f6e8d39b49ecf5	1	printf '%s' "$1" | grep -q "^ $(printf '%s' "$2" | sed 's/[$]/\\$/g')"
+shell	tests/lock-policy.sh	SC2312	3f6142fa31806856	1	[ "$(knob lock_timeout)" = 180 ] || {
+shell	tests/lock-policy.sh	SC2312	442c6fcfdf83567c	1	until [ "$(grep -cvx "$first" "$LOCK_POLICY_HOLDERS")" -ge 1 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2312	48154e6d00a6f43b	1	[ "$(knob suspend_timeout)" = 900 ] || {
+shell	tests/lock-policy.sh	SC2312	4abb9b3a07b755d8	2	[ "$(watchers)" = 1 ] || { echo "expected exactly one watcher after the respawn, got $(watchers)" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2312	500e9af616dd1ccf	1	[ "$(watchers)" = 0 ] || { echo "the plain-process watcher outlived an unlocked session" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2312	50e88c09ac4dcda0	2	echo "both requests must succeed, got $(cat "$work/race.a") $(cat "$work/race.b")" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2312	54288a7fa7d66519	3	until [ "$(watchers)" = 0 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2312	562df410bb4f5ade	1	until [ "$(watchers)" = 2 ] || [ "$i" -ge 100 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2312	5b62320e57c38fa7	3	until [ "$(grep -c '^vigil-lock:' "$LOCK_POLICY_LOG")" = 2 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2312	5eedfad7fe297c5e	1	ln -s "$(command -v timeout)" "$work/system/timeout"
+shell	tests/lock-policy.sh	SC2312	66f7241ec9ca781c	1	if [ "$(stat -c '%u' "$lock_conf")" != 0 ]; then
+shell	tests/lock-policy.sh	SC2312	681bbe39f7f1c6ba	5	kill -9 "$(head -n1 "$LOCK_POLICY_HOLDERS")"
+shell	tests/lock-policy.sh	SC2312	6c9a32cbbfa22959	1	[ "$(grep -c '^swaylock:locked$' "$LOCK_POLICY_LOG")" = 1 ] || {
+shell	tests/lock-policy.sh	SC2312	71be34d10c2f6973	1	[ "$(watchers)" = 2 ] || { echo "a second session on another display got no watcher of its own" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2312	7a1d7371bd483769	1	[ "$(watchers)" = 1 ] || { echo "a request on a locked session did not restart a lost watcher" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2312	8546a31ec0fc9aa7	2	until [ "$(watchers)" = 1 ] || [ "$i" -ge 100 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2312	8603a6a480ce54c4	8	until [ "$(watchers)" = 1 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2312	8851ccf8a9f514d3	7	until [ "$(watchers)" = 0 ] || [ "$i" -ge 100 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2312	90bfc6286d1fa470	2	echo "both racing runs must succeed, got $(cat "$work/race.a") $(cat "$work/race.b")" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2312	a7e2f6b09aba22a2	1	[ "$(watchers)" = 0 ] || { echo "the watcher kept running after Hyprland exited" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2312	aaf1d25e7e2c324a	2	[ "$(watchers)" = 1 ] || { echo "expected exactly one plain-process watcher, got $(watchers)" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2312	c36199b16e5ca6bd	1	[ "$(watchers)" = 1 ] || { echo "with no user manager a lock started no watcher for its locker" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2312	c834144997806b3a	1	until [ "$(grep -c '^vigil-lock:' "$LOCK_POLICY_LOG")" = 2 ] || [ "$i" -ge 250 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2312	c9efab1ff4da6a4c	1	if [ "$(id -u)" -eq 0 ]; then chown 0:0 "$lock_conf"; else sudo -n chown 0:0 "$lock_conf"; fi
+shell	tests/lock-policy.sh	SC2312	d685394410ca69e1	1	if [ "$(id -u)" -eq 0 ] || sudo -n true 2>/dev/null; then
+shell	tests/lock-policy.sh	SC2312	dc84b2bbd5ad74a3	1	if [ "$(id -u)" -eq 0 ]; then
+shell	tests/lock-policy.sh	SC2312	e16f6fb096b571fc	4	[ "$(cat "$work/race.a") $(cat "$work/race.b")" = "0 0" ] || {
+shell	tests/lock-policy.sh	SC2312	e33c053a02444bdf	1	cp "$(command -v timeout)" "$work/no-toggle/timeout"
+shell	tests/lock-policy.sh	SC2312	e3bd778c0055fd3a	1	[ "$(watchers)" = 1 ] || { echo "a scoped watcher launch that failed left no watcher" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2312	e9544ed312ecdd4b	4	[ "$(grep -c '^vigil-lock:' "$LOCK_POLICY_LOG")" = 1 ] || {
+shell	tests/lock-policy.sh	SC2312	ef6a7533dd76841e	1	until [ "$(grep -c '^vigil-lock:' "$LOCK_POLICY_LOG")" = 2 ] || [ "$i" -ge 150 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2312	f1892a04dbf9010c	1	[ "$(grep -c 'cannot list screen lockers' "$LOCK_POLICY_JOURNAL")" = 1 ] || {
+shell	tests/lock-policy.sh	SC2312	fee859973281562e	3	[ "$(watchers)" = 1 ] || { echo "a lock started no watcher for its locker" >&2; exit 1; }
+shell	tests/lock-policy.sh	suppression	128b87bfb50ff992	1	# shellcheck disable=SC2086 # deliberate: lock_shell may carry an option
+shell	tests/media-stream.sh	SC2015	1ecbddfc1cc2da6f	1	[ "$elapsed" -lt 2000 ] && ok "returned promptly (${elapsed} ms)" || bad "hung for ${elapsed} ms"
+shell	tests/media-stream.sh	SC2015	3dc583bdc7efe283	1	[ "$(j 0 .class)" = playing ] && ok "playing: class playing" || bad "class: $(j 0 .class)"
+shell	tests/media-stream.sh	SC2015	43ad1d719769253f	1	python3 -m py_compile "$script" && ok "py_compile" || bad "py_compile failed"
+shell	tests/media-stream.sh	SC2015	61928dc202955e97	1	[ "$rc" -eq 0 ] && ok "exits 0" || bad "exit $rc without playerctl"
+shell	tests/media-stream.sh	SC2015	698c4ef1923603d5	1	&& ok "the format names status, so play/pause re-emits" \
+shell	tests/media-stream.sh	SC2015	6ecffe91eae93e9f	1	&& ok "every player is admitted (%any), ranked below the preferred ones" \
+shell	tests/media-stream.sh	SC2015	7dca2169befb9e70	1	[ "${#lines[@]}" -eq 6 ] && ok "one output line per state change, repeats swallowed (${#lines[@]})" \
+shell	tests/media-stream.sh	SC2015	8e22c3d42a5dfd57	1	[ "$(grep -c '^$' "$out")" -ge 1 ] && ok "a lost feed blanks the module" || bad "nothing blanked after the feed died"
+shell	tests/media-stream.sh	SC2015	91ab945de721f067	1	[ "$(j 3 .alt)" = firefox ] && ok "a change in another player is shown" || bad "alt: $(j 3 .alt)"
+shell	tests/media-stream.sh	SC2015	b6d02fc915abedd6	1	[ "$(cat "$out")" = "" ] && [ "$(wc -l < "$out")" -eq 1 ] && ok "exactly one blank line" || bad "unexpected output: $(cat "$out")"
+shell	tests/media-stream.sh	SC2015	c41bbc8e61e6bd58	1	&& bad "position in the format makes playerctl tick every second" \
+shell	tests/media-stream.sh	SC2015	c6f7cbdbbb9a3f2c	1	[ "$(j 4 .text)" = "No artist $play" ] && ok "no artist: no dangling separator" || bad "text: $(j 4 .text)"
+shell	tests/media-stream.sh	SC2015	c9efb7bc7bf9a261	1	[ "$(j 0 .alt)" = spotify ] && ok "playing: alt is the player" || bad "alt: $(j 0 .alt)"
+shell	tests/media-stream.sh	SC2015	cb93e0f0e715a33e	1	&& ok "quotes and markup survive as data (waybar escapes markup itself)" \
+shell	tests/media-stream.sh	SC2015	d547ee50295278c2	1	[ -z "${lines[1]}" ] && ok "paused: blank line, module hidden" || bad "paused still shows: ${lines[1]}"
+shell	tests/media-stream.sh	SC2015	d812ba445145d0d1	1	printf '%s' "$argv" | grep -q -- '--follow' && ok "uses --follow" || bad "no --follow in: $argv"
+shell	tests/media-stream.sh	SC2015	e210cbe384d7233e	1	[ -z "${lines[5]}" ] && ok "stopped: blank line" || bad "stopped still shows: ${lines[5]}"
+shell	tests/media-stream.sh	SC2015	f197bb5d5f180747	1	&& ok "exec is the follower script itself" \
+shell	tests/media-stream.sh	SC2015	f8b919be577c5338	1	[ "$(j 0 .text)" = "Song One - A Band $play" ] && ok "playing: title - artist and the play glyph" || bad "playing text: $(j 0 .text)"
+shell	tests/media-stream.sh	SC2292	1ecbddfc1cc2da6f	1	[ "$elapsed" -lt 2000 ] && ok "returned promptly (${elapsed} ms)" || bad "hung for ${elapsed} ms"
+shell	tests/media-stream.sh	SC2292	2df8285a67d56969	2	if [ "$spawns" -ge 2 ] && [ "$spawns" -le 6 ]; then
+shell	tests/media-stream.sh	SC2292	38cec0a5664aeaf6	1	if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+shell	tests/media-stream.sh	SC2292	3dc583bdc7efe283	1	[ "$(j 0 .class)" = playing ] && ok "playing: class playing" || bad "class: $(j 0 .class)"
+shell	tests/media-stream.sh	SC2292	61928dc202955e97	1	[ "$rc" -eq 0 ] && ok "exits 0" || bad "exit $rc without playerctl"
+shell	tests/media-stream.sh	SC2292	7bd06fd6603b7746	1	[ "$(j 3 .text)" = "A \"quoted\" <b>title</b> - Someone $play" ] \
+shell	tests/media-stream.sh	SC2292	7dca2169befb9e70	1	[ "${#lines[@]}" -eq 6 ] && ok "one output line per state change, repeats swallowed (${#lines[@]})" \
+shell	tests/media-stream.sh	SC2292	8e22c3d42a5dfd57	1	[ "$(grep -c '^$' "$out")" -ge 1 ] && ok "a lost feed blanks the module" || bad "nothing blanked after the feed died"
+shell	tests/media-stream.sh	SC2292	91ab945de721f067	1	[ "$(j 3 .alt)" = firefox ] && ok "a change in another player is shown" || bad "alt: $(j 3 .alt)"
+shell	tests/media-stream.sh	SC2292	b6d02fc915abedd6	2	[ "$(cat "$out")" = "" ] && [ "$(wc -l < "$out")" -eq 1 ] && ok "exactly one blank line" || bad "unexpected output: $(cat "$out")"
+shell	tests/media-stream.sh	SC2292	c6f7cbdbbb9a3f2c	1	[ "$(j 4 .text)" = "No artist $play" ] && ok "no artist: no dangling separator" || bad "text: $(j 4 .text)"
+shell	tests/media-stream.sh	SC2292	c825131a023e12e6	3	[ -e /run/tripwire/hits ] || { [ "${HYPR_DE_SEALED-}" = build-root ] && [ ! -e /run/systemd/private ]; } || exec "$(dirname -- "$0")/run" "$0"
+shell	tests/media-stream.sh	SC2292	c9efb7bc7bf9a261	1	[ "$(j 0 .alt)" = spotify ] && ok "playing: alt is the player" || bad "alt: $(j 0 .alt)"
+shell	tests/media-stream.sh	SC2292	d547ee50295278c2	1	[ -z "${lines[1]}" ] && ok "paused: blank line, module hidden" || bad "paused still shows: ${lines[1]}"
+shell	tests/media-stream.sh	SC2292	d584c4658bf1e4e3	1	[ -z "$l" ] && continue
+shell	tests/media-stream.sh	SC2292	e210cbe384d7233e	1	[ -z "${lines[5]}" ] && ok "stopped: blank line" || bad "stopped still shows: ${lines[5]}"
+shell	tests/media-stream.sh	SC2292	e8e5d31c980539b1	1	[ "$fail" -eq 0 ] && { echo "media module streams"; exit 0; }
+shell	tests/media-stream.sh	SC2292	f8b919be577c5338	1	[ "$(j 0 .text)" = "Song One - A Band $play" ] && ok "playing: title - artist and the play glyph" || bad "playing text: $(j 0 .text)"
+shell	tests/media-stream.sh	SC2312	3dc583bdc7efe283	2	[ "$(j 0 .class)" = playing ] && ok "playing: class playing" || bad "class: $(j 0 .class)"
+shell	tests/media-stream.sh	SC2312	7bd06fd6603b7746	1	[ "$(j 3 .text)" = "A \"quoted\" <b>title</b> - Someone $play" ] \
+shell	tests/media-stream.sh	SC2312	8e22c3d42a5dfd57	1	[ "$(grep -c '^$' "$out")" -ge 1 ] && ok "a lost feed blanks the module" || bad "nothing blanked after the feed died"
+shell	tests/media-stream.sh	SC2312	91ab945de721f067	2	[ "$(j 3 .alt)" = firefox ] && ok "a change in another player is shown" || bad "alt: $(j 3 .alt)"
+shell	tests/media-stream.sh	SC2312	b6d02fc915abedd6	3	[ "$(cat "$out")" = "" ] && [ "$(wc -l < "$out")" -eq 1 ] && ok "exactly one blank line" || bad "unexpected output: $(cat "$out")"
+shell	tests/media-stream.sh	SC2312	c6f7cbdbbb9a3f2c	2	[ "$(j 4 .text)" = "No artist $play" ] && ok "no artist: no dangling separator" || bad "text: $(j 4 .text)"
+shell	tests/media-stream.sh	SC2312	c9efb7bc7bf9a261	2	[ "$(j 0 .alt)" = spotify ] && ok "playing: alt is the player" || bad "alt: $(j 0 .alt)"
+shell	tests/media-stream.sh	SC2312	d28eb9a27c0f1463	1	|| bad "text mangled: $(j 3 .text)"
+shell	tests/media-stream.sh	SC2312	f8b919be577c5338	2	[ "$(j 0 .text)" = "Song One - A Band $play" ] && ok "playing: title - artist and the play glyph" || bad "playing text: $(j 0 .text)"
+shell	tests/pam-rewrite.sh	SC2012	f115a9915b2d5cc8	1	[ "$(ls "$pam".hypr-de-backup.* | wc -l)" -eq 1 ] && ok "no second backup" || bad "backed up again on a no-op"
+shell	tests/pam-rewrite.sh	SC2015	0135894e88e84b04	1	[ "$?" -eq 0 ] && ok "returns 0" || bad "failed on a missing file (would fail the transaction)"
+shell	tests/pam-rewrite.sh	SC2015	08e2b4d788753918	1	printf '%s' "$out" | grep -q "no insertion point" && ok "said so" || bad "silently did nothing: $out"
+shell	tests/pam-rewrite.sh	SC2015	2768dddc9b83f372	1	ls "$pam".hypr-de-backup.* >/dev/null 2>&1 && bad "backed up a file it did not change" || ok "no backup"
+shell	tests/pam-rewrite.sh	SC2015	39d66655b8efc117	1	[ "$(cat "$pam")" = "$before" ] && ok "unchanged" || bad "rewrote a file it found no insertion point in"
+shell	tests/pam-rewrite.sh	SC2015	45286609a1c42167	1	printf '%s' "$out" | grep -q "backup:" && ok "reported the backup path" || bad "did not report the backup"
+shell	tests/pam-rewrite.sh	SC2015	45441dcf08bdbff0	1	printf '%s' "$out" | grep -q "dropped a line" && ok "said why it refused" || bad "no explanation: $out"
+shell	tests/pam-rewrite.sh	SC2015	4dae29aec3484351	1	[ "$(stat -c %i "$pam")" = "$ino_before" ] && ok "same inode (mode/owner/label kept)" || bad "replaced the inode"
+shell	tests/pam-rewrite.sh	SC2015	a0499ef5276d245f	1	[ "$(cat "$pam")" = "$before" ] && ok "original intact after a lossy rewrite" || bad "REPLACED the PAM file with a partial one"
+shell	tests/pam-rewrite.sh	SC2015	ad4d3238cc70aad0	1	printf '%s' "$out" | grep -q "awk failed" && ok "said why it refused" || bad "no explanation: $out"
+shell	tests/pam-rewrite.sh	SC2015	aeb6c5a09152271a	1	ls "$pam".hypr-de-backup.* >/dev/null 2>&1 && ok "backup written" || bad "no backup written"
+shell	tests/pam-rewrite.sh	SC2015	b40a49d6755e8f7b	1	[ "$missing" -eq 0 ] && ok "every original line survived" || bad "the rewrite dropped an original line"
+shell	tests/pam-rewrite.sh	SC2015	c95bd0128fa1b974	1	[ "$(cat "$pam")" = "$before" ] && ok "original intact after an empty rewrite" || bad "TRUNCATED the live PAM file"
+shell	tests/pam-rewrite.sh	SC2015	ca41cd2435b2e581	1	[ "$(stat -c %a "$pam")" = "$mode_before" ] && ok "mode unchanged ($mode_before)" || bad "mode changed"
+shell	tests/pam-rewrite.sh	SC2015	d0e7705dd4c5a59c	1	ls "$pam".hypr-de-backup.* >/dev/null 2>&1 && bad "backed up despite refusing" || ok "no pointless backup"
+shell	tests/pam-rewrite.sh	SC2015	d2895e38ac493466	1	[ "$(cat "$pam")" = "$before" ] && ok "original intact after awk failed" || bad "modified the file after awk failed"
+shell	tests/pam-rewrite.sh	SC2015	e75f803d7db78ee6	1	printf '%s' "$out" | grep -q "came out empty" && ok "said why it refused" || bad "no explanation: $out"
+shell	tests/pam-rewrite.sh	SC2015	e96ac90dc5c84ae0	1	[ "$n" -eq 3 ] && ok "inserted 3 keyring lines" || bad "inserted $n keyring lines"
+shell	tests/pam-rewrite.sh	SC2015	f115a9915b2d5cc8	1	[ "$(ls "$pam".hypr-de-backup.* | wc -l)" -eq 1 ] && ok "no second backup" || bad "backed up again on a no-op"
+shell	tests/pam-rewrite.sh	SC2015	f72acf70b95adb0e	1	[ "$(md5sum < "$pam")" = "$sum" ] && ok "idempotent" || bad "second run modified the file"
+shell	tests/pam-rewrite.sh	SC2181	0135894e88e84b04	1	[ "$?" -eq 0 ] && ok "returns 0" || bad "failed on a missing file (would fail the transaction)"
+shell	tests/pam-rewrite.sh	SC2292	0135894e88e84b04	1	[ "$?" -eq 0 ] && ok "returns 0" || bad "failed on a missing file (would fail the transaction)"
+shell	tests/pam-rewrite.sh	SC2292	39d66655b8efc117	1	[ "$(cat "$pam")" = "$before" ] && ok "unchanged" || bad "rewrote a file it found no insertion point in"
+shell	tests/pam-rewrite.sh	SC2292	4dae29aec3484351	1	[ "$(stat -c %i "$pam")" = "$ino_before" ] && ok "same inode (mode/owner/label kept)" || bad "replaced the inode"
+shell	tests/pam-rewrite.sh	SC2292	883c97c7ce7eab2f	1	[ "$fail" -eq 0 ] && { echo "PAM rewrite is safe"; exit 0; }
+shell	tests/pam-rewrite.sh	SC2292	a0499ef5276d245f	1	[ "$(cat "$pam")" = "$before" ] && ok "original intact after a lossy rewrite" || bad "REPLACED the PAM file with a partial one"
+shell	tests/pam-rewrite.sh	SC2292	b40a49d6755e8f7b	1	[ "$missing" -eq 0 ] && ok "every original line survived" || bad "the rewrite dropped an original line"
+shell	tests/pam-rewrite.sh	SC2292	c825131a023e12e6	3	[ -e /run/tripwire/hits ] || { [ "${HYPR_DE_SEALED-}" = build-root ] && [ ! -e /run/systemd/private ]; } || exec "$(dirname -- "$0")/run" "$0"
+shell	tests/pam-rewrite.sh	SC2292	c95bd0128fa1b974	1	[ "$(cat "$pam")" = "$before" ] && ok "original intact after an empty rewrite" || bad "TRUNCATED the live PAM file"
+shell	tests/pam-rewrite.sh	SC2292	ca41cd2435b2e581	1	[ "$(stat -c %a "$pam")" = "$mode_before" ] && ok "mode unchanged ($mode_before)" || bad "mode changed"
+shell	tests/pam-rewrite.sh	SC2292	d2895e38ac493466	1	[ "$(cat "$pam")" = "$before" ] && ok "original intact after awk failed" || bad "modified the file after awk failed"
+shell	tests/pam-rewrite.sh	SC2292	e96ac90dc5c84ae0	1	[ "$n" -eq 3 ] && ok "inserted 3 keyring lines" || bad "inserted $n keyring lines"
+shell	tests/pam-rewrite.sh	SC2292	f115a9915b2d5cc8	1	[ "$(ls "$pam".hypr-de-backup.* | wc -l)" -eq 1 ] && ok "no second backup" || bad "backed up again on a no-op"
+shell	tests/pam-rewrite.sh	SC2292	f72acf70b95adb0e	1	[ "$(md5sum < "$pam")" = "$sum" ] && ok "idempotent" || bad "second run modified the file"
+shell	tests/pam-rewrite.sh	SC2312	39d66655b8efc117	1	[ "$(cat "$pam")" = "$before" ] && ok "unchanged" || bad "rewrote a file it found no insertion point in"
+shell	tests/pam-rewrite.sh	SC2312	4dae29aec3484351	1	[ "$(stat -c %i "$pam")" = "$ino_before" ] && ok "same inode (mode/owner/label kept)" || bad "replaced the inode"
+shell	tests/pam-rewrite.sh	SC2312	a0499ef5276d245f	1	[ "$(cat "$pam")" = "$before" ] && ok "original intact after a lossy rewrite" || bad "REPLACED the PAM file with a partial one"
+shell	tests/pam-rewrite.sh	SC2312	c95bd0128fa1b974	1	[ "$(cat "$pam")" = "$before" ] && ok "original intact after an empty rewrite" || bad "TRUNCATED the live PAM file"
+shell	tests/pam-rewrite.sh	SC2312	ca41cd2435b2e581	1	[ "$(stat -c %a "$pam")" = "$mode_before" ] && ok "mode unchanged ($mode_before)" || bad "mode changed"
+shell	tests/pam-rewrite.sh	SC2312	d2895e38ac493466	1	[ "$(cat "$pam")" = "$before" ] && ok "original intact after awk failed" || bad "modified the file after awk failed"
+shell	tests/pam-rewrite.sh	SC2312	f115a9915b2d5cc8	2	[ "$(ls "$pam".hypr-de-backup.* | wc -l)" -eq 1 ] && ok "no second backup" || bad "backed up again on a no-op"
+shell	tests/pam-rewrite.sh	SC2312	f72acf70b95adb0e	1	[ "$(md5sum < "$pam")" = "$sum" ] && ok "idempotent" || bad "second run modified the file"
+shell	tests/power-menu-exit.sh	SC2015	3f3b7fb2eb513e77	1	[ "$(run with Logout)" = "desktop-boot-exit " ] && ok "logout uses desktop-boot-exit" || bad "logout with desktop-boot-exit"
+shell	tests/power-menu-exit.sh	SC2015	4cf673629d5fdae0	1	[ "$(run without Lock)" = "lock-cmd.sh " ] && ok "the menu's Lock runs lock-cmd.sh itself" || bad "the menu's Lock does not reach lock-cmd.sh"
+shell	tests/power-menu-exit.sh	SC2015	7a3eca8307a7dadc	1	[ "$(run with Reboot)" = "desktop-boot-exit -p systemctl reboot" ] && ok "reboot uses desktop-boot-exit" || bad "reboot with desktop-boot-exit"
+shell	tests/power-menu-exit.sh	SC2015	81430b66bb185d54	1	[ "$(run without Shutdown)" = "hyprshutdown -p systemctl poweroff -i" ] && ok "shutdown falls back to hyprshutdown" || bad "shutdown fallback"
+shell	tests/power-menu-exit.sh	SC2015	9914341a57652389	1	[ "$(cat "$work/log")" = "lock-cmd.sh " ] && ok "Super+L runs lock-cmd.sh itself" || bad "Super+L does not reach lock-cmd.sh: '$bind'"
+shell	tests/power-menu-exit.sh	SC2015	d6eb7ab07a333065	1	&& ok "Super+L also works on a locked screen, so a crashed lock screen can be recovered from the keyboard" \
+shell	tests/power-menu-exit.sh	SC2016	06c74937b5e013f1	1	printf '#!/bin/sh\necho "desktop-boot-exit $*" >>"$LOG"\n' >"$work/with/desktop-boot-exit"
+shell	tests/power-menu-exit.sh	SC2016	9fdcbd2b459cec5b	1	printf '#!/bin/sh\necho "hyprshutdown $*" >>"$LOG"\n' >"$work/$d/hyprshutdown"
+shell	tests/power-menu-exit.sh	SC2016	d999ea2d9c2f7f5a	1	printf '#!/bin/sh\ncat >/dev/null; printf "%%s\\n" "$PICK"\n' >"$work/$d/fuzzel"
+shell	tests/power-menu-exit.sh	SC2016	f95b043245dc4b60	1	printf '#!/bin/sh\necho "lock-cmd.sh $*" >>"$LOG"\n' >"$work/libexec/lock-cmd.sh"
+shell	tests/power-menu-exit.sh	SC2292	3f3b7fb2eb513e77	1	[ "$(run with Logout)" = "desktop-boot-exit " ] && ok "logout uses desktop-boot-exit" || bad "logout with desktop-boot-exit"
+shell	tests/power-menu-exit.sh	SC2292	4cf673629d5fdae0	1	[ "$(run without Lock)" = "lock-cmd.sh " ] && ok "the menu's Lock runs lock-cmd.sh itself" || bad "the menu's Lock does not reach lock-cmd.sh"
+shell	tests/power-menu-exit.sh	SC2292	7a3eca8307a7dadc	1	[ "$(run with Reboot)" = "desktop-boot-exit -p systemctl reboot" ] && ok "reboot uses desktop-boot-exit" || bad "reboot with desktop-boot-exit"
+shell	tests/power-menu-exit.sh	SC2292	81430b66bb185d54	1	[ "$(run without Shutdown)" = "hyprshutdown -p systemctl poweroff -i" ] && ok "shutdown falls back to hyprshutdown" || bad "shutdown fallback"
+shell	tests/power-menu-exit.sh	SC2292	9914341a57652389	1	[ "$(cat "$work/log")" = "lock-cmd.sh " ] && ok "Super+L runs lock-cmd.sh itself" || bad "Super+L does not reach lock-cmd.sh: '$bind'"
+shell	tests/power-menu-exit.sh	SC2292	a38be61ffb771950	1	if [ -n "$bind" ]; then
+shell	tests/power-menu-exit.sh	SC2292	c825131a023e12e6	3	[ -e /run/tripwire/hits ] || { [ "${HYPR_DE_SEALED-}" = build-root ] && [ ! -e /run/systemd/private ]; } || exec "$(dirname -- "$0")/run" "$0"
+shell	tests/power-menu-exit.sh	SC2312	3f3b7fb2eb513e77	1	[ "$(run with Logout)" = "desktop-boot-exit " ] && ok "logout uses desktop-boot-exit" || bad "logout with desktop-boot-exit"
+shell	tests/power-menu-exit.sh	SC2312	4cf673629d5fdae0	1	[ "$(run without Lock)" = "lock-cmd.sh " ] && ok "the menu's Lock runs lock-cmd.sh itself" || bad "the menu's Lock does not reach lock-cmd.sh"
+shell	tests/power-menu-exit.sh	SC2312	7a3eca8307a7dadc	1	[ "$(run with Reboot)" = "desktop-boot-exit -p systemctl reboot" ] && ok "reboot uses desktop-boot-exit" || bad "reboot with desktop-boot-exit"
+shell	tests/power-menu-exit.sh	SC2312	81430b66bb185d54	1	[ "$(run without Shutdown)" = "hyprshutdown -p systemctl poweroff -i" ] && ok "shutdown falls back to hyprshutdown" || bad "shutdown fallback"
+shell	tests/power-menu-exit.sh	SC2312	883443a64eb12536	1	LOG="$work/log" PATH="$work/sys" /bin/sh -c "$(printf '%s' "$bind" | sed "s|@LIBEXECDIR@|$work/libexec|g")"
+shell	tests/power-menu-exit.sh	SC2312	9914341a57652389	1	[ "$(cat "$work/log")" = "lock-cmd.sh " ] && ok "Super+L runs lock-cmd.sh itself" || bad "Super+L does not reach lock-cmd.sh: '$bind'"
+shell	tests/power-menu-exit.sh	SC2312	bf195885840126a8	1	ln -s "$(command -v cat)" "$work/sys/cat"
+shell	tests/privacy-privilege.sh	SC1090	b05586a212e5cb87	1	source <(sed -n '/^resolve_terminal()/,/^}/p' "$root/dist/libexec/waybar-updates-check")
+shell	tests/privacy-privilege.sh	SC2015	06ddc43439d1826e	1	&& ok "ownership is checked before acting" || bad "no ownership check"
+shell	tests/privacy-privilege.sh	SC2015	27fcbb552453c199	1	&& bad "--all pushes the whole session environment into every activated service" \
+shell	tests/privacy-privilege.sh	SC2015	72fa7c4b6b3ee689	1	&& ok "the command is shown before the password prompt" \
+shell	tests/privacy-privilege.sh	SC2015	9acf461d55253235	1	grep -q "Lock)" "$pm" && ok "the lock entry exists" || bad "the lock action disappeared"
+shell	tests/privacy-privilege.sh	SC2015	d0eb08a8e5a9a18a	1	grep -q "Next" "$NOTIFY_LOG" && ok "locked: the control still works and still confirms" || bad "locked: no feedback at all"
+shell	tests/privacy-privilege.sh	SC2015	e3d8cd9407f681f2	1	&& ok "unlocked: metadata is still shown" \
+shell	tests/privacy-privilege.sh	SC2015	f2e884429930c77b	1	&& ok "the enumerated set still carries HYPRLAND_INSTANCE_SIGNATURE" \
+shell	tests/privacy-privilege.sh	SC2016	b90de7b7380acb07	1	printf '#!/bin/sh\necho \"%s\" > \"$STAT_OUT\"\nexit 0\n' "runuser-called" > "$rbin/runuser"
+shell	tests/privacy-privilege.sh	SC2292	191aa0f8d02edbe7	1	if [ -s "$STAT_OUT" ]; then
+shell	tests/privacy-privilege.sh	SC2292	45a0a019837adb6e	1	[ "$fail" -eq 0 ] && { echo "privacy and privilege boundaries hold"; exit 0; }
+shell	tests/privacy-privilege.sh	SC2292	c825131a023e12e6	3	[ -e /run/tripwire/hits ] || { [ "${HYPR_DE_SEALED-}" = build-root ] && [ ! -e /run/systemd/private ]; } || exec "$(dirname -- "$0")/run" "$0"
+shell	tests/privacy-privilege.sh	SC2312	b05586a212e5cb87	1	source <(sed -n '/^resolve_terminal()/,/^}/p' "$root/dist/libexec/waybar-updates-check")
+shell	tests/privacy-privilege.sh	suppression	f67b15bb72341ee2	1	# shellcheck disable=SC1090
+shell	tests/qemu-fresh/check.sh	SC2292	0024e2adf8ed9cd8	2	if [ -e "$f" ]; then
+shell	tests/qemu-fresh/check.sh	SC2292	00f453fefed32581	1	if [ -d /run/user/1000 ]; then
+shell	tests/qemu-fresh/check.sh	SC2292	1ebbdbbf2e354c27	1	if [ -r /etc/xdg/hypr/hyprland.lua ] && grep -q 'main.lua' /etc/xdg/hypr/hyprland.lua; then
+shell	tests/qemu-fresh/check.sh	SC2292	2e0796941809a8c3	1	if [ -n "$errs" ]; then
+shell	tests/qemu-fresh/check.sh	SC2292	3d403b56ea6c032b	1	if [ -e "$f" ]; then ok "$f"; else bad "$f missing"; fi
+shell	tests/qemu-fresh/check.sh	SC2292	54ce15945ce39ca6	1	if [ "${#usr_failed[@]}" -eq 0 ]; then
+shell	tests/qemu-fresh/check.sh	SC2292	5e918a7f84e0242a	1	[ -e /etc/hypr-de-qemu-fresh ] || { echo "$0: runs only inside the qemu-fresh VM" >&2; exit 2; }
+shell	tests/qemu-fresh/check.sh	SC2292	8672a7c5a0935a5b	1	if [ -f /usr/share/libalpm/hooks/95-hypr-de-reload.hook ]; then
+shell	tests/qemu-fresh/check.sh	SC2292	88b9c82737e7e3fd	1	have=$(pkg_version "$pkg") && [ -n "$have" ] || {
+shell	tests/qemu-fresh/check.sh	SC2292	897cf7d1c9f656bb	1	if [ -x /usr/bin/logind-idle-control-tray ]; then ok "logind-idle-control-tray binary"; else bad "idle-control tray binary missing"; fi
+shell	tests/qemu-fresh/check.sh	SC2292	a563cf81d4c585ab	1	if pkg_version hyprstate-gui >/dev/null 2>&1 && [ -n "$(pkg_version hyprstate-gui)" ]; then
+shell	tests/qemu-fresh/check.sh	SC2292	accbbbdb406f1f80	1	if [ "$fail" -eq 0 ]; then
+shell	tests/qemu-fresh/check.sh	SC2292	adc4b24427bbb005	1	if [ "$got" = "lmtt-material-you" ]; then
+shell	tests/qemu-fresh/check.sh	SC2292	af21d6eabf75f553	1	if [ -n "$ed_decl" ] && command -v "${ed_decl#export EDITOR=}" >/dev/null; then
+shell	tests/qemu-fresh/check.sh	SC2292	affcabce65a6c916	1	if [ "$(printf '%s\n%s\n' "$want" "$have" | sort -V | head -1)" = "$want" ]; then
+shell	tests/qemu-fresh/check.sh	SC2292	b7356752f2e0baae	2	if [ -x "$LIBDIR/hypr-de/hypr-de-reload-sessions" ] || [ -x /usr/libexec/hypr-de/hypr-de-reload-sessions ]; then
+shell	tests/qemu-fresh/check.sh	SC2292	ba810bbbd101cdcf	1	if [ "${#sys_failed[@]}" -eq 0 ]; then
+shell	tests/qemu-fresh/check.sh	SC2292	ddf38cc3ab9e3080	1	if [ -f "$HOME/.config/hypr-de/nvim-colors.lua" ] && grep -q 'colors_name' "$HOME/.config/hypr-de/nvim-colors.lua"; then
+shell	tests/qemu-fresh/check.sh	SC2292	e48c4bee212287a2	1	[ "$DISTRO" = fedora ] && greeter_user=greetd
+shell	tests/qemu-fresh/check.sh	SC2292	ed7e360f38451419	1	if [ -f "$f" ]; then ok "$f"; else bad "$f missing"; fi
+shell	tests/qemu-fresh/check.sh	SC2292	f2aaa21f9c9701d3	2	if [ "$DISTRO" = arch ]; then
+shell	tests/qemu-fresh/check.sh	SC2292	f9d62fc041129a7c	1	if [ -f /usr/share/icons/Papirus/index.theme ]; then
+shell	tests/qemu-fresh/check.sh	SC2310	88b9c82737e7e3fd	2	have=$(pkg_version "$pkg") && [ -n "$have" ] || {
+shell	tests/qemu-fresh/check.sh	SC2310	a563cf81d4c585ab	3	if pkg_version hyprstate-gui >/dev/null 2>&1 && [ -n "$(pkg_version hyprstate-gui)" ]; then
+shell	tests/qemu-fresh/check.sh	SC2312	a563cf81d4c585ab	1	if pkg_version hyprstate-gui >/dev/null 2>&1 && [ -n "$(pkg_version hyprstate-gui)" ]; then
+shell	tests/qemu-fresh/check.sh	SC2312	affcabce65a6c916	2	if [ "$(printf '%s\n%s\n' "$want" "$have" | sort -V | head -1)" = "$want" ]; then
+shell	tests/qemu-fresh/check.sh	SC2312	b8aa8ac49af937cf	1	bad "greetd is $(systemctl is-active greetd 2>/dev/null || echo missing)"
+shell	tests/qemu-fresh/firstboot.sh	SC2292	5e918a7f84e0242a	1	[ -e /etc/hypr-de-qemu-fresh ] || { echo "$0: runs only inside the qemu-fresh VM" >&2; exit 2; }
+shell	tests/qemu-fresh/firstboot.sh	SC2292	650295292e672325	1	[ -f /etc/pacman.conf ] && sed -i 's/^#\?ParallelDownloads.*/ParallelDownloads = 5/' /etc/pacman.conf
+shell	tests/qemu-fresh/firstboot.sh	SC2292	e00489b06b88c81a	1	[ "$ok_net" = 1 ] || {
+shell	tests/qemu-fresh/firstboot.sh	SC2312	010627cc9d7a77b8	1	echo "=== hypr-de firstboot $(date -Is) ==="
+shell	tests/qemu-fresh/firstboot.sh	SC2312	0c2f38931396de59	1	echo "=== hypr-de firstboot done $(date -Is) ==="
+shell	tests/qemu-fresh/lock-check.sh	SC2002	b43be568145ff757	1	cg=$(cat "/proc/$lpid/cgroup" 2>/dev/null | head -1)
+shell	tests/qemu-fresh/lock-check.sh	SC2015	ee13bbbe3d0767d4	1	locker_up && bad "could not clear the locker" || ok "locker cleared"
+shell	tests/qemu-fresh/lock-check.sh	SC2292	26ea97775f457362	1	if [ -n "$gsid" ]; then
+shell	tests/qemu-fresh/lock-check.sh	SC2292	5e918a7f84e0242a	1	[ -e /etc/hypr-de-qemu-fresh ] || { echo "$0: runs only inside the qemu-fresh VM" >&2; exit 2; }
+shell	tests/qemu-fresh/lock-check.sh	SC2292	78809db14b3c7afc	1	[ -n "$(loginctl show-session "$s" -p Seat --value 2>/dev/null)" ] || continue
+shell	tests/qemu-fresh/lock-check.sh	SC2292	827e8b759c09808b	1	if [ "$fail" -eq 0 ]; then echo "LOCK: PASS"; exit 0; fi
+shell	tests/qemu-fresh/lock-check.sh	SC2312	51426a2ff1d147be	2	| grep -E '^(HYPRLAND_INSTANCE_SIGNATURE|WAYLAND_DISPLAY)=' | sed 's/^/export /')"
+shell	tests/qemu-fresh/lock-check.sh	SC2312	78809db14b3c7afc	1	[ -n "$(loginctl show-session "$s" -p Seat --value 2>/dev/null)" ] || continue
+shell	tests/qemu-fresh/lock-check.sh	SC2312	999431fba42dfbe8	1	eval "$(systemctl --user show-environment 2>/dev/null \
+shell	tests/qemu-fresh/lock-check.sh	SC2312	f88adc770d8bd584	1	ok "graphical session is $gsid (seat $(loginctl show-session "$gsid" -p Seat --value 2>/dev/null))"
+shell	tests/qemu-fresh/run.sh	SC2016	2974530b01e3bca7	1	guest_ssh 'set -e sess=$(ls /usr/share/wayland-sessions/*uwsm*.desktop 2>/dev/null | head -1) [ -n "$sess" ] || sess=$(grep -l "Hyprland" /usr/share/wayland-sessions/*.desktop 2>/dev/null | head -1) [ -n "$sess" ] || { echo "no wayland session entry found" >&2; exit 1; } cmd=$(awk -F= "/^Exec=/{print \$2; exit}" "$sess") echo " session entry: $sess" echo " exec: $cmd" [ -f /etc/greetd/config.toml.bak ] || sudo cp /etc/greetd/config.toml /etc/greetd/config.toml.bak sudo cp /etc/greetd/config.toml.bak /etc/greetd/config.toml printf "\n[initial_session]\ncommand = \"%s\"\nuser = \"%s\"\n" "$cmd" "$USER" | sudo tee -a /etc/greetd/config.toml >/dev/null sudo systemctl restart greetd sleep 2 systemctl is-active greetd'
+shell	tests/qemu-fresh/run.sh	SC2016	909718e534e42ddc	1	guest_ssh 'for _ in $(seq 1 30); do pgrep -u mason -x waybar >/dev/null && break; sleep 1; done' 2>/dev/null || true
+shell	tests/qemu-fresh/run.sh	SC2016	da9e9f896cb174e8	1	guest_ssh 'set -e list="" for p in hypr-de hypr-de-gaming; do rpm -q "$p" >/dev/null 2>&1 && list="$list $p"; done echo " upgrading:$list" sudo dnf -y upgrade $list 2>&1 | tail -4'
+shell	tests/qemu-fresh/run.sh	SC2046	af1ccffade3c69e2	1	qemu-system-x86_64 $(qemu_args) &
+shell	tests/qemu-fresh/run.sh	SC2046	c551a245a21acd5c	1	exec qemu-system-x86_64 $(qemu_args)
+shell	tests/qemu-fresh/run.sh	SC2249	2f9437e61fab173f	1	case "$st" in ok) echo " firstboot ok ($i)" return 0 ;; fail) echo "firstboot failed; last log:" >&2 guest_ssh 'sudo tail -40 /var/log/get-hypr-de.log' >&2 || true exit 1 ;; esac
+shell	tests/qemu-fresh/run.sh	SC2249	8f17797594351a82	1	case "$cmd" in reset) stop_vm write_cidata reset_overlay start_vm ;; start) start_vm ;; wait) wait_firstboot ;; reboot) reboot_guest ;; check) run_check ;; test) stop_vm write_cidata reset_overlay start_vm background wait_firstboot reboot_guest run_check ;; lock) stop_vm write_cidata reset_overlay start_vm background wait_firstboot run_lock_test ;; upgrade) stop_vm write_cidata reset_overlay start_vm background wait_firstboot run_upgrade_test ;; esac
+shell	tests/qemu-fresh/run.sh	SC2292	15d566b4b5324119	1	[ -f "$SSH_PUB" ] || { echo "no SSH pubkey at $SSH_PUB" >&2; exit 1; }
+shell	tests/qemu-fresh/run.sh	SC2292	1da6f9998ba85ca3	1	if [ "$DOWNGRADED" = 1 ]; then
+shell	tests/qemu-fresh/run.sh	SC2292	23a75e5c908c3732	1	if [ "${1:-}" = background ]; then
+shell	tests/qemu-fresh/run.sh	SC2292	2f97ccfe3fbad05b	1	if [ "${HYPR_DE_HEADLESS:-0}" = 1 ]; then
+shell	tests/qemu-fresh/run.sh	SC2292	3c947949ff9f2e08	1	[ -f "$CIDATA_ISO" ] || { echo "no cidata.iso; run: $0 reset" >&2; exit 1; }
+shell	tests/qemu-fresh/run.sh	SC2292	487864425c45a87e	1	if [ -f "$CLOUDIMG" ]; then
+shell	tests/qemu-fresh/run.sh	SC2292	69bfcfa2a9d09fe8	1	[ -f "$OVERLAY" ] || { echo "no overlay; run: $0 reset" >&2; exit 1; }
+shell	tests/qemu-fresh/run.sh	SC2292	77cfdfa9b37054e4	3	if [ "$DISTRO" = fedora ]; then
+shell	tests/qemu-fresh/run.sh	SC2292	8c83e16fade5c5b9	2	if [ "$DOWNGRADED" = 1 ] && [ "$before" = "$after" ]; then
+shell	tests/qemu-fresh/run.sh	SC2292	a18c7a52e254be2b	1	[ -n "$img" ] || { echo "no Cloud-Base-Generic qcow2 in index" >&2; exit 1; }
+shell	tests/qemu-fresh/run.sh	SC2292	b2ffdff6375918f0	1	if [ -z "$CLOUDIMG_URL" ]; then
+shell	tests/qemu-fresh/run.sh	SC2292	b7d51ab3d38a8cdd	3	if [ -n "$holder" ] && [ -f "$WORKDIR/qemu.pid" ] && [ "$holder" = "$(cat "$WORKDIR/qemu.pid")" ]; then
+shell	tests/qemu-fresh/run.sh	SC2292	e417dc6fec8f698e	2	if [ -z "$prev" ]; then
+shell	tests/qemu-fresh/run.sh	SC2310	02a616058dedc417	1	guest_ssh true 2>/dev/null || break
+shell	tests/qemu-fresh/run.sh	SC2310	67c2826e8510b6e1	1	guest_ssh 'sudo journalctl -u greetd -b --no-pager | tail -20' >&2 || true
+shell	tests/qemu-fresh/run.sh	SC2310	6e7dca5a3fc4357e	1	if guest_ssh true 2>/dev/null; then
+shell	tests/qemu-fresh/run.sh	SC2310	909718e534e42ddc	1	guest_ssh 'for _ in $(seq 1 30); do pgrep -u mason -x waybar >/dev/null && break; sleep 1; done' 2>/dev/null || true
+shell	tests/qemu-fresh/run.sh	SC2310	a484b1cffdc77049	1	guest_ssh 'systemctl is-active greetd; sudo systemctl status greetd --no-pager -l 2>&1 | tail -15' >&2 || true
+shell	tests/qemu-fresh/run.sh	SC2310	a5d9efd4fa407f8c	1	if guest_ssh 'sudo dnf -y downgrade hypr-de hypr-de-gaming >/dev/null 2>&1 || sudo dnf -y downgrade hypr-de >/dev/null 2>&1'; then
+shell	tests/qemu-fresh/run.sh	SC2310	b39fb6de3ce1aada	1	if guest_ssh "set -e
+shell	tests/qemu-fresh/run.sh	SC2310	c74ef11bcf14e36f	1	if guest_ssh 'pgrep -u mason -x Hyprland >/dev/null' 2>/dev/null; then
+shell	tests/qemu-fresh/run.sh	SC2310	cff13f0dd5a0edb8	2	guest_ssh 'sudo tail -40 /var/log/get-hypr-de.log' >&2 || true
+shell	tests/qemu-fresh/run.sh	SC2310	dd65a32c74276ecf	1	guest_ssh 'sudo systemctl reboot' || true
+shell	tests/qemu-fresh/run.sh	SC2310	f9e57172086325a5	1	st=$(guest_ssh 'cat /var/lib/hypr-de-firstboot.status 2>/dev/null || echo none' 2>/dev/null || echo none)
+shell	tests/qemu-fresh/run.sh	SC2312	4fb716ba178b6619	1	echo " downgraded to $(guest_ssh 'rpm -q --qf "%{VERSION}" hypr-de' 2>/dev/null)"
+shell	tests/qemu-fresh/run.sh	SC2312	af1ccffade3c69e2	1	qemu-system-x86_64 $(qemu_args) &
+shell	tests/qemu-fresh/run.sh	SC2312	b7d51ab3d38a8cdd	1	if [ -n "$holder" ] && [ -f "$WORKDIR/qemu.pid" ] && [ "$holder" = "$(cat "$WORKDIR/qemu.pid")" ]; then
+shell	tests/qemu-fresh/run.sh	SC2312	c1e00c4f0c5bdff3	1	instance-id: $VMNAME-$(date +%s)
+shell	tests/qemu-fresh/run.sh	SC2312	c551a245a21acd5c	1	exec qemu-system-x86_64 $(qemu_args)
+shell	tests/qemu-fresh/run.sh	suppression	801e00d2eaa62dda	2	# shellcheck disable=SC2046
+shell	tests/qemu-fresh/upgrade-check.sh	SC2015	687e7b2750ce34ef	1	[ -z "$uf" ] && ok "no failed user units" || bad "failed user units: $uf"
+shell	tests/qemu-fresh/upgrade-check.sh	SC2292	2e70575220a1e873	1	if [ -z "$after" ] || printf '%s' "$after" | grep -qi 'no errors'; then
+shell	tests/qemu-fresh/upgrade-check.sh	SC2292	31fd24fbe0e39acb	1	[ -x "$helper" ] || helper=/usr/libexec/hypr-de/hypr-de-reload-sessions
+shell	tests/qemu-fresh/upgrade-check.sh	SC2292	5db3aeeb2c458ec3	1	if [ "$fail" -eq 0 ]; then echo "UPGRADE: PASS"; exit 0; fi
+shell	tests/qemu-fresh/upgrade-check.sh	SC2292	5e918a7f84e0242a	1	[ -e /etc/hypr-de-qemu-fresh ] || { echo "$0: runs only inside the qemu-fresh VM" >&2; exit 2; }
+shell	tests/qemu-fresh/upgrade-check.sh	SC2292	664a159e828d9700	1	if [ -x /usr/libexec/hypr-de/hypr-de-reload-sessions ]; then
+shell	tests/qemu-fresh/upgrade-check.sh	SC2292	687e7b2750ce34ef	1	[ -z "$uf" ] && ok "no failed user units" || bad "failed user units: $uf"
+shell	tests/qemu-fresh/upgrade-check.sh	SC2292	7d61ca838c1f423e	1	if [ -x "$helper" ]; then
+shell	tests/qemu-fresh/upgrade-check.sh	SC2292	7e44c856c9fca0fb	1	if [ -n "$still" ] && ! printf '%s' "$still" | grep -qi 'no errors'; then
+shell	tests/qemu-fresh/upgrade-check.sh	SC2292	8416c8d33a503b01	1	if [ -r /etc/xdg/hypr/hyprland.lua ]; then
+shell	tests/qemu-fresh/upgrade-check.sh	SC2292	8975dad1f6338183	1	if [ -n "$induced" ] && ! printf '%s' "$induced" | grep -qi 'no errors'; then
+shell	tests/qemu-fresh/upgrade-check.sh	SC2292	b6f2f21c7c4fdebc	1	if [ -z "$errs" ] || printf '%s' "$errs" | grep -qi 'no errors'; then
+shell	tests/qemu-fresh/upgrade-check.sh	SC2312	51426a2ff1d147be	2	| grep -E '^(HYPRLAND_INSTANCE_SIGNATURE|WAYLAND_DISPLAY)=' | sed 's/^/export /')"
+shell	tests/qemu-fresh/upgrade-check.sh	SC2312	58ab940d3e12d31f	1	ok "induced the latched banner: $(printf '%s' "$induced" | head -1)"
+shell	tests/qemu-fresh/upgrade-check.sh	SC2312	999431fba42dfbe8	1	eval "$(systemctl --user show-environment 2>/dev/null \
+shell	tests/run	SC2292	0e49046213292ac1	1	if [ $# -eq 0 ]; then
+shell	tests/run	SC2292	0faa327c55b3432c	1	[ -L "/usr/bin/$name" ] && continue
+shell	tests/run	SC2292	2fe75a8a8cd778d3	1	[ -n "${!v-}" ] && { printf '$%s\n' "$v"; return 0; }
+shell	tests/run	SC2292	42447ca8f3f9107e	1	[ -n "${wired[${real##*/}]-}" ] || continue
+shell	tests/run	SC2292	4b93bd700026cef2	1	if [ -L "$d" ]; then
+shell	tests/run	SC2292	50ad2ab227d80327	1	elif [ -d "$d" ]; then
+shell	tests/run	SC2292	8470ac975e9022c4	1	if [ "$rc" -ne 97 ] || ! grep -q -- '--canary' "$log/hits"; then
+shell	tests/run	SC2292	8dd85e37548f3deb	1	elif [ "$rc" -ne 0 ]; then
+shell	tests/run	SC2292	9304d7ecde4d7d65	1	[ -e "$p" ] && { printf '%s\n' "$p"; return 0; }
+shell	tests/run	SC2292	97a6fd2986345627	1	if [ "$sealed" = 0 ]; then
+shell	tests/run	SC2292	9da74713b932d46f	1	[ -n "${seen[$real]-}" ] && continue
+shell	tests/run	SC2292	ada0c34cc2fb8a4d	2	if [ "$sealed" = 1 ] && [ "${#seen[@]}" -gt 0 ]; then
+shell	tests/run	SC2292	c659bf2c9cf4b9d2	1	if [ -s "$log/hits" ]; then
+shell	tests/run	SC2292	c9f153a944b42e96	1	[ -e "$dir/$name" ] || continue
+shell	tests/run	SC2292	ebf584fe07aff378	1	if [ "${HYPR_DE_ALLOW_UNSEALED-}" != 1 ]; then
+shell	tests/runtime-paths.sh	SC2015	1558966af81806b7	1	[ -e "$lock" ] && ok "lock file is not unlinked" || bad "lock file was unlinked (path race)"
+shell	tests/runtime-paths.sh	SC2015	34b91796ea8202de	1	[ "$res" = NOT ] && ok "a live non-recorder pid is not treated as a recording" \
+shell	tests/runtime-paths.sh	SC2015	36c8c038b7223de9	1	[ -e "/tmp/listener.sh.lock" ] && bad "/tmp lock created" || ok "no lock in /tmp"
+shell	tests/runtime-paths.sh	SC2015	a11206fde98bca8a	1	[ "$mode" = 700 ] && ok "state dir is 0700" || bad "state dir mode is ${mode:-missing}"
+shell	tests/runtime-paths.sh	SC2015	ec726171a35536dc	1	[ -e /tmp/swaync-context ] && bad "/tmp/swaync-context exists" || ok "nothing created /tmp/swaync-context"
+shell	tests/runtime-paths.sh	SC2292	1558966af81806b7	1	[ -e "$lock" ] && ok "lock file is not unlinked" || bad "lock file was unlinked (path race)"
+shell	tests/runtime-paths.sh	SC2292	1c8ed69fd35e2e65	3	if [ "$rc" -ne 0 ] && printf '%s' "$out" | grep -q "XDG_RUNTIME_DIR is unset"; then
+shell	tests/runtime-paths.sh	SC2292	33f5e33b070e4508	1	if [ -z "$hits" ]; then
+shell	tests/runtime-paths.sh	SC2292	34b91796ea8202de	1	[ "$res" = NOT ] && ok "a live non-recorder pid is not treated as a recording" \
+shell	tests/runtime-paths.sh	SC2292	36c8c038b7223de9	1	[ -e "/tmp/listener.sh.lock" ] && bad "/tmp lock created" || ok "no lock in /tmp"
+shell	tests/runtime-paths.sh	SC2292	a11206fde98bca8a	1	[ "$mode" = 700 ] && ok "state dir is 0700" || bad "state dir mode is ${mode:-missing}"
+shell	tests/runtime-paths.sh	SC2292	a20d4e54cea5a72b	1	if [ "$rc" -eq 1 ] && printf '%s' "$out" | grep -q "Another instance is already running"; then
+shell	tests/runtime-paths.sh	SC2292	a8c5e013941459c3	1	if [ -f "$XDG_RUNTIME_DIR/hypr-de/listener.sh.lock" ] || printf '%s' "$out" | grep -q "HYPRLAND_INSTANCE_SIGNATURE"; then
+shell	tests/runtime-paths.sh	SC2292	b77598e66e56071f	1	[ "$fail" -eq 0 ] && { echo "runtime state paths are correct"; exit 0; }
+shell	tests/runtime-paths.sh	SC2292	c825131a023e12e6	3	[ -e /run/tripwire/hits ] || { [ "${HYPR_DE_SEALED-}" = build-root ] && [ ! -e /run/systemd/private ]; } || exec "$(dirname -- "$0")/run" "$0"
+shell	tests/runtime-paths.sh	SC2292	ec726171a35536dc	1	[ -e /tmp/swaync-context ] && bad "/tmp/swaync-context exists" || ok "nothing created /tmp/swaync-context"
+shell	tests/scene-geometry.sh	SC2292	0658263628b1f985	1	if [ -r "$scene_py" ] && command -v python3 >/dev/null; then
+shell	tests/scene-geometry.sh	SC2292	c825131a023e12e6	3	[ -e /run/tripwire/hits ] || { [ "${HYPR_DE_SEALED-}" = build-root ] && [ ! -e /run/systemd/private ]; } || exec "$(dirname -- "$0")/run" "$0"
+shell	tests/scene-plugin-build.sh	SC1091	80dfb0ec0bd3011a	1	installs=$(unset SCENE_PLUGIN; . "$root/packaging/paths.conf"; printf '%s' "$SCENE_PLUGIN")
+shell	tests/scene-plugin-build.sh	SC2015	555ff6b35c8ebdae	1	grep -qw "$entry" <<<"$symbols" && ok "${module##*/} exports $entry" || bad "${module##*/} does not export $entry"
+shell	tests/scene-plugin-build.sh	SC2154	80dfb0ec0bd3011a	1	installs=$(unset SCENE_PLUGIN; . "$root/packaging/paths.conf"; printf '%s' "$SCENE_PLUGIN")
+shell	tests/scene-plugin-build.sh	SC2292	0c069330d9c466f9	1	if [ -z "$missing" ]; then
+shell	tests/scene-plugin-build.sh	SC2292	0eae6d367eebac6a	2	if DESTDIR="$work/stage" cmake --install "$work/build" --prefix /usr >"$work/install.log" 2>&1 && [ -f "$work/stage$installs" ] && [ -f "$work/stage$private" ]; then
+shell	tests/scene-plugin-build.sh	SC2292	1329d1987f3c2834	1	if [ -z "$extra" ]; then
+shell	tests/scene-plugin-build.sh	SC2292	2161dfdc424b0a71	1	if [ -z "$imports" ]; then
+shell	tests/scene-plugin-build.sh	SC2292	c825131a023e12e6	3	[ -e /run/tripwire/hits ] || { [ "${HYPR_DE_SEALED-}" = build-root ] && [ ! -e /run/systemd/private ]; } || exec "$(dirname -- "$0")/run" "$0"
+shell	tests/scene-plugin-build.sh	SC2292	d02283994c71310b	1	if [ -z "$needed" ]; then
+shell	tests/scene-plugin-build.sh	SC2312	2594117b51bf168a	1	bad "the loader links: $(tr '\n' ' ' <<<"$needed")"
+shell	tests/scene-plugin-build.sh	SC2312	273fa8504bee7b52	1	bad "the loader also exports: $(tr '\n' ' ' <<<"$extra")"
+shell	tests/scene-plugin-build.sh	SC2312	4d4147bf03d6cd4a	2	mapfile -t objects < <(printf '%s\n' "$hyprland"; loaded "$hyprland"; loaded "$plugin")
+shell	tests/scene-plugin-build.sh	SC2312	641ebc57cfa1d013	1	bad "nothing Hyprland loads provides: $(tr '\n' ' ' <<<"$missing")"
+shell	tests/scene-plugin-build.sh	SC2312	885497b4666639e1	1	ok "builds against Hyprland $(pkg-config --modversion hyprland) headers"
+shell	tests/scene-plugin-build.sh	SC2312	8937f3570285a8fb	3	bad "does not install to $installs and $private: $(find "$work/stage" -name '*.so' 2>/dev/null | sed "s|^$work/stage||" | tr '\n' ' ')"
+shell	tests/scene-plugin-build.sh	SC2312	d77a0344b05c94ac	1	bad "does not build against Hyprland $(pkg-config --modversion hyprland) headers"
+shell	tests/scene-plugin-build.sh	SC2312	ed310533ba4c6fa9	1	bad "the loader needs symbols a Hyprland upgrade can remove: $(tr '\n' ' ' <<<"$imports")"
+shell	tests/scene-plugin-foreign.sh	SC2292	21d15b6bcd6b8c75	1	[ -n "$api" ] && break
+shell	tests/scene-plugin-foreign.sh	SC2292	24a074d6e9467d2e	1	if grep -qx 'outcome faulted' <<<"$out" && [ "$(unloading "$out")" = "plugin closed " ]; then
+shell	tests/scene-plugin-foreign.sh	SC2292	4dadd4093aea0c98	2	if [ "$(unloading "$out")" = "plugin exited module closed plugin closed " ]; then
+shell	tests/scene-plugin-foreign.sh	SC2292	94474cb665b24dd3	1	if [ "$logged" = 1 ] && grep -q "^log 3 idle, boot scene off: .*$why" <<<"$out"; then
+shell	tests/scene-plugin-foreign.sh	SC2292	9a4ba02e544aabec	1	if [ "$(sed -n 's/^neighbour //p' <<<"$out")" = "$running" ]; then
+shell	tests/scene-plugin-foreign.sh	SC2292	c825131a023e12e6	3	[ -e /run/tripwire/hits ] || { [ "${HYPR_DE_SEALED-}" = build-root ] && [ ! -e /run/systemd/private ]; } || exec "$(dirname -- "$0")/run" "$0"
+shell	tests/scene-plugin-foreign.sh	SC2292	ceae1157c026f27c	2	if [ "$(unloading "$out")" = "module exit plugin exited module closed plugin closed " ]; then
+shell	tests/scene-plugin-foreign.sh	SC2312	24a074d6e9467d2e	1	if grep -qx 'outcome faulted' <<<"$out" && [ "$(unloading "$out")" = "plugin closed " ]; then
+shell	tests/scene-plugin-foreign.sh	SC2312	27fc4882e78dc317	2	bad "$where: init did not return: $(grep '^outcome ' <<<"$out" || tail -n 3 <<<"$out")"
+shell	tests/scene-plugin-foreign.sh	SC2312	4dadd4093aea0c98	2	if [ "$(unloading "$out")" = "plugin exited module closed plugin closed " ]; then
+shell	tests/scene-plugin-foreign.sh	SC2312	53dfa3afdfa0e451	1	bad "with a module whose init throws, the order was: $(unloading "$out")"
+shell	tests/scene-plugin-foreign.sh	SC2312	56974a11b102ad63	1	read -ra headers < <(pkg-config --cflags hyprland pixman-1 libdrm)
+shell	tests/scene-plugin-foreign.sh	SC2312	794b69821a1f5268	1	bad "unload order was: $(unloading "$out")"
+shell	tests/scene-plugin-foreign.sh	SC2312	8a4279a3ca576bb3	2	bad "the neighbour plugin does not name the running Hyprland: $(grep -E '^(neighbour|running) ' <<<"$out" | tr '\n' ' ')"
+shell	tests/scene-plugin-foreign.sh	SC2312	91ae7216682fef01	1	bad "${unfit[$variant]}, the order was: $(unloading "$out")"
+shell	tests/scene-plugin-foreign.sh	SC2312	9a4ba02e544aabec	1	if [ "$(sed -n 's/^neighbour //p' <<<"$out")" = "$running" ]; then
+shell	tests/scene-plugin-foreign.sh	SC2312	a2294330866a1996	2	bad "with a module that faults in init: $(grep '^outcome ' <<<"$out"), the order was: $(unloading "$out")"
+shell	tests/scene-plugin-foreign.sh	SC2312	a289175d6e96dfa2	1	bad "$where: wrote $logged journal lines: $(grep '^log ' <<<"$out")"
+shell	tests/scene-plugin-foreign.sh	SC2312	c3eb0a72177807c1	2	bad "the module's init did not get Hyprland's handle $handle: $(grep -E '^(outcome|description) ' <<<"$out" | tr '\n' ' ')"
+shell	tests/scene-plugin-foreign.sh	SC2312	c409b374d655c2b7	1	bad "$where: description is: $(sed -n 's/^description //p' <<<"$out")"
+shell	tests/scene-plugin-foreign.sh	SC2312	ceae1157c026f27c	2	if [ "$(unloading "$out")" = "module exit plugin exited module closed plugin closed " ]; then
+shell	tests/scene-plugin-foreign.sh	SC2312	d0fbd107bea0c523	1	quiet "$(load "$work/current/hypr-de-scene.so")" "in the Hyprland it was built for, with a module that needs a symbol this Hyprland lacks" \
+shell	tests/scene-plugin-foreign.sh	SC2312	e079d08824326712	1	bad "with a module that throws naming its API version, the order was: $(unloading "$out")"
+shell	tests/scene-plugin-path.sh	SC1091	ee0d3fa77bf0b1b6	1	same "an install from source names it at" "$(unset SCENE_PLUGIN; . "$root/packaging/paths.conf"; printf '%s' "$SCENE_PLUGIN")"
+shell	tests/scene-plugin-path.sh	SC2154	ee0d3fa77bf0b1b6	1	same "an install from source names it at" "$(unset SCENE_PLUGIN; . "$root/packaging/paths.conf"; printf '%s' "$SCENE_PLUGIN")"
+shell	tests/scene-plugin-path.sh	SC2292	0ac18a7b0c5e0a25	1	same() { if [ "$2" = "$want" ]; then ok "$1 $want"; else bad "$1 ${2:-nothing}, not $want"; fi; }
+shell	tests/scene-plugin-path.sh	SC2292	c825131a023e12e6	3	[ -e /run/tripwire/hits ] || { [ "${HYPR_DE_SEALED-}" = build-root ] && [ ! -e /run/systemd/private ]; } || exec "$(dirname -- "$0")/run" "$0"
+shell	tests/scene-plugin-path.sh	SC2312	0b61cf45644df3ed	1	same "hypr-de's Arch package names it at" "$(sed -n 's/^ *SCENE_PLUGIN=\([^ ]*\).*/\1/p' "$root/packaging/PKGBUILD")"
+shell	tests/scene-plugin-path.sh	SC2312	2e5e1a098d003224	1	bad "the hypr-de-scene RPM's description opts in with $(grep -o 'hl.plugin.load([^)]*)' <<<"$scene")"
+shell	tests/scene-plugin-path.sh	SC2312	9ed9c8610324a6a4	1	"/usr/$(sed -n 's/^install(TARGETS hypr-de-scene hypr-de-scene-impl LIBRARY DESTINATION \(.*\))$/\1/p' "$root/plugins/hypr-de-scene/CMakeLists.txt")/hypr-de-scene.so"
+shell	tests/scene-plugin-path.sh	SC2312	bf2bcc67dc19e733	2	bad "the hypr-de-scene RPM does not list $path in %files: $(grep '\.so' <<<"$files" | tr '\n' ' ')"
+shell	tests/scene-plugin-path.sh	SC2312	ee0d3fa77bf0b1b6	2	same "an install from source names it at" "$(unset SCENE_PLUGIN; . "$root/packaging/paths.conf"; printf '%s' "$SCENE_PLUGIN")"
+shell	tests/scene-readiness.sh	SC2292	c825131a023e12e6	3	[ -e /run/tripwire/hits ] || { [ "${HYPR_DE_SEALED-}" = build-root ] && [ ! -e /run/systemd/private ]; } || exec "$(dirname -- "$0")/run" "$0"
+shell	tests/session-env.sh	SC2292	c825131a023e12e6	3	[ -e /run/tripwire/hits ] || { [ "${HYPR_DE_SEALED-}" = build-root ] && [ ! -e /run/systemd/private ]; } || exec "$(dirname -- "$0")/run" "$0"
+shell	tests/share-consent.sh	SC2015	20feeed235577d20	1	[ "$(ncalls)" = 2 ] && ok "unrelated client was prompted" || bad "UNRELATED CLIENT INHERITED CONSENT"
+shell	tests/share-consent.sh	SC2015	2584dab7cb1dc836	1	[ "$(ncalls)" = 1 ] && ok "a shrinking client set still replays" || bad "re-prompted unnecessarily"
+shell	tests/share-consent.sh	SC2015	2f7e588eb9ec756d	1	[ "$(ncalls)" = 1 ] && ok "one picker for two sessions from one client" || bad "picker ran $(ncalls) times"
+shell	tests/share-consent.sh	SC2015	45b66cea46c4d9d8	1	grep -q '\[SELECTION\]0/screen:DP-1' "$work/out" && ok "replayed the selection verbatim" || bad "replay lost the selection"
+shell	tests/share-consent.sh	SC2015	4a3f99eeec7b3c65	1	[ "$(ncalls)" = 2 ] && ok "new client was prompted" || bad "NEW CLIENT INHERITED CONSENT (picker ran $(ncalls) time(s))"
+shell	tests/share-consent.sh	SC2015	5e96b588f12d92b4	1	[ "$(ncalls)" = 2 ] && ok "expired selection re-prompts" || bad "replayed an expired selection"
+shell	tests/share-consent.sh	SC2015	64b95dffc4bc26a9	1	grep -q "$v" "$src" && bad "$src still honours \$$v" || ok "$v is not consulted"
+shell	tests/share-consent.sh	SC2015	66f2f29a501fd0b2	1	[ "$(ncalls)" = 2 ] && ok "unidentifiable caller gets a picker" || bad "replayed to an unidentifiable caller"
+shell	tests/share-consent.sh	SC2015	67d614fcc62815a2	1	[ "$after" -gt "$before" ] && ok "a cancel does not leave a replayable selection" || bad "replayed after a cancel"
+shell	tests/share-consent.sh	SC2015	70b1afe22814bd6b	1	grep -q '^\[SELECTION\]' "$work/out" && ok "stdout carries [SELECTION]" || bad "stdout lost the protocol line"
+shell	tests/share-consent.sh	SC2015	8f230355cb91f4a0	1	&& ok "picker and busctl are absolute paths" \
+shell	tests/share-consent.sh	SC2015	9b8bbb7418d89654	1	[ -f "$cache" ] && bad "cache survived a cancel" || ok "cancel cleared the cache"
+shell	tests/share-consent.sh	SC2292	13ea8942212acb59	1	ncalls() { [ -f "$calls" ] && wc -l < "$calls" | tr -d ' ' || echo 0; }
+shell	tests/share-consent.sh	SC2292	20feeed235577d20	1	[ "$(ncalls)" = 2 ] && ok "unrelated client was prompted" || bad "UNRELATED CLIENT INHERITED CONSENT"
+shell	tests/share-consent.sh	SC2292	2584dab7cb1dc836	1	[ "$(ncalls)" = 1 ] && ok "a shrinking client set still replays" || bad "re-prompted unnecessarily"
+shell	tests/share-consent.sh	SC2292	2f7e588eb9ec756d	1	[ "$(ncalls)" = 1 ] && ok "one picker for two sessions from one client" || bad "picker ran $(ncalls) times"
+shell	tests/share-consent.sh	SC2292	4a3f99eeec7b3c65	1	[ "$(ncalls)" = 2 ] && ok "new client was prompted" || bad "NEW CLIENT INHERITED CONSENT (picker ran $(ncalls) time(s))"
+shell	tests/share-consent.sh	SC2292	5e96b588f12d92b4	1	[ "$(ncalls)" = 2 ] && ok "expired selection re-prompts" || bad "replayed an expired selection"
+shell	tests/share-consent.sh	SC2292	66f2f29a501fd0b2	1	[ "$(ncalls)" = 2 ] && ok "unidentifiable caller gets a picker" || bad "replayed to an unidentifiable caller"
+shell	tests/share-consent.sh	SC2292	67d614fcc62815a2	1	[ "$after" -gt "$before" ] && ok "a cancel does not leave a replayable selection" || bad "replayed after a cancel"
+shell	tests/share-consent.sh	SC2292	9b8bbb7418d89654	1	[ -f "$cache" ] && bad "cache survived a cancel" || ok "cancel cleared the cache"
+shell	tests/share-consent.sh	SC2292	c825131a023e12e6	3	[ -e /run/tripwire/hits ] || { [ "${HYPR_DE_SEALED-}" = build-root ] && [ ! -e /run/systemd/private ]; } || exec "$(dirname -- "$0")/run" "$0"
+shell	tests/share-consent.sh	SC2292	dc33e65ae626dff7	1	[ "$fail" -eq 0 ] && { echo "share consent is scoped to the requesting client"; exit 0; }
+shell	tests/share-consent.sh	SC2312	20feeed235577d20	1	[ "$(ncalls)" = 2 ] && ok "unrelated client was prompted" || bad "UNRELATED CLIENT INHERITED CONSENT"
+shell	tests/share-consent.sh	SC2312	2584dab7cb1dc836	1	[ "$(ncalls)" = 1 ] && ok "a shrinking client set still replays" || bad "re-prompted unnecessarily"
+shell	tests/share-consent.sh	SC2312	2f7e588eb9ec756d	2	[ "$(ncalls)" = 1 ] && ok "one picker for two sessions from one client" || bad "picker ran $(ncalls) times"
+shell	tests/share-consent.sh	SC2312	4a3f99eeec7b3c65	2	[ "$(ncalls)" = 2 ] && ok "new client was prompted" || bad "NEW CLIENT INHERITED CONSENT (picker ran $(ncalls) time(s))"
+shell	tests/share-consent.sh	SC2312	5e96b588f12d92b4	1	[ "$(ncalls)" = 2 ] && ok "expired selection re-prompts" || bad "replayed an expired selection"
+shell	tests/share-consent.sh	SC2312	66f2f29a501fd0b2	1	[ "$(ncalls)" = 2 ] && ok "unidentifiable caller gets a picker" || bad "replayed to an unidentifiable caller"
+shell	tests/share-consent.sh	SC2312	6ce9cdc45c7a2a1e	1	{ echo $(( $(date +%s) - 600 )); sed -n 2p "$cache"; sed -n 3p "$cache"; } > "$cache.new" && mv "$cache.new" "$cache"
+shell	tests/steam-launch-options.sh	SC2015	14d3c2dac90afc37	1	grep -qE '^pkill[^\n]*(-x )?steam( |$)' "$PKILL_LOG" && ok "steam is targeted" || bad "steam never killed"
+shell	tests/steam-launch-options.sh	SC2015	1810670c050cbfdc	1	grep -q AllowSkipGameUpdate "$vdf" && bad "injected key landed in the VDF" || ok "no injected key"
+shell	tests/steam-launch-options.sh	SC2015	190382c0cbf31b55	1	grep -q 'steamwebhelper' "$PKILL_LOG" && ok "steamwebhelper is targeted" || bad "steamwebhelper never killed"
+shell	tests/steam-launch-options.sh	SC2015	271e2d641442f998	1	printf '%s' "$out" | grep -q "Selection \[" && bad "prompted for a selection anyway" || ok "no selection prompt"
+shell	tests/steam-launch-options.sh	SC2015	3f01a5abdb6eb9f9	1	[ "$got" = "mangohud %command%" ] && ok "inserted for an app that had none" || bad "insert gave '$got'"
+shell	tests/steam-launch-options.sh	SC2015	45c54a0c3689ff04	1	grep -q '"1700000001"' "$vdf" && ok "other apps untouched" || bad "clobbered another app"
+shell	tests/steam-launch-options.sh	SC2015	7ac2a74f27d2ca90	1	[ "$n" -eq 1 ] && ok "no duplicate LaunchOptions keys" || bad "$n LaunchOptions keys after write"
+shell	tests/steam-launch-options.sh	SC2015	7e071aca1db58623	1	[ "$got" = "PROTON_LOG=1 mangohud %command%" ] && ok "read back: $got" || bad "read '$got'"
+shell	tests/steam-launch-options.sh	SC2015	cc53cfd127861c26	1	[ "$got" = "$want" ] && ok "round-trips verbatim: $got" || bad "wrote '$got', wanted '$want'"
+shell	tests/steam-launch-options.sh	SC2015	f76849e7ff4d3758	1	ls "$vdf".backup.* >/dev/null 2>&1 && ok "backup written" || bad "no backup"
+shell	tests/steam-launch-options.sh	SC2015	f9450fd3e13eba9d	1	&& bad "three-argument match() is a gawk extension; mawk returns nothing" \
+shell	tests/steam-launch-options.sh	SC2016	5af71047d3d4eea4	1	refuses 'X=$(id) %command%'
+shell	tests/steam-launch-options.sh	SC2016	f6e2493d0ae38ccb	1	refuses '$(id) %command%'
+shell	tests/steam-launch-options.sh	SC2016	f72e174c14c9d88b	1	refuses '`id` %command%'
+shell	tests/steam-launch-options.sh	SC2292	3f01a5abdb6eb9f9	1	[ "$got" = "mangohud %command%" ] && ok "inserted for an app that had none" || bad "insert gave '$got'"
+shell	tests/steam-launch-options.sh	SC2292	6ccf2f9c7ddff95d	1	short() { if [ "${#1}" -gt 72 ]; then printf '%.72s...(%d chars)' "$1" "${#1}"; else printf '%s' "$1"; fi; }
+shell	tests/steam-launch-options.sh	SC2292	7ac2a74f27d2ca90	1	[ "$n" -eq 1 ] && ok "no duplicate LaunchOptions keys" || bad "$n LaunchOptions keys after write"
+shell	tests/steam-launch-options.sh	SC2292	7e071aca1db58623	1	[ "$got" = "PROTON_LOG=1 mangohud %command%" ] && ok "read back: $got" || bad "read '$got'"
+shell	tests/steam-launch-options.sh	SC2292	a881508b99d99345	1	[ "$fail" -eq 0 ] && { echo "steam launch-option handling is correct"; exit 0; }
+shell	tests/steam-launch-options.sh	SC2292	b351e2ed1fede1e0	1	if [ "$rc" -ne 0 ] && printf '%s' "$out" | grep -q "refused as unsafe"; then
+shell	tests/steam-launch-options.sh	SC2292	c825131a023e12e6	3	[ -e /run/tripwire/hits ] || { [ "${HYPR_DE_SEALED-}" = build-root ] && [ ! -e /run/systemd/private ]; } || exec "$(dirname -- "$0")/run" "$0"
+shell	tests/steam-launch-options.sh	SC2292	cc53cfd127861c26	1	[ "$got" = "$want" ] && ok "round-trips verbatim: $got" || bad "wrote '$got', wanted '$want'"
+shell	tests/steam-launch-options.sh	SC2292	f4726dd214f8a4bb	1	if [ "$n" -eq 2 ]; then
+shell	tests/steam-launch-options.sh	SC2312	2f8218cd6e75b2b1	1	ok "refuses: $(short "$1") -- $why"
+shell	tests/steam-launch-options.sh	SC2312	30ccb4c12c2140dd	1	bad "SHOULD REFUSE: $(short "$1")"
+shell	tests/steam-launch-options.sh	SC2312	31db90643c7fb9b5	1	ok "one pkill per process ($(tr '\n' ';' < "$PKILL_LOG"))"
+shell	tests/steam-launch-options.sh	SC2312	4124ca5f9877f5c4	1	accepts "$(build_launch_options)"
+shell	tests/steam-launch-options.sh	SC2312	58bae1048aaeddad	1	printf '%s\n' "$(cat "$PKILL_LOG")"
+shell	tests/steam-launch-options.sh	SC2312	87b2bfb3716d9eb8	1	ok "accepts: $(short "$1")"
+shell	tests/steam-launch-options.sh	SC2312	dfd10d4c8ed60abe	1	refuses "$(printf 'A=1 %%command%% %0.sX' $(seq 1 520))"
+shell	tests/steam-launch-options.sh	SC2312	fc4bf64a5b116be6	2	bad "should accept: $(short "$1") ($(validate_launch_options "$1" 2>&1))"
+shell	tests/user-config-safety.sh	SC2015	2cb5a5a06e6412b5	1	emit | jq -e . >/dev/null 2>&1 && ok "empty cache -> valid JSON" || bad "empty cache -> invalid JSON"
+shell	tests/user-config-safety.sh	SC2015	45615fd93f7256d1	1	emit | jq -e . >/dev/null 2>&1 && ok "junk first line -> valid JSON" || bad "junk first line -> invalid JSON"
+shell	tests/user-config-safety.sh	SC2015	76d32351dabddfcb	1	&& bad "still writes the swappy config unconditionally" \
+shell	tests/user-config-safety.sh	SC2015	a97013485a1c3e9b	1	printf '%s' "$out" | jq -r .tooltip | grep -q '#00ff00' && ok "lists the saved colors" || bad "colors missing from the tooltip"
+shell	tests/user-config-safety.sh	SC2015	be655caafb5a7b5b	1	&& bad "swaybg.service still consults the environment" \
+shell	tests/user-config-safety.sh	SC2015	e26a7b00d5e9d8a2	1	&& ok "seeded from the packaged copy (one source of truth)" \
+shell	tests/user-config-safety.sh	SC2292	456e9609226598b5	1	if [ "$block" = false ]; then
+shell	tests/user-config-safety.sh	SC2292	4e9e6fe4d2906b6e	1	[ "$fail" -eq 0 ] && { echo "user config is safe"; exit 0; }
+shell	tests/user-config-safety.sh	SC2292	75b3a41911b3b191	1	if [ -e "$home1/.config/swappy/config" ]; then
+shell	tests/user-config-safety.sh	SC2292	aea6576ce5520714	1	if [ -z "$block" ]; then
+shell	tests/user-config-safety.sh	SC2292	be0bf86e584e3a81	1	elif [ "$(cat "$home2/.config/swappy/config")" = "$before" ]; then
+shell	tests/user-config-safety.sh	SC2292	c825131a023e12e6	3	[ -e /run/tripwire/hits ] || { [ "${HYPR_DE_SEALED-}" = build-root ] && [ ! -e /run/systemd/private ]; } || exec "$(dirname -- "$0")/run" "$0"
+shell	tests/user-config-safety.sh	SC2312	be0bf86e584e3a81	1	elif [ "$(cat "$home2/.config/swappy/config")" = "$before" ]; then
+shell	tests/waitenv.sh	SC2292	0da20cb9a0dd3df7	1	for p in "$work"/*/wpid; do [ -e "$p" ] && kill "$(cat "$p")" 2>/dev/null; done
+shell	tests/waitenv.sh	SC2292	2bd9bcda65af6845	1	if await_reads "$1" 2 && [ "$(running "$1")" = running ]; then echo running; else echo exited; fi
+shell	tests/waitenv.sh	SC2292	2f042d3c03ef3cf0	1	[ -e "$c/env" ] || : >"$c/env"
+shell	tests/waitenv.sh	SC2292	39d2850f3d49719e	1	[ "$2" = last ] && i=$(( ${#reads[@]} - 1 ))
+shell	tests/waitenv.sh	SC2292	4b4a4d373a3916bc	1	[ $# -gt 0 ] && shift
+shell	tests/waitenv.sh	SC2292	4ceb192481792cef	1	running() { kill -0 "$(cat "$work/$1/pid")" 2>/dev/null && [ ! -e "$work/$1/rc" ] && echo running || echo exited; }
+shell	tests/waitenv.sh	SC2292	8afaa5870418321a	2	while [ ! -s "$work/$1/done" ] && [ "$n" -lt 2000 ]; do sleep 0.005; n=$(( n + 1 )); done
+shell	tests/waitenv.sh	SC2292	9de2ea529a42f3e7	1	[ -e "$work/$1/reads" ] && mapfile -t r <"$work/$1/reads"
+shell	tests/waitenv.sh	SC2292	c12aec25a74c37a9	2	while [ $# -gt 0 ] && [ "$1" != -- ]; do vars+=("$1"); shift; done
+shell	tests/waitenv.sh	SC2292	c825131a023e12e6	3	[ -e /run/tripwire/hits ] || { [ "${HYPR_DE_SEALED-}" = build-root ] && [ ! -e /run/systemd/private ]; } || exec "$(dirname -- "$0")/run" "$0"
+shell	tests/waitenv.sh	SC2312	0da20cb9a0dd3df7	1	for p in "$work"/*/wpid; do [ -e "$p" ] && kill "$(cat "$p")" 2>/dev/null; done
+shell	tests/waitenv.sh	SC2312	12189f0af63ef150	1	check "$(grep -c -e SHELL -e PWD -e OLDWD -e '"_"' "$work/filter/out")" 0 \
+shell	tests/waitenv.sh	SC2312	290aaae2ec2a04e4	1	check "$(finish settle)" 0 "exits 0 after the settle" "the waiter failed with a settle set"
+shell	tests/waitenv.sh	SC2312	2bd9bcda65af6845	1	if await_reads "$1" 2 && [ "$(running "$1")" = running ]; then echo running; else echo exited; fi
+shell	tests/waitenv.sh	SC2312	2e0fc6ada6d3c3e1	1	lo=$(took "$c") t=$(since_read "$c" first)
+shell	tests/waitenv.sh	SC2312	419d5d44a7938775	1	check "$(running to-bad)" running "an invalid timeout falls back to uwsm's 30 s" "an invalid timeout ended the wait early"
+shell	tests/waitenv.sh	SC2312	4717d46b92dd8e3a	1	check "$(finish stage)" 0 "the last variable, even empty, ends the wait as in uwsm" "the waiter did not exit 0"
+shell	tests/waitenv.sh	SC2312	4ceb192481792cef	1	running() { kill -0 "$(cat "$work/$1/pid")" 2>/dev/null && [ ! -e "$work/$1/rc" ] && echo running || echo exited; }
+shell	tests/waitenv.sh	SC2312	581b24ca71579d5c	1	echo $(( $(cat "$work/$1/done") - reads[i] / 1000 ))
+shell	tests/waitenv.sh	SC2312	585785c89f6cc9aa	1	check "$(finish killed)" 1 "a settle pause that is killed exits 1" \
+shell	tests/waitenv.sh	SC2312	58a5e2969216b0a6	1	check "$(running to-forever)" running "the unit's infinite timeout wins over the variable" \
+shell	tests/waitenv.sh	SC2312	5ac1c736bff39ba2	1	check "$(held stage)" running "WAYLAND_DISPLAY and the signature alone do not end a wait for more" \
+shell	tests/waitenv.sh	SC2312	5d0beb6d2505fcb2	1	(( $(now_ms) < end )) || break
+shell	tests/waitenv.sh	SC2312	622746ec81d098d6	2	check "$(grep -A1 -x 'Still expecting:' "$work/filter/out" | sed -n 2p)" " X, _1, B" \
+shell	tests/waitenv.sh	SC2312	76639dda0be9533c	1	check "$(finish "lat$i")" 0 "run $i exits 0 once the variables are there" "run $i did not exit 0"
+shell	tests/waitenv.sh	SC2312	790b59e48e77e283	1	check "$(finish blip)" 0 "two failed reads then a good one exit 0" "the waiter gave up on a brief read failure"
+shell	tests/waitenv.sh	SC2312	7b9535f7a9e7f8fb	1	check "$(finish noclock)" 1 "an unreadable clock exits 1 with nothing present" \
+shell	tests/waitenv.sh	SC2312	8261937a2a8e9eef	1	check "$(finish slow)" 0 "and still exits 0 once the variables arrive" "the slow waiter did not exit 0"
+shell	tests/waitenv.sh	SC2312	84a1d6d77178cdce	1	check "$(held stage)" running "names that only contain or prefix the wanted ones do not count" \
+shell	tests/waitenv.sh	SC2312	8d8156aab6ca3ca3	1	check "$(finish down)" 1 "a manager that stays unreadable exits 1" "the waiter did not fail on an unreadable manager"
+shell	tests/waitenv.sh	SC2312	8da8dd319714d4ef	1	check "$(finish "$c")" 1 "$c: no variables by the timeout exits 1" "$c: the waiter did not fail on timeout"
+shell	tests/waitenv.sh	SC2312	8fbd0fe5473f50c2	1	check "$(grep -c 'show-environment' "$work/blip/calls")" 3 "it read three times" "the waiter read a different number of times"
+shell	tests/waitenv.sh	SC2312	a454fad52709485c	2	check "$(find "$work/runtime" -mindepth 1 | wc -l)" 0 "it writes nothing to uwsm's runtime dir or cleanup list" \
+shell	tests/waitenv.sh	SC2312	a757b82def350af1	1	check "$(finish filter)" 0 "the shell's own names and illegal names are never waited for" \
+shell	tests/waitenv.sh	SC2312	bcc84d23d3d63e37	1	check "$(held args)" running "a variable named on the command line is waited for" \
+shell	tests/waitenv.sh	SC2312	bdaa332826864253	2	check "$(grep -c -e 'Warning!' -e 'Error!' "$work"/*/out | grep -vc ':0$')" 0 \
+shell	tests/waitenv.sh	SC2312	c65ce9e132fb275d	1	check "$(held stage)" running "nothing set: still waiting" "the waiter returned with nothing set"
+shell	tests/waitenv.sh	SC2312	d1b178272dd72632	1	check "$(held filter)" running "valid names still hold the wait" "the waiter dropped a valid name"
+shell	tests/waitenv.sh	SC2312	dabfbe831c9b8247	2	took() { echo $(( $(cat "$work/$1/done") - $(cat "$work/$1/${2:-start}") )); }
+shell	tests/waitenv.sh	SC2312	dd4d3ecbec9670ee	1	(( $(now_ms) < end )) || return 1
+shell	tests/waitenv.sh	SC2312	e1edc8c9bb15d51d	1	check "$(finish args)" 0 "and its arrival ends the wait" "the waiter did not exit 0 once its argument arrived"
+shell	tests/waitenv.sh	SC2312	eca7539e7ad38692	1	exec $(command -v sleep) "\$@"
+shell	tests/waitenv.sh	SC2312	f916bf22470541cd	2	kill "$(cat "$work/to-bad/wpid")" "$(cat "$work/to-forever/wpid")" 2>/dev/null
+shell	tests/waitenv.sh	SC2329	83c62705df2d21fb	1	stop_all() { local p for p in "$work"/*/wpid; do [ -e "$p" ] && kill "$(cat "$p")" 2>/dev/null; done wait }
+shell	tests/wallpaper-source.sh	SC2015	34c3ed6204833d8e	1	&& ok "unreadable path falls back and says so" || bad "showed $(shown); err: $(cat "$work/err")"
+shell	tests/wallpaper-source.sh	SC2015	3c2458a47de65854	1	&& bad "the setter still plants a set-environment override" || ok "the setter plants no override"
+shell	tests/wallpaper-source.sh	SC2015	456162519fb9f591	1	[ "$(shown)" = "$work/cfg/my wall.png" ] && ok "space preserved as one argument" || bad "showed $(shown)"
+shell	tests/wallpaper-source.sh	SC2015	69553a607edb9533	1	[ "$(shown)" = "$work/cfg/mine.png" ] && ok "WALLPAPER_PATH in the environment is ignored" || bad "showed $(shown)"
+shell	tests/wallpaper-source.sh	SC2015	938ef2190d1aa955	1	[ "$(shown)" = "$work/cfg/mine.png" ] && ok "only [background].path is read" || bad "showed $(shown)"
+shell	tests/wallpaper-source.sh	SC2015	c3e5ad5d0c9e56db	1	[ "$(shown)" = "$work/cfg/mine.png" ] && ok "swaybg -i <registry path>" || bad "showed $(shown)"
+shell	tests/wallpaper-source.sh	SC2015	d7088f9cd67131d1	1	[ "$(shown)" = "$work/share/wallpapers/default.png" ] && ok "falls back to default" || bad "showed $(shown)"
+shell	tests/wallpaper-source.sh	SC2015	df6d31b95f0a472e	1	&& bad "swaybg.service still consults the environment" || ok "swaybg.service does not consult the environment"
+shell	tests/wallpaper-source.sh	SC2016	9657dd05f84e8a42	1	grep -v '^[[:space:]]*#' "$root/dist/systemd/user/swaybg.service" | grep -q 'ConditionEnvironment\|\${WALLPAPER_PATH}' \
+shell	tests/wallpaper-source.sh	SC2248	f48a2ebf33e7dd92	1	exit $fail
+shell	tests/wallpaper-source.sh	SC2292	456162519fb9f591	1	[ "$(shown)" = "$work/cfg/my wall.png" ] && ok "space preserved as one argument" || bad "showed $(shown)"
+shell	tests/wallpaper-source.sh	SC2292	69553a607edb9533	1	[ "$(shown)" = "$work/cfg/mine.png" ] && ok "WALLPAPER_PATH in the environment is ignored" || bad "showed $(shown)"
+shell	tests/wallpaper-source.sh	SC2292	938ef2190d1aa955	1	[ "$(shown)" = "$work/cfg/mine.png" ] && ok "only [background].path is read" || bad "showed $(shown)"
+shell	tests/wallpaper-source.sh	SC2292	c3e5ad5d0c9e56db	1	[ "$(shown)" = "$work/cfg/mine.png" ] && ok "swaybg -i <registry path>" || bad "showed $(shown)"
+shell	tests/wallpaper-source.sh	SC2292	c825131a023e12e6	3	[ -e /run/tripwire/hits ] || { [ "${HYPR_DE_SEALED-}" = build-root ] && [ ! -e /run/systemd/private ]; } || exec "$(dirname -- "$0")/run" "$0"
+shell	tests/wallpaper-source.sh	SC2292	d7088f9cd67131d1	1	[ "$(shown)" = "$work/share/wallpapers/default.png" ] && ok "falls back to default" || bad "showed $(shown)"
+shell	tests/wallpaper-source.sh	SC2292	f8165d036de46241	1	[ "$(shown)" = "$work/share/wallpapers/default.png" ] && grep -q unreadable "$work/err" \
+shell	tests/wallpaper-source.sh	SC2312	34c3ed6204833d8e	2	&& ok "unreadable path falls back and says so" || bad "showed $(shown); err: $(cat "$work/err")"
+shell	tests/wallpaper-source.sh	SC2312	456162519fb9f591	2	[ "$(shown)" = "$work/cfg/my wall.png" ] && ok "space preserved as one argument" || bad "showed $(shown)"
+shell	tests/wallpaper-source.sh	SC2312	69553a607edb9533	2	[ "$(shown)" = "$work/cfg/mine.png" ] && ok "WALLPAPER_PATH in the environment is ignored" || bad "showed $(shown)"
+shell	tests/wallpaper-source.sh	SC2312	938ef2190d1aa955	2	[ "$(shown)" = "$work/cfg/mine.png" ] && ok "only [background].path is read" || bad "showed $(shown)"
+shell	tests/wallpaper-source.sh	SC2312	c3e5ad5d0c9e56db	2	[ "$(shown)" = "$work/cfg/mine.png" ] && ok "swaybg -i <registry path>" || bad "showed $(shown)"
+shell	tests/wallpaper-source.sh	SC2312	d7088f9cd67131d1	2	[ "$(shown)" = "$work/share/wallpapers/default.png" ] && ok "falls back to default" || bad "showed $(shown)"
+shell	tests/wallpaper-source.sh	SC2312	f8165d036de46241	1	[ "$(shown)" = "$work/share/wallpapers/default.png" ] && grep -q unreadable "$work/err" \
+shell	tests/wallpaper-sync.sh	SC1007	0c54f58905fb890e	1	WD= run
+shell	tests/wallpaper-sync.sh	SC2015	1ea7bb727b2c8ec4	1	[ "$(cat "$work/cfg/environment.d/wallpaper.conf")" = "WALLPAPER_PATH=$work/cfg/mine.png" ] && ok "environment.d follows" || bad "environment.d: $(cat "$work/cfg/environment.d/wallpaper.conf")"
+shell	tests/wallpaper-sync.sh	SC2015	1fe7aeb2d3208db7	1	[ "$(lockconf)" = "\$WALLPAPER = $work/cfg/mine.png" ] && ok "hyprlock conf follows" || bad "hyprlock conf: $(lockconf)"
+shell	tests/wallpaper-sync.sh	SC2015	30c7e6d880c8e6f4	1	[ "$(restarts)" = 1 ] && ok "no restart" || bad "restarts: $(restarts)"
+shell	tests/wallpaper-sync.sh	SC2015	8e1b09c5780ee704	1	&& ok "hypr-de-wallpaper.toml is a reload module on the sync" || bad "module does not run the sync"
+shell	tests/wallpaper-sync.sh	SC2015	944224bcd2f0ef88	1	[ "$(restarts)" = 2 ] && ok "no restart without WAYLAND_DISPLAY" || bad "restarts: $(restarts)"
+shell	tests/wallpaper-sync.sh	SC2015	9873cb2f0866ad71	1	[ "$(lockconf)" = "\$WALLPAPER = $work/cfg/my wall.png" ] && ok "space survives in the conf" || bad "conf: $(lockconf)"
+shell	tests/wallpaper-sync.sh	SC2015	a7a56d7054400139	1	[ "$(restarts)" = 2 ] && ok "no restart with MainPID 0" || bad "restarts: $(restarts)"
+shell	tests/wallpaper-sync.sh	SC2015	b5dfde0f88972356	1	[ "$(lockconf)" = "\$WALLPAPER = $work/cfg/mine.png" ] && ok "conf still written" || bad "conf: $(lockconf)"
+shell	tests/wallpaper-sync.sh	SC2015	b7f2b769461c2dbe	1	[ "$(stat -c %Y "$work/cfg/hypr-de/wallpaper.conf")" = "$(date -d '2000-01-01' +%s)" ] && ok "hyprlock conf untouched" || bad "hyprlock conf rewritten"
+shell	tests/wallpaper-sync.sh	SC2015	cd8f991d6f6f0048	1	[ "$(restarts)" = 2 ] && ok "restart for the new image" || bad "restarts: $(restarts)"
+shell	tests/wallpaper-sync.sh	SC2015	e5017b5d5b9c037f	1	[ "$(restarts)" = 1 ] && ok "swaybg restarted once" || bad "restarts: $(restarts)"
+shell	tests/wallpaper-sync.sh	SC2015	ee57ed433e79d503	1	[ "$(restarts)" = 2 ] && ok "default already shown, no restart" || bad "restarts: $(restarts)"
+shell	tests/wallpaper-sync.sh	SC2015	f0e8e4c51c65ade2	1	[ "$(lockconf)" = "\$WALLPAPER = $work/share/wallpapers/default.png" ] && ok "conf names the default" || bad "conf: $(lockconf)"
+shell	tests/wallpaper-sync.sh	SC2015	fe4ae4960efe1c9c	1	[ "$(restarts)" = 2 ] && ok "no restart once it shows" || bad "restarts: $(restarts)"
+shell	tests/wallpaper-sync.sh	SC2016	ef2f04aae319e84a	1	printf '#!/bin/sh\ntrap '"'"'kill $child'"'"' TERM\nsleep 60 & child=$!\nwait\n' > "$work/bin/swaybg"
+shell	tests/wallpaper-sync.sh	SC2248	f48a2ebf33e7dd92	1	exit $fail
+shell	tests/wallpaper-sync.sh	SC2292	08cc7424e32520de	1	[ -f "$work/swaybg.pid" ] && kill "$(cat "$work/swaybg.pid")" 2>/dev/null
+shell	tests/wallpaper-sync.sh	SC2292	1ea7bb727b2c8ec4	1	[ "$(cat "$work/cfg/environment.d/wallpaper.conf")" = "WALLPAPER_PATH=$work/cfg/mine.png" ] && ok "environment.d follows" || bad "environment.d: $(cat "$work/cfg/environment.d/wallpaper.conf")"
+shell	tests/wallpaper-sync.sh	SC2292	1fe7aeb2d3208db7	1	[ "$(lockconf)" = "\$WALLPAPER = $work/cfg/mine.png" ] && ok "hyprlock conf follows" || bad "hyprlock conf: $(lockconf)"
+shell	tests/wallpaper-sync.sh	SC2292	30c7e6d880c8e6f4	1	[ "$(restarts)" = 1 ] && ok "no restart" || bad "restarts: $(restarts)"
+shell	tests/wallpaper-sync.sh	SC2292	4e87f87eed8f665c	1	cleanup() { [ -f "$work/swaybg.pid" ] && kill "$(cat "$work/swaybg.pid")" 2>/dev/null; rm -rf "$work"; }
+shell	tests/wallpaper-sync.sh	SC2292	944224bcd2f0ef88	1	[ "$(restarts)" = 2 ] && ok "no restart without WAYLAND_DISPLAY" || bad "restarts: $(restarts)"
+shell	tests/wallpaper-sync.sh	SC2292	9873cb2f0866ad71	1	[ "$(lockconf)" = "\$WALLPAPER = $work/cfg/my wall.png" ] && ok "space survives in the conf" || bad "conf: $(lockconf)"
+shell	tests/wallpaper-sync.sh	SC2292	a7a56d7054400139	1	[ "$(restarts)" = 2 ] && ok "no restart with MainPID 0" || bad "restarts: $(restarts)"
+shell	tests/wallpaper-sync.sh	SC2292	b5dfde0f88972356	1	[ "$(lockconf)" = "\$WALLPAPER = $work/cfg/mine.png" ] && ok "conf still written" || bad "conf: $(lockconf)"
+shell	tests/wallpaper-sync.sh	SC2292	b7f2b769461c2dbe	1	[ "$(stat -c %Y "$work/cfg/hypr-de/wallpaper.conf")" = "$(date -d '2000-01-01' +%s)" ] && ok "hyprlock conf untouched" || bad "hyprlock conf rewritten"
+shell	tests/wallpaper-sync.sh	SC2292	c825131a023e12e6	3	[ -e /run/tripwire/hits ] || { [ "${HYPR_DE_SEALED-}" = build-root ] && [ ! -e /run/systemd/private ]; } || exec "$(dirname -- "$0")/run" "$0"
+shell	tests/wallpaper-sync.sh	SC2292	cd8f991d6f6f0048	1	[ "$(restarts)" = 2 ] && ok "restart for the new image" || bad "restarts: $(restarts)"
+shell	tests/wallpaper-sync.sh	SC2292	e5017b5d5b9c037f	1	[ "$(restarts)" = 1 ] && ok "swaybg restarted once" || bad "restarts: $(restarts)"
+shell	tests/wallpaper-sync.sh	SC2292	ee57ed433e79d503	1	[ "$(restarts)" = 2 ] && ok "default already shown, no restart" || bad "restarts: $(restarts)"
+shell	tests/wallpaper-sync.sh	SC2292	f0e8e4c51c65ade2	1	[ "$(lockconf)" = "\$WALLPAPER = $work/share/wallpapers/default.png" ] && ok "conf names the default" || bad "conf: $(lockconf)"
+shell	tests/wallpaper-sync.sh	SC2292	fe4ae4960efe1c9c	1	[ "$(restarts)" = 2 ] && ok "no restart once it shows" || bad "restarts: $(restarts)"
+shell	tests/wallpaper-sync.sh	SC2312	08cc7424e32520de	1	[ -f "$work/swaybg.pid" ] && kill "$(cat "$work/swaybg.pid")" 2>/dev/null
+shell	tests/wallpaper-sync.sh	SC2312	1ea7bb727b2c8ec4	2	[ "$(cat "$work/cfg/environment.d/wallpaper.conf")" = "WALLPAPER_PATH=$work/cfg/mine.png" ] && ok "environment.d follows" || bad "environment.d: $(cat "$work/cfg/environment.d/wallpaper.conf")"
+shell	tests/wallpaper-sync.sh	SC2312	1fe7aeb2d3208db7	2	[ "$(lockconf)" = "\$WALLPAPER = $work/cfg/mine.png" ] && ok "hyprlock conf follows" || bad "hyprlock conf: $(lockconf)"
+shell	tests/wallpaper-sync.sh	SC2312	2eec591e25a4ec6b	1	kill "$(cat "$work/swaybg.pid")" 2>/dev/null; rm -f "$work/swaybg.pid"
+shell	tests/wallpaper-sync.sh	SC2312	30c7e6d880c8e6f4	2	[ "$(restarts)" = 1 ] && ok "no restart" || bad "restarts: $(restarts)"
+shell	tests/wallpaper-sync.sh	SC2312	4e87f87eed8f665c	1	cleanup() { [ -f "$work/swaybg.pid" ] && kill "$(cat "$work/swaybg.pid")" 2>/dev/null; rm -rf "$work"; }
+shell	tests/wallpaper-sync.sh	SC2312	944224bcd2f0ef88	2	[ "$(restarts)" = 2 ] && ok "no restart without WAYLAND_DISPLAY" || bad "restarts: $(restarts)"
+shell	tests/wallpaper-sync.sh	SC2312	9873cb2f0866ad71	2	[ "$(lockconf)" = "\$WALLPAPER = $work/cfg/my wall.png" ] && ok "space survives in the conf" || bad "conf: $(lockconf)"
+shell	tests/wallpaper-sync.sh	SC2312	a7a56d7054400139	2	[ "$(restarts)" = 2 ] && ok "no restart with MainPID 0" || bad "restarts: $(restarts)"
+shell	tests/wallpaper-sync.sh	SC2312	b5dfde0f88972356	2	[ "$(lockconf)" = "\$WALLPAPER = $work/cfg/mine.png" ] && ok "conf still written" || bad "conf: $(lockconf)"
+shell	tests/wallpaper-sync.sh	SC2312	b7f2b769461c2dbe	2	[ "$(stat -c %Y "$work/cfg/hypr-de/wallpaper.conf")" = "$(date -d '2000-01-01' +%s)" ] && ok "hyprlock conf untouched" || bad "hyprlock conf rewritten"
+shell	tests/wallpaper-sync.sh	SC2312	cd8f991d6f6f0048	2	[ "$(restarts)" = 2 ] && ok "restart for the new image" || bad "restarts: $(restarts)"
+shell	tests/wallpaper-sync.sh	SC2312	e5017b5d5b9c037f	2	[ "$(restarts)" = 1 ] && ok "swaybg restarted once" || bad "restarts: $(restarts)"
+shell	tests/wallpaper-sync.sh	SC2312	ee57ed433e79d503	2	[ "$(restarts)" = 2 ] && ok "default already shown, no restart" || bad "restarts: $(restarts)"
+shell	tests/wallpaper-sync.sh	SC2312	f0e8e4c51c65ade2	2	[ "$(lockconf)" = "\$WALLPAPER = $work/share/wallpapers/default.png" ] && ok "conf names the default" || bad "conf: $(lockconf)"
+shell	tests/wallpaper-sync.sh	SC2312	fe4ae4960efe1c9c	2	[ "$(restarts)" = 2 ] && ok "no restart once it shows" || bad "restarts: $(restarts)"
+shell	tests/wallpaper-sync.sh	SC2329	4e87f87eed8f665c	1	cleanup() { [ -f "$work/swaybg.pid" ] && kill "$(cat "$work/swaybg.pid")" 2>/dev/null; rm -rf "$work"; }
