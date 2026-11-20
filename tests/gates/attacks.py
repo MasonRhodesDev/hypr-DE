@@ -4,9 +4,10 @@ Each case makes one change, runs the named gates as CI does and passes only when
 the gates print the expected FAIL line. A case with no expected line is one the
 gates pass by design, with the reason beside it. A case's options can set the
 environment ({work} is the case's scratch directory), leave its change out of
-git ("add": False), or fail on any FAIL line it does not expect ("exact"). The
-gate "ratchet" runs tests/gates/ratchet.py against HEAD. Run it where the C++
-gates run:
+git ("add": False), fail on any FAIL line it does not expect ("exact"), or name
+other lines the output must hold ("out"). The gate "ratchet" runs HEAD's copy
+of tests/gates/ratchet.py against HEAD, as CI runs the base branch's copy. Run
+it where the C++ gates run:
 
     python3 -I tests/gates/attacks.py [case ...]
 
@@ -45,6 +46,34 @@ import hashlib
 with open("tests/gates/baseline.tsv", "a", encoding="utf-8") as f:
     f.write("\\t".join(["shell", "dist/uwsm/env", "SC9999", hashlib.sha256(b"x").hexdigest()[:16], "1", "x"]) + "\\n")
 EOF"""
+GEOMETRY = f"{PLUGIN}/src/Geometry.cpp"
+WALLPAPER = "dist/bin/hypr-de-set-wallpaper"
+QUOTED = r"""sed -i 's/^\[ \$# -eq 1 \] || usage$/[ "$#" -eq 1 ] || usage/' dist/bin/hypr-de-set-wallpaper"""
+# a cc1plus that drops the stack protector from every real compile and leaves the preprocessor alone, so -E and -### look clean
+CC1PLUS = """#!/bin/sh
+real=$(/usr/bin/gcc -print-prog-name=cc1plus)
+case " $* " in *" -E "*) exec "$real" "$@" ;; esac
+exec "$real" "$@" -fno-stack-protector
+"""
+# a step after the given line that flips a byte in a section of the built library after its link, before package() installs it
+PATCH = """cat >../patch.py <<'PY'
+import subprocess
+import sys
+
+path, wanted = sys.argv[1], sys.argv[2]
+for line in subprocess.run(["readelf", "-SW", path], capture_output=True, text=True, check=True).stdout.splitlines():
+    fields = line.replace("[ ", "[").split()
+    if len(fields) > 5 and fields[1] == wanted:
+        offset, size = int(fields[4], 16), int(fields[5], 16)
+        with open(path, "r+b") as f:
+            f.seek(offset + size // 2)
+            byte = f.read(1)[0]
+            f.seek(offset + size // 2)
+            f.write(bytes([byte ^ 1]))
+PY
+cp ../patch.py packaging/hypr-de-scene/patch.py
+sed -i 's|^source=(|source=(patch.py |; s|^sha256sums=(|sha256sums=(SKIP |' {scene}
+sed -i 's|^  {after}$|&\\n  python3 "$srcdir/patch.py" build/hypr-de-scene-impl.so {section}|' {scene}"""
 
 # name: (gates, change made with bash in the clone, FAIL lines that must appear, and options); no lines means the gates pass by design
 CASES = {
@@ -249,8 +278,7 @@ LC_ALL=C sort -o tests/gates/classified.tsv tests/gates/classified.tsv""",
     "p2": (["classify"], """sed -i 's|^%cmake -S plugins/hypr-de-scene$|& -DCMAKE_CXX_FLAGS=-fno-stack-protector|' packaging/hypr-de-scene.spec
 sed -i 's|^%cmake_build$|sed -i /Safety.cmake/d plugins/hypr-de-scene/CMakeLists.txt\\n&|' packaging/hypr-de-scene.spec
 sed -i '1i %global _hardened_build 0' packaging/hypr-de-scene.spec""",
-           [r"classify: packaging/hypr-de-scene\.spec spec-cmake-differs", r"classify: packaging/hypr-de-scene\.spec spec-build-step",
-            r"classify: packaging/hypr-de-scene\.spec spec-flags"]),
+           [r"classify: packaging/hypr-de-scene\.spec spec-build-step", r"classify: packaging/hypr-de-scene\.spec spec-flags"]),
     # one baselined warning fixed and another of the same rule added in the same file
     "k0": (["shell"], """sed -i 's/^\\[ \\$# -eq 1 \\] || usage$/[[ $# -eq 1 ]] || usage\\n[ -n "$1" ] || usage/' dist/bin/hypr-de-set-wallpaper""",
            [r"shell: dist/bin/hypr-de-set-wallpaper SC2292"]),
@@ -275,6 +303,70 @@ for f in /usr/bin/*; do [ "${f##*/}" = cmake ] || ln -s "$f" ../nocmake/; done""
            [r"cpp-harden: toolchain cannot-run"], {"env": {"PATH": "{work}/nocmake"}, "exact": True}),
     # a file git does not track is not part of what a local run judges
     "u1": (["classify"], """printf 'x\\n' >scratch.out""", [], {"add": False}),
+    # round 5, F1: a baselined finding follows its line through an edit, and the ratchet takes the row --update rewrites
+    "f1a": (["cpp-harden", "cpp-tidy"], rf"""sed -i 's|^\( *return static_cast<int>(x + 0\.5);\)$|\1 // round half up|' {GEOMETRY}""", [], {"exact": True}),
+    "f1b": (["shell"], QUOTED, [], {"exact": True}),
+    "f1c": (["shell", "ratchet"], QUOTED + "\ntests/gates/check.sh shell --update >/dev/null", [], {"exact": True}),
+    # F2: the PKGBUILD's cmake line may change its order and generator, or hold its options in an array
+    "f2": (["classify"], f"""sed -i 's|^  cmake -S plugins/hypr-de-scene -B build .*$|  local _opts=(-DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr)\\n  cmake -G "Unix Makefiles" -B build -S plugins/hypr-de-scene "${{_opts[@]}}"|' {SCENE}""",
+           [], {"exact": True}),
+    # F3: a new test source needs no reason, and a cpp-test row on a file that is not C or C++ fails
+    "f3": (["classify", "ratchet"], f"""printf 'int main() {{ return 0; }}\\n' >{PLUGIN}/tests/clamp.cpp
+printf '{PLUGIN}/tests/clamp.cpp\\tcpp-test\\n' >>tests/gates/classified.tsv
+LC_ALL=C sort -o tests/gates/classified.tsv tests/gates/classified.tsv""", [], {"exact": True}),
+    "f3b": (["classify"], f"""printf 'echo hi\\n' >{PLUGIN}/tests/helper
+printf '{PLUGIN}/tests/helper\\tcpp-test\\n' >>tests/gates/classified.tsv
+LC_ALL=C sort -o tests/gates/classified.tsv tests/gates/classified.tsv""", [rf"classify: {PLUGIN}/tests/helper invalid"]),
+    # F4: a compiler stage from the build's own tree, through -B, or a specs file named in a response file
+    "f4a": (CPP, f"""mkdir -p {PLUGIN}/tools
+cat >{PLUGIN}/tools/cc1plus <<'EOF'
+{CC1PLUS}EOF
+chmod 755 {PLUGIN}/tools/cc1plus
+printf '{PLUGIN}/tools/cc1plus\\tsh\\n' >>tests/gates/classified.tsv
+LC_ALL=C sort -o tests/gates/classified.tsv tests/gates/classified.tsv
+printf '\\ntarget_compile_options(hypr-de-scene-impl PRIVATE -B${{CMAKE_CURRENT_SOURCE_DIR}}/tools/)\\n' >>{CM}""",
+            [rf"cpp-harden: {SCENE} driver-override", rf"cpp-harden: {SCENE} untrusted-tool"]),
+    "f4b": (CPP, f"""printf '*cc1plus:\\n+ %%{{!E:-fno-stack-protector}}\\n\\n' >{PLUGIN}/weak.specs
+printf '{PLUGIN}/weak.specs\\tdata\\n' >>tests/gates/classified.tsv
+LC_ALL=C sort -o tests/gates/classified.tsv tests/gates/classified.tsv
+cat >>{CM} <<'EOF'
+
+file(WRITE ${{CMAKE_CURRENT_BINARY_DIR}}/opts.rsp "-specs=${{CMAKE_CURRENT_SOURCE_DIR}}/weak.specs\\n")
+target_compile_options(hypr-de-scene-impl PRIVATE @${{CMAKE_CURRENT_BINARY_DIR}}/opts.rsp)
+EOF""", [rf"cpp-harden: {SCENE} driver-override"]),
+    # the wrappers drop GCC_EXEC_PREFIX, so the tree's cc1plus, which fails any compile it is given, never runs
+    "f4c": (CPP, f"""triple=$(gcc -dumpmachine) version=$(gcc -dumpversion)
+mkdir -p "{PLUGIN}/tools/$triple/$version"
+printf '#!/bin/sh\\necho "the tree'"'"'s cc1plus ran" >&2\\nexit 1\\n' >"{PLUGIN}/tools/$triple/$version/cc1plus"
+chmod 755 "{PLUGIN}/tools/$triple/$version/cc1plus"
+printf '%s\\tsh\\n' "{PLUGIN}/tools/$triple/$version/cc1plus" >>tests/gates/classified.tsv
+LC_ALL=C sort -o tests/gates/classified.tsv tests/gates/classified.tsv
+sed -i 's|^  cmake -S plugins/hypr-de-scene|  export GCC_EXEC_PREFIX="$PWD/{PLUGIN}/tools/"\\n&|' {SCENE}""", [], {"exact": True}),
+    # F5: features.h has set __USE_FORTIFY_LEVEL, and the source takes it away before string.h reads it
+    "f5": (CPP, f"""sed -i '1i #include <features.h>\\n#undef __USE_FORTIFY_LEVEL\\n#include <string.h>' {GEOMETRY}""",
+           [rf"cpp-harden: {PLUGIN}/src/Geometry\.cpp fortify-off"]),
+    # F6: check() runs in the audited build, so its change to the built library's code shows
+    "f6a": (CPP, PATCH.format(scene=SCENE, after="./tests/scene-plugin-build.sh", section=".text"), [rf"cpp-harden: {IMPL} unattributed"]),
+    # and a change to its data after the link shows as well as one to its code
+    "f6b": (CPP, PATCH.format(scene=SCENE, after="cmake --build build", section=".rodata"), [rf"cpp-harden: {IMPL} unattributed"]),
+    # F7: the gates, the workflows and CODEOWNERS are configuration, and the base's ratchet judges a pull request that rewrites it
+    "f7a": (["ratchet"], """sed -i 's/"cannot-run", "forged-record"/"cannot-run"/' tests/gates/gate.py
+sed -i '/^\\/tests\\/gates\\//d' .github/CODEOWNERS
+sed -i '/# What the gates allow only shrinks/,$d' .github/workflows/safety-gates.yml""",
+            [r"ratchet: config tests/gates/gate\.py", r"ratchet: config \.github/CODEOWNERS", r"ratchet: config \.github/workflows/safety-gates\.yml"]),
+    "f7b": (["ratchet"], RATCHET_ROW + """
+printf 'print("ok   ratchet: nothing the gates allow has grown")\\n' >tests/gates/ratchet.py""",
+            [r"ratchet: baseline shell dist/uwsm/env SC9999", r"ratchet: config tests/gates/ratchet\.py"]),
+    # F8: a loosening with its reason is a warning on the run and a line in its summary
+    "f8": (["ratchet"], RATCHET_ROW, [], {"env": {"GATE_CHANGE_REASONS": "Gate-change: SC9999 is new", "GITHUB_ACTIONS": "true", "GITHUB_STEP_SUMMARY": "{work}/summary"},
+                                          "out": [r"::warning title=Gate loosened::baseline shell dist/uwsm/env SC9999"]}),
+    # F10: a spec's build sections hold only %autosetup, %cmake -S, %cmake_build and %cmake_install, %conf included
+    "f10a": (["classify"], """sed -i 's|^%cmake -S plugins/hypr-de-scene$|%{__cmake} -S plugins/hypr-de-scene -DCMAKE_CXX_FLAGS=-fno-stack-protector|' packaging/hypr-de-scene.spec""",
+             [r"classify: packaging/hypr-de-scene\.spec spec-build-step"]),
+    "f10b": (["classify"], """sed -i 's|^%cmake_build$|%cmake_build -- CXX_FLAGS="-O0 -w"|' packaging/hypr-de-scene.spec""",
+             [r"classify: packaging/hypr-de-scene\.spec spec-build-step"]),
+    "f10c": (["classify"], """sed -i 's|^%build$|%conf\\n%cmake -S plugins/hypr-de-scene -DCMAKE_BUILD_TYPE=Debug\\n\\n%build|; /^%cmake -S plugins\\/hypr-de-scene$/d' packaging/hypr-de-scene.spec""",
+             [r"classify: packaging/hypr-de-scene\.spec spec-build-step"]),
 }
 
 
@@ -291,19 +383,34 @@ def attempt(name, root):
         if options.get("add", True):
             subprocess.run(["git", "add", "-A"], cwd=clone, check=True)
         env = {**os.environ, **{key: value.format(work=work) for key, value in options.get("env", {}).items()}}
-        command = ["python3", "-I", "tests/gates/ratchet.py", "HEAD"] if gates == ["ratchet"] else ["tests/gates/check.sh", *gates]
-        result = subprocess.run(command, cwd=clone, capture_output=True, text=True, check=False, env=env)
-        lines = [line for line in result.stdout.splitlines() if line.startswith(("FAIL ", "gate:"))] + result.stderr.splitlines()[-3:]
+        others = [gate for gate in gates if gate != "ratchet"]
+        results = [*([ratchet(clone, work, env)] if "ratchet" in gates else []), *([gate_run(others, clone, env)] if others else [])]
+        stdout, stderr = "".join(r.stdout for r in results), "".join(r.stderr for r in results)
+        failed = any(r.returncode for r in results)
+        lines = [line for line in stdout.splitlines() if line.startswith(("FAIL ", "gate:"))] + stderr.splitlines()[-3:]
         missing = [pattern for pattern in expected if not any(re.match(rf"FAIL {pattern}:", line) for line in lines)]
         shown = [line for line in lines if any(re.match(rf"FAIL {pattern}:", line) for pattern in expected)]
         extra = [line for line in lines if line.startswith("FAIL ") and line not in shown] if options.get("exact") else []
-        ok = not missing and not extra and (result.returncode != 0 if expected else result.returncode == 0)
+        unseen = [pattern for pattern in options.get("out", []) if not any(re.match(pattern, line) for line in stdout.splitlines())]
+        ok = not missing and not extra and not unseen and failed == bool(expected)
         report = [f"{'ok  ' if ok else 'MISS'} {name}", *(f"     {line}" for line in (shown if ok else lines))]
-        report += [f"     expected, not seen: {pattern}" for pattern in missing]
+        report += [f"     expected, not seen: {pattern}" for pattern in [*missing, *unseen]]
         report += [f"     not expected: {line}" for line in extra]
         return ok, "\n".join(report)
     finally:
         shutil.rmtree(work, ignore_errors=True)
+
+
+def ratchet(clone, work, env):
+    # CI runs the base branch's copy, so a pull request that rewrites the ratchet is still judged by the old one
+    script = os.path.join(work, "ratchet.py")
+    with open(script, "w", encoding="utf-8") as f:
+        f.write(subprocess.run(["git", "show", "HEAD:tests/gates/ratchet.py"], cwd=clone, capture_output=True, text=True, check=True).stdout)
+    return subprocess.run(["python3", "-I", script, "HEAD"], cwd=clone, capture_output=True, text=True, check=False, env=env)
+
+
+def gate_run(gates, clone, env):
+    return subprocess.run(["tests/gates/check.sh", *gates], cwd=clone, capture_output=True, text=True, check=False, env=env)
 
 
 def main():
