@@ -879,11 +879,11 @@ def package(pkgbuild, case):
     return Package(pkgbuild, work, info, result, records, problems)
 
 
-def packages(found):
+def packages(found, only):
     if not toolchain(found, "the packages"):
         return []
     classes = manifest()
-    return [package(p, "") for p in sorted(tracked()) if os.path.basename(p) == "PKGBUILD" and classes.get(p) == "pkgbuild"]
+    return [package(p, "") for p in sorted(tracked()) if os.path.basename(p) == "PKGBUILD" and classes.get(p) == "pkgbuild" and (not only or p in only)]
 
 
 # ---------- the preprocessor's view of one compile
@@ -1339,13 +1339,13 @@ def harden_findings(pkgbuild, case):
     return found, built, *analyse(found, built)
 
 
-def gate_cpp_harden(found, _args):
+def gate_cpp_harden(found, args):
     read_by = set()
-    for built in packages(found):
+    for built in packages(found, args.pkgbuild):
         result, _built, _units, reads = harden_findings(built.pkgbuild, "")
         merge(found, result)
         read_by |= reads
-    if not blocked(found):
+    if not blocked(found) and not args.pkgbuild:
         classes = manifest()
         for directory in sorted(gated_dirs(tracked())):
             for path in sorted(p for p in tracked() if p.startswith(directory + "/") and p.lower().endswith(CPP_SUFFIXES)):
@@ -1393,8 +1393,8 @@ def tidy_units(found, built, units):
             found.add(where, match[5], source_text(where, int(match[2])) or match[4], f"{where}:{match[2]}: {match[4]} [{match[5]}]")
 
 
-def gate_cpp_tidy(found, _args):
-    for built in packages(found):
+def gate_cpp_tidy(found, args):
+    for built in packages(found, args.pkgbuild):
         result, _built, units, _reads = harden_findings(built.pkgbuild, "")
         if blocked(result):
             found.add(built.pkgbuild, "not-judged", "not judged", f"{built.pkgbuild}: cpp-harden cannot see all of this package's code, so clang-tidy does not judge it")
@@ -1610,6 +1610,7 @@ def main():
     parser.add_argument("--update", action="store_true", help="lower the baseline to what is found now")
     parser.add_argument("--allow-growth", action="store_true", help="with --update, also record new findings, which the pull request must justify")
     parser.add_argument("--rpms", nargs="*", default=[], help="for the rpm gate: the RPMs to audit, with their debuginfo")
+    parser.add_argument("--pkgbuild", action="append", default=[], help="build only this PKGBUILD for the C++ gates, as attacks.py does for the package a case changes; CI builds every one")
     args = parser.parse_args()
     os.chdir(ROOT)
     baseline = parse_baseline(read(BASELINE)) if os.path.exists(BASELINE) else {}

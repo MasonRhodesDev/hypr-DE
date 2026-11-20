@@ -4,10 +4,15 @@ Each case makes one change, runs the named gates as CI does and passes only when
 the gates print the expected FAIL line. A case with no expected line is one the
 gates pass by design, with the reason beside it. A case's options can set the
 environment ({work} is the case's scratch directory), leave its change out of
-git ("add": False), fail on any FAIL line it does not expect ("exact"), or name
-other lines the output must hold ("out"). The gate "ratchet" runs HEAD's copy
-of tests/gates/ratchet.py against HEAD, as CI runs the base branch's copy. Run
-it where the C++ gates run:
+git ("add": False), fail on any FAIL line it does not expect ("exact"), name
+other lines the output must hold ("out"), or drop the plugin's check()
+("check": False). A case drops it when its change breaks the plugin's own
+tests, so check() would stop the build, as build-failed, before the line the
+case is about; or, for r4, when check()'s test build would make the shipped
+library's exact bytes through the shim and so attribute it. The gate "ratchet" runs HEAD's copy
+of tests/gates/ratchet.py against HEAD, as CI runs the base branch's copy. The
+C++ gates build only the plugin's package (--pkgbuild), the one every case
+changes; CI builds every package. Run it where the C++ gates run:
 
     python3 -I tests/gates/attacks.py [case ...]
 
@@ -80,7 +85,7 @@ CASES = {
     "a1": (CPP, f"""printf '\\nset_source_files_properties(src/Spec.cpp PROPERTIES COMPILE_OPTIONS "-O0;-U_FORTIFY_SOURCE")\\n' >>{CM}""",
            [rf"cpp-harden: {PLUGIN}/src/Spec\.cpp unoptimized", rf"cpp-harden: {PLUGIN}/src/Spec\.cpp fortify-off"]),
     "a2": (CPP, f"""sed -i 's|^include(../cmake/Safety.cmake)$|add_library(second SHARED src/Log.cpp)\\n&|' {CM}""",
-           [rf"cpp-harden: {PLUGIN}/src/Log\.cpp fortify-off"]),
+           [rf"cpp-harden: {PLUGIN}/src/Log\.cpp fortify-off"], {"check": False}),
     "a3": (CPP, f"""sed -i 's|^include(../cmake/Safety.cmake)$|&\\nadd_compile_options(-fno-stack-protector -U_FORTIFY_SOURCE)|' {CM}""",
            [rf"cpp-harden: {UNIT} stack-protector-off"]),
     # after the targets exist, add_compile_options changes nothing CMake builds
@@ -108,7 +113,7 @@ CASES = {
     "b3": (CPP, f"""printf -- '-fno-stack-protector\\n-O0\\n-U_FORTIFY_SOURCE\\n' >{PLUGIN}/flags.rsp; printf '\\ntarget_compile_options(hypr-de-scene-impl PRIVATE @${{CMAKE_CURRENT_SOURCE_DIR}}/flags.rsp)\\n' >>{CM}""",
            [rf"cpp-harden: {UNIT} stack-protector-off", rf"cpp-harden: {UNIT} unoptimized", rf"cpp-harden: {UNIT} fortify-off"]),
     "b5": (CPP, f"""printf 'inline int gate_narrow(long v) {{ return v; }}\\n' >{PLUGIN}/src/Hdr.hpp; sed -i '1i #include <Hdr.hpp>' {PLUGIN}/src/Spec.cpp; printf '\\ntarget_include_directories(hypr-de-scene-impl SYSTEM PRIVATE ${{CMAKE_CURRENT_SOURCE_DIR}}/src)\\n' >>{CM}""",
-           [rf"cpp-harden: {PLUGIN}/src/Hdr\.hpp system-header-in-tree"]),
+           [rf"cpp-harden: {PLUGIN}/src/Hdr\.hpp system-header-in-tree"], {"check": False}),
     "b5ctl": (CPP, f"""printf 'inline int gate_narrow(long v) {{ return v; }}\\n' >{PLUGIN}/src/Hdr.hpp; sed -i '1i #include "Hdr.hpp"' {PLUGIN}/src/Spec.cpp""",
               [rf"cpp-harden: {PLUGIN}/src/Hdr\.hpp -Wconversion"]),
     "b7": (CPP, f"""cat - {PLUGIN}/src/Spec.cpp >x <<'EOF'\n{EVASION}EOF\nmv x {PLUGIN}/src/Spec.cpp""",
@@ -122,7 +127,7 @@ CASES = {
             [rf"cpp-harden: {UNIT} fortify-off"]),
     "b9": (CPP, f"""printf '\\ntarget_link_options(hypr-de-scene-impl PRIVATE -Wl,-rpath,/tmp/hypr-de-plugins)\\n' >>{CM}""", [rf"cpp-harden: {IMPL} elf-runpath"]),
     "b10": (CPP, f"""printf '\\ntarget_link_options(hypr-de-scene-impl PRIVATE -Wl,-z,norelro -Wl,-z,lazy -Wl,-z,execstack)\\nset_target_properties(hypr-de-scene-impl PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${{CMAKE_BINARY_DIR}}/CMakeFiles/out)\\n' >>{CM}""",
-            [rf"cpp-harden: {IMPL} elf-no-relro", rf"cpp-harden: {IMPL} elf-lazy-binding", rf"cpp-harden: {IMPL} elf-executable-stack"]),
+            [rf"cpp-harden: {IMPL} elf-no-relro", rf"cpp-harden: {IMPL} elf-lazy-binding", rf"cpp-harden: {IMPL} elf-executable-stack"], {"check": False}),
     "t1": (CPP, f"""printf '\\nset_target_properties(hypr-de-scene-impl PROPERTIES COMPILE_OPTIONS "-Wall")\\n' >>{CM}""",
            [rf"cpp-harden: {UNIT} warning-missing:-Wconversion", rf"cpp-harden: {UNIT} stack-clash-off"]),
     "t2": (CPP, f"""printf '\\ntarget_compile_options(hypr-de-scene-impl PRIVATE "$<$<CONFIG:Release>:-fno-stack-protector>" "$<$<COMPILE_LANGUAGE:CXX>:-U_FORTIFY_SOURCE>")\\n' >>{CM}""",
@@ -181,7 +186,7 @@ printf '%s\\n' '{BLOB}' >"$1.cpp"
 /usr/bin/c++ -x c++ -shared -fPIC -O0 -fno-stack-protector -Wl,-z,relro,-z,now,-z,noexecstack "-Wl,--build-id=0x$id" -o "$1" "$1.cpp"
 EOF
 printf '\\nadd_custom_command(TARGET hypr-de-scene-impl POST_BUILD COMMAND sh ${{CMAKE_CURRENT_SOURCE_DIR}}/swap.sh $<TARGET_FILE:hypr-de-scene-impl>)\\n' >>{CM}""",
-           [rf"cpp-harden: {IMPL} unattributed"]),
+           [rf"cpp-harden: {IMPL} unattributed"], {"check": False}),
     # the warnings are read from what each compile wrote, so a build() that throws its output away keeps every count
     "w1": (CPP, f"""sed -i 's|^  cmake --build build$|  cmake --build build >/dev/null 2>\\&1|' {SCENE}""", []),
     "c1": (["classify", "shell"], """mkdir -p dist/lib
@@ -218,7 +223,7 @@ printf '\nadd_custom_command(TARGET hypr-de-scene-impl POST_BUILD COMMAND python
            [rf"cpp-harden: {SCENE} forged-record"]),
     # a compiler named by path runs outside the shim: the trace says so once per package, and nothing else is printed
     "r4": (CPP, f"""sed -i 's|^  cmake -S plugins/hypr-de-scene -B build|& -DCMAKE_CXX_COMPILER=/usr/bin/g++|' {SCENE}""",
-           [rf"cpp-harden: {SCENE} unshimmed", r"cpp-harden: @hypr-de-scene/usr/lib/hypr-de/\S+ unattributed"], {"exact": True}),
+           [rf"cpp-harden: {SCENE} unshimmed", r"cpp-harden: @hypr-de-scene/usr/lib/hypr-de/\S+ unattributed"], {"exact": True, "check": False}),
     # --version, --help and a call with two sources go through the shim without failing the build or leaving a broken record
     "r5": (CPP, f"""cat >../r5.sh <<'EOF'
   c++ --version >/dev/null
@@ -236,11 +241,11 @@ printf '#pragma GCC optimize ("O0")\\n' >../vendor/vendor/vendor.h
 chmod -R a+rX ../vendor
 sed -i '0,/#include <regex>/s||#include <regex>\\n#include <cstring>\\n#include <cstdlib>\\n#include <vendor/vendor.h>|' {PLUGIN}/src/Spec.cpp
 printf '\\ntarget_include_directories(hypr-de-scene-impl PRIVATE %s/../vendor)\\n' "$PWD" >>{CM}""",
-           [rf"cpp-harden: {PLUGIN}/src/Spec\.cpp pragma-unbalanced"]),
+           [rf"cpp-harden: {PLUGIN}/src/Spec\.cpp pragma-unbalanced"], {"check": False}),
     "cet1": (CPP, f"""cat >>{PLUGIN}/src/Spec.cpp <<'EOF'
 
 extern "C" __attribute__((nocf_check, used, visibility("default"))) int gate_probe_nocf(int v) {{ return v * 3; }}
-EOF""", [rf"cpp-harden: {PLUGIN}/src/Spec\.cpp source-weakens: attribute nocf_check"]),
+EOF""", [rf"cpp-harden: {PLUGIN}/src/Spec\.cpp source-weakens: attribute nocf_check"], {"check": False}),
     "cet2": (CPP, f"""printf '\\ntarget_compile_options(hypr-de-scene-impl PRIVATE -mmanual-endbr)\\n' >>{CM}""", [rf"cpp-harden: {UNIT} manual-endbr"]),
     "m1": (CPP, f"""sed -i 's|^  install -Dm644 LICENSE.*$|&\\n  chmod 4755 "$pkgdir/usr/lib/hypr-de/hypr-de-scene.so"|' {SCENE}""",
            [r"cpp-harden: @hypr-de-scene/usr/lib/hypr-de/hypr-de-scene\.so mode-setid"]),
@@ -377,7 +382,8 @@ def attempt(name, root):
     try:
         clone = os.path.join(work, "clone")
         subprocess.run(["git", "clone", "-q", "--no-hardlinks", root, clone], check=True)
-        made = subprocess.run(["bash", "-euc", change], cwd=clone, capture_output=True, text=True, check=False)
+        made = subprocess.run(["bash", "-euc", change + ("" if options.get("check", True) else f"\nsed -i '/^check() {{$/,/^}}$/d' {SCENE}")],
+                              cwd=clone, capture_output=True, text=True, check=False)
         if made.returncode:
             return False, f"MISS {name}\n     the change did not apply: {made.stderr.strip()}"
         if options.get("add", True):
@@ -410,7 +416,9 @@ def ratchet(clone, work, env):
 
 
 def gate_run(gates, clone, env):
-    return subprocess.run(["tests/gates/check.sh", *gates], cwd=clone, capture_output=True, text=True, check=False, env=env)
+    # every case changes the plugin's package, so the C++ gates build only that one, three cases at a time
+    only = ["--pkgbuild", SCENE] if {"cpp-harden", "cpp-tidy"} & set(gates) else []
+    return subprocess.run(["tests/gates/check.sh", *gates, *only], cwd=clone, capture_output=True, text=True, check=False, env=env)
 
 
 def main():
