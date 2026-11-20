@@ -2,6 +2,7 @@ import argparse
 import atexit
 import collections
 import concurrent.futures
+import difflib
 import functools
 import hashlib
 import json
@@ -37,10 +38,10 @@ FIXTURE_PKGBUILD = f"{FIXTURE}/PKGBUILD"
 UNBASELINED_GATES = {"cpp-selftest", "classify"}
 UNBASELINED_RULES = {
     "build-failed", "tidy-failed", "not-built", "unattributed", "unlintable-shell", "pkgbuild-source",
-    "cannot-run", "forged-record", "malformed-record", "unshimmed", "not-judged",
+    "cannot-run", "forged-record", "malformed-record", "unshimmed", "not-judged", "untrusted-tool", "driver-override",
 }
 # a gate that cannot see the code it judges says so once, and stays silent about what it therefore cannot count
-BLOCKING_RULES = {"build-failed", "unattributed", "cannot-run", "forged-record", "malformed-record", "unshimmed", "not-judged"}
+BLOCKING_RULES = {"build-failed", "unattributed", "cannot-run", "forged-record", "malformed-record", "unshimmed", "not-judged", "untrusted-tool", "driver-override"}
 # what a file the gates cannot place by its suffix or its plugin is, so that none goes unchecked by default
 CLASSES = {
     "sh": "shell script that sh runs or sources",
@@ -48,7 +49,7 @@ CLASSES = {
     "python": "Python script",
     "lua": "Lua script",
     "pkgbuild": "makepkg build script; its package is built and audited",
-    "spec": "RPM spec; its scriptlets are linted, and the CMake project it builds must match its PKGBUILD's",
+    "spec": "RPM spec; its scriptlets are linted, its build sections may only unpack, configure, build and install, and the RPM job audits what it ships",
     "blob": "opaque data no gate can read; the row's third field says why it is in the tree",
     "make": "Makefile",
     "data": "read, never run",
@@ -71,11 +72,15 @@ ENCODED = re.compile(
     r"|(?:0x[0-9a-fA-F]{1,2}\s*,\s*){128,}|(?:\\x[0-9a-fA-F]{2}){64,}|(?:\\[0-7]{1,3}){64,}",
     re.MULTILINE,
 )
-# a spec builds the C++ plugin only with these lines; anything else in its build sections is a step the gates do not run
-SPEC_BUILD_LINE = re.compile(r"%(?:autosetup|setup|cmake|cmake_build|cmake_install)\b.*|\s*(?:#.*)?")
+# the only lines a spec's prep, conf, build and install sections may hold: unpack, configure the source directory with
+# no options of its own, build and install. Fedora's flags then harden the build, and the RPM job audits what it ships.
+SPEC_BUILD_LINE = re.compile(r"%autosetup(?: -n \S+)?(?: -p\d+)?|%cmake -S [\w./-]+|%cmake_build|%cmake_install|\s*(?:#.*)?")
+# a spec that asks for a compiler or a C or C++ build system, or names one in its build sections, macros included, compiles;
+# a clean Fedora build root has no compiler a spec did not ask for
+SPEC_COMPILES = re.compile(r"(?<![\w.+-])(?:gcc|gcc-c\+\+|g\+\+|c\+\+|cc|cxx|clang(?:\+\+)?|cmake\w*|meson\w*|ninja(?:-build)?|make\w*|ld|as)(?![\w.+-])")
 SPEC_FLAGS_MACRO = re.compile(r"^%(?:global|define|undefine)\s+(\S*(?:flags|hardened|fortify|lto|annobin|cmake|_build_type)\S*)", re.MULTILINE)
-# the CMake options a distribution sets its own way, so a spec and a PKGBUILD may differ in them
-DISTRIBUTION_OPTIONS = re.compile(r"-B\s*\S+|-DCMAKE_(?:BUILD_TYPE|INSTALL_PREFIX)(?::\w+)?=\S+")
+# how alike, from 0 to 1, a baselined line and the line an edit made of it are; a fixed line and a new one are rarely this close
+SAME_LINE = 0.6
 
 # shellcheck reads these; any other shell in a shebang cannot be linted, so it fails
 LINTED_SHELLS = {"sh", "bash", "dash", "ksh", "ash", "mksh", "busybox"}
@@ -119,6 +124,10 @@ FORTIFY_LEVEL = 3
 # glibc sends these to their __*_chk form whenever fortify is on, so a plain import is code fortify never saw
 ALWAYS_FORTIFIED = {"printf", "fprintf", "vprintf", "vfprintf", "sprintf", "vsprintf", "vsnprintf", "dprintf", "vdprintf", "syslog", "vsyslog"}
 SHIMMED = ("c++", "g++", "gcc", "cc")
+# the environment that tells GCC or the loader where to find programs and libraries; the wrappers drop it before the shim runs
+SCRUBBED = ("COMPILER_PATH", "GCC_EXEC_PREFIX", "LIBRARY_PATH", "GCC_COMPARE_DEBUG")
+# driver options that choose which compiler, assembler or linker runs, or rewrite what each is told, past what -### shows
+OVERRIDE = re.compile(r"-B.*|-?-specs(?:=.*)?|-wrapper|-fplugin(?:-arg-[\w-]+)?=.*|-iplugindir=.*")
 # where a scriptlet may run a program but never write: the system's library and program directories, and the loader's own lists
 PROTECTED = re.compile(r"(?<![\w./$-])(?:(?:/usr(?:/local)?)?/(?:lib|lib64|bin|sbin|libexec)|/etc/ld\.so\.[\w.]+)(?![\w.-])")
 COMMAND_WORD = re.compile(r"(?:^|[;&|({`!]|\b(?:then|do|else|if|elif|while|until|exec|command|env|nice|time))\s*[\"']?$")
@@ -368,6 +377,8 @@ def gate_classify(found, _args):
             found.add(path, "invalid", kind, f"{path}: a blob needs a reason")
         elif kind == "cpp-fixture" and not path.startswith("tests/gates/"):
             found.add(path, "invalid", kind, f"{path}: only the gates' own fixtures under tests/gates are cpp-fixture")
+        elif kind == "cpp-test" and not path.lower().endswith(CPP_SUFFIXES):
+            found.add(path, "invalid", kind, f"{path}: only a C or C++ source or header is cpp-test")
     for path in sorted(files):
         kind = classes.get(path)
         if os.path.basename(path) == "PKGBUILD" and kind not in ("pkgbuild", "cpp-fixture"):
@@ -408,35 +419,26 @@ def opaque(path):
     return f"{len(encoded[0])} characters of encoded data at byte {encoded.start()}" if encoded else None
 
 
-def cmake_options(words):
-    return sorted(DISTRIBUTION_OPTIONS.sub("", " ".join(words)).split())
-
-
 def check_spec(found, path, pkgbuilds):
-    """A spec that builds a CMake project builds the one its PKGBUILD builds, with the same options and nothing else."""
+    """A spec that compiles runs nothing but the lines SPEC_BUILD_LINE allows, and a PKGBUILD the gates build makes a package of its name."""
     text = read(path)
     for macro in SPEC_FLAGS_MACRO.finditer(text):
         found.add(path, "spec-flags", macro[0], f"{path}: {macro[0]} changes the distribution's compiler flags or build type")
-    sections, current = collections.defaultdict(list), None
+    steps, current = [], None
     for number, line in enumerate(text.splitlines(), 1):
         section = SPEC_SECTION.match(line)
         current = section[1] if section else current
-        if not section and current in ("prep", "build", "install"):
-            sections[current].append((number, line))
-    calls = [shlex.split(line)[1:] for _number, line in sections["build"] if line.startswith("%cmake ")]
-    if not calls:
+        if not section and current in ("prep", "conf", "build", "install"):
+            steps.append((number, line))
+    requires = [line.split(":", 1)[1] for line in text.splitlines() if re.match(r"BuildRequires\s*:", line)]
+    if not any(SPEC_COMPILES.search(re.sub(r"%\{?[?!]*_*", " ", line.split("#", 1)[0])) for line in [*requires, *(line for _n, line in steps)]):
         return
-    for number, line in (entry for name in ("prep", "build", "install") for entry in sections[name]):
+    for number, line in steps:
         if not SPEC_BUILD_LINE.fullmatch(line):
-            found.add(path, "spec-build-step", line, f"{path}:{number}: {line.strip()}: a spec that builds C++ runs only %autosetup, %cmake, %cmake_build and %cmake_install")
+            found.add(path, "spec-build-step", line, f"{path}:{number}: {line.strip()}: a spec that compiles runs only %autosetup, %cmake -S <directory>, %cmake_build and %cmake_install")
     name = re.search(r"^Name:\s*(\S+)", text, re.MULTILINE)
-    pkgbuild = pkgbuilds.get(name[1] if name else "")
-    if not pkgbuild:
+    if not pkgbuilds.get(name[1] if name else ""):
         found.add(path, "spec-unmatched", "unmatched", f"{path}: no PKGBUILD builds a package named {name[1] if name else '(no Name)'}, so the gates build nothing like it")
-        return
-    ours = [shlex.split(line.split("cmake ", 1)[1]) for line in read(pkgbuild).splitlines() if re.match(r"\s*cmake -S ", line)]
-    if [cmake_options(c) for c in calls] != [cmake_options(c) for c in ours]:
-        found.add(path, "spec-cmake-differs", " ".join(map(" ".join, calls)), f"{path}: %cmake {calls} configures differently from {pkgbuild}'s cmake {ours}, which is the build the gates audit")
 
 
 def shell_scripts(files, classes):
@@ -586,7 +588,8 @@ def shim(work):
             continue
         reals[name] = real
         command = [sys.executable, "-I", os.path.join(work, "shim.py"), real, os.path.join(work, "records.sock")]
-        write(os.path.join(wrappers, name), f'#!/bin/sh\nexec {shlex.join(command)} "$@"\n')
+        scrub = f"unset {' '.join(SCRUBBED)}\nfor name in $(env | sed -n 's/^\\(LD_[A-Za-z0-9_]*\\)=.*/\\1/p'); do unset \"$name\"; done\n"
+        write(os.path.join(wrappers, name), f'#!/bin/sh\n{scrub}exec {shlex.join(command)} "$@"\n')
         os.chmod(os.path.join(wrappers, name), 0o705)
     return wrappers, reals
 
@@ -661,7 +664,7 @@ def fits(value, shape):
 
 OBJECT_SHAPE = {"sha256": str, "lto": bool, "defines": [str]}
 RECORD_SHAPE = {
-    "cwd": str, "compiler": str, "argv": [str], "jobs": [[str]], "status": int, "diagnostics": str, "sources": int,
+    "cwd": str, "compiler": str, "argv": [str], "options": [str], "jobs": [[str]], "status": int, "diagnostics": str, "sources": int,
     "preprocessed?": str, "objects?": {"*": OBJECT_SHAPE},
     "link?": {"output": str, "build_id": (str, type(None)), "code": (str, type(None)), "inputs": [{
         "path": str, "missing?": bool, "uid?": int, "mode?": int, "kind?": str, "sha256?": str, "lto?": bool,
@@ -742,6 +745,8 @@ def shim_processes(work, reals, parents, runs):
 
     for pid, path, args in runs:
         image[pid] = (path, args)
+        if under_shim(pid) and not trusted(path, work):
+            problems.append(("untrusted-tool", f"process {pid} under the compiler shim ran {path}, a program the build user could have written"))
         if shim_path in args:
             real = args[args.index(shim_path) + 1] if args.index(shim_path) + 1 < len(args) else ""
             if real in reals.values():
@@ -751,6 +756,24 @@ def shim_processes(work, reals, parents, runs):
         elif os.path.dirname(path) != wrappers and TOOL.fullmatch(os.path.basename(path)) and not probe(args[1:]) and not under_shim(parents.get(pid)):
             problems.append(("unshimmed", f"{path} ran outside the gate's compiler shim: {' '.join(args[:6])}"))
     return shims, problems
+
+
+def trusted(path, work):
+    """A program only root could have written or put in place: root's, not writable by others, in directories only root can change."""
+    real = os.path.realpath(path)
+    if not os.path.isabs(path) or real == work or real.startswith(work + "/"):
+        return False
+    while True:
+        try:
+            status = os.stat(real)
+        except OSError:
+            return False
+        sticky = stat.S_ISDIR(status.st_mode) and status.st_mode & stat.S_ISVTX
+        if status.st_uid != 0 or (status.st_mode & 0o022 and not sticky):
+            return False
+        if real == "/":
+            return True
+        real = os.path.dirname(real)
 
 
 def probe(args):
@@ -780,8 +803,9 @@ def recorded_build(work, reals, argv, **kwargs):
 
 
 def builder_env(home, wrappers, **extra):
-    # nothing from the gate's own environment, so a build cannot behave differently under CI
-    return {"PATH": f"{wrappers}:/usr/local/bin:/usr/bin:/bin", "HOME": home, "LANG": "C.UTF-8", **extra}
+    # nothing from the gate's own environment, so a build cannot behave differently under CI; CC and CXX reach tests/run, which clears the rest
+    path, compilers = f"{wrappers}:/usr/local/bin:/usr/bin:/bin", {"CC": os.path.join(wrappers, "cc"), "CXX": os.path.join(wrappers, "c++")}
+    return {"PATH": path, "HOME": home, "LANG": "C.UTF-8", **compilers, **extra}
 
 
 def makepkg_conf(work):
@@ -793,7 +817,8 @@ def makepkg_conf(work):
         'CFLAGS="" CXXFLAGS="" CPPFLAGS="" LDFLAGS="" LTOFLAGS="" DEBUG_CFLAGS="" DEBUG_CXXFLAGS=""\n'
         f'MAKEFLAGS="-j{os.cpu_count()}"\n'
         "OPTIONS=(strip docs !libtool !staticlibs emptydirs zipman purge !debug !lto)\n"
-        "BUILDENV=(!distcc !color !ccache !check !sign)\n"
+        # check() runs between build() and package(), as it does when the package ships, so what it changes is audited too
+        "BUILDENV=(!distcc !color !ccache check !sign)\n"
         "PKGEXT=.pkg.tar\nSRCEXT=.src.tar\n",
     )
     return conf
@@ -849,7 +874,7 @@ def package(pkgbuild, case):
         shutil.copy(exported(f"{os.path.basename(info['url'][0])}-{info['pkgver'][0]}"), os.path.join(start, name))
     handed_to_builder(work)
     env = builder_env(os.path.join(work, "home"), wrappers, BUILDDIR=os.path.join(work, "build"), PKGDEST=os.path.join(work, "out"), SRCDEST=start, **({"FIXTURE_BAD": case} if case else {}))
-    command = ["makepkg", "--config", makepkg_conf(work), "--nodeps", "--skipinteg", "--nocheck", "--noconfirm", "--noprogressbar"]
+    command = ["makepkg", "--config", makepkg_conf(work), "--nodeps", "--skipinteg", "--noconfirm", "--noprogressbar"]
     result, records, problems = recorded_build(work, reals, command, cwd=start, env=env)
     return Package(pkgbuild, work, info, result, records, problems)
 
@@ -927,20 +952,22 @@ def view(found, unit, seen):
             found.add(left, "system-header-in-tree", "system header", f"{left}: compiled as a system header, so GCC hides its warnings")
 
     tracked_macros = {"_FORTIFY_SOURCE", "__USE_FORTIFY_LEVEL", "_GLIBCXX_ASSERTIONS", "NDEBUG"}
+    # glibc's features.h sets __USE_FORTIFY_LEVEL, so once the unit has left it an undefined level is fortify turned off
+    glibc = False
     # the optimize or target pragma in force, if any, and the push_options not yet popped
     options = (None, ())
     origin = {}
-    reported = set()
 
     def report(rule, detail):
-        if rule not in reported:
-            reported.add(rule)
+        # once per source, however many builds compile it
+        if (unit.name, rule) not in seen:
+            seen.add((unit.name, rule))
             found.add(unit.name, rule, rule, f"{unit.name}: {detail}")
 
     def check(at):
         level = macros.get("_FORTIFY_SOURCE")
         used = macros.get("__USE_FORTIFY_LEVEL")
-        if not level or not level.isdigit() or int(level) < FORTIFY_LEVEL or (used is not None and (not used.isdigit() or int(used) < FORTIFY_LEVEL)):
+        if not level or not level.isdigit() or int(level) < FORTIFY_LEVEL or ((used is not None or glibc) and (not used or not used.isdigit() or int(used) < FORTIFY_LEVEL)):
             report("fortify-off", f"_FORTIFY_SOURCE is {level} (__USE_FORTIFY_LEVEL {used}) at {at}{origin.get('_FORTIFY_SOURCE', '')}")
         if "_GLIBCXX_ASSERTIONS" not in macros:
             report("assertions-off", f"_GLIBCXX_ASSERTIONS is not defined at {at}{origin.get('_GLIBCXX_ASSERTIONS', '')}")
@@ -952,6 +979,7 @@ def view(found, unit, seen):
             marker = LINEMARKER.match(raw[g])
             if marker:
                 name, flags = unescape(marker[2]), marker[3].split()
+                glibc |= "2" in flags and os.path.basename(where or "") == "features.h"
                 previous, region = region, {"<built-in>": "built-in", "<command-line>": "command-line"}.get(name, "source")
                 entered = built.place(os.path.join(unit.record["cwd"], name)) if region == "source" else None
                 if region == "source" and previous == "command-line":
@@ -1106,8 +1134,8 @@ def audit(found, built, units_by_object, links_by_build_id):
             check_elf(found, key, path)
             check_needed(found, key, path, built)
             build_id = re.search(r"Build ID:\s*(\w+)", run(["readelf", "-nW", path]).stdout)
-            # a build ID can be set by hand, so the code itself has to be what that link wrote
-            code = run([sys.executable, "-I", SHIM, "--code-digest", path]).stdout.strip()
+            # a build ID can be set by hand, so what the file loads, code and data, has to be what that link wrote
+            code = run([sys.executable, "-I", SHIM, "--loaded-digest", path]).stdout.strip()
             links = [link for link in links_by_build_id.get(build_id[1] if build_id else None, []) if link["link"]["code"] == code]
             if not links:
                 found.add(key, "unattributed", "no link", f"{key}: no link this build ran made it (build ID {build_id[1] if build_id else 'missing'})")
@@ -1257,6 +1285,9 @@ def analyse(found, built):
     # records come sorted, and every record that matches an object or a build ID is judged, so no order decides which one counts
     units, units_by_object, links = [], collections.defaultdict(list), collections.defaultdict(list)
     for record in built.records:
+        for option in (o for o in record["options"] if OVERRIDE.fullmatch(o)):
+            found.add(built.pkgbuild, "driver-override", option, f"{built.pkgbuild}: a compile ran with {option}, which changes the programs GCC runs or what it tells them")
+    for record in built.records:
         unit = Unit(record, built) if "preprocessed" in record else None
         if unit:
             units.append(unit)
@@ -1335,6 +1366,11 @@ def merge(found, other):
 
 def tidy_units(found, built, units):
     require("clang-tidy", "clang-tidy")
+    # each source once, from a compile whose directory is still there: check()'s test builds remove theirs
+    by_source = {}
+    for unit in sorted(units, key=lambda u: not os.path.isdir(u.record["cwd"])):
+        by_source.setdefault(unit.source, unit)
+    units = list(by_source.values())
     database = scratch()
     entries = [{"directory": u.record["cwd"], "arguments": [u.record["compiler"], *u.record["argv"]], "file": u.source} for u in units]
     write(os.path.join(database, "compile_commands.json"), json.dumps(entries))
@@ -1445,6 +1481,56 @@ def gate_cpp_selftest(found, _args):
         found.add(FIXTURE, "clean-reported", " ".join(key), f"cpp-harden reported {key} for the clean fixture, which has none")
 
 
+# ---------- the RPM the scene-plugin workflow builds on Fedora
+
+
+# "FAIL: stack-prot test because ..." and "MAYB: test: notes, reason: ..."
+ANNOCHECK_LINE = re.compile(r"^Hardened: \S+: (?:FAIL|MAYB): (?:test: (?P<maybe>[\w-]+)(?:, reason: (?P<why>.*?))?|(?P<test>[\w-]+) test because (?P<because>.*?))\s*$")
+
+
+def gate_rpm(found, args):
+    """Every binary RPM given: its modes as it installs, the ELF checks cpp-harden makes, and annocheck's per-compile notes."""
+    rpms = sorted(p for p in args.rpms if not p.endswith(".src.rpm"))
+    missing = [tool for tool in ("rpm", "rpm2cpio", "cpio", "readelf", "annocheck") if not shutil.which(tool)]
+    if missing or not rpms:
+        found.add("rpm", "cannot-run", "cannot run", f"rpm: {', '.join(missing) + ' missing' if missing else 'no RPM given with --rpms'}, so no RPM is audited")
+        return
+    root = scratch()
+    for path in rpms:
+        payload = subprocess.run(["rpm2cpio", path], capture_output=True, check=False)
+        unpack = subprocess.run(["cpio", "-idm", "--quiet"], input=payload.stdout, cwd=root, capture_output=True, check=False)
+        if payload.returncode or unpack.returncode:
+            found.add(path, "cannot-run", "cannot unpack", f"{path}: cannot unpack: {(payload.stderr + unpack.stderr).decode(errors='replace').strip()}")
+    for path in (p for p in rpms if not re.search(r"-debug(?:info|source)-", os.path.basename(p))):
+        name = run(["rpm", "-qp", "--qf", "%{NAME}", path]).stdout
+        files = run(["rpm", "-qp", "--qf", "[%{FILENAMES}\t%{FILEMODES}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\n]", path]).stdout
+        for line in files.splitlines():
+            installed, mode, user, group = line.split("\t")
+            key, mode = f"@{name}{installed}", int(mode)
+            problems = {
+                "mode-setid": mode & (stat.S_ISUID | stat.S_ISGID),
+                "mode-world-writable": mode & stat.S_IWOTH and not stat.S_ISLNK(mode),
+                "owner-not-root": user != "root" or group != "root",
+            }
+            for rule in (rule for rule, hit in problems.items() if hit):
+                found.add(key, rule, rule, f"{key}: {rule} (mode {mode:o}, owner {user}:{group})")
+            unpacked = os.path.join(root, installed.lstrip("/"))
+            if stat.S_ISREG(mode) and head_of(unpacked).startswith(b"\x7fELF"):
+                check_elf(found, key, unpacked)
+                annocheck(found, key, unpacked, os.path.join(root, "usr/lib/debug"))
+
+
+def annocheck(found, key, path, debug):
+    """Fedora's GCC records how each compile ran in annobin notes, which rpmbuild moves into the debuginfo package."""
+    result = run(["annocheck", f"--debug-dir={debug}", path])
+    tests = [match for match in map(ANNOCHECK_LINE.match, result.stdout.splitlines()) if match]
+    for match in tests:
+        test = match["test"] or match["maybe"]
+        found.add(key, f"annocheck:{test}", test, f"{key}: annocheck {test}: {match['because'] or match['why'] or 'failed'}")
+    if result.returncode and not tests:
+        found.add(key, "cannot-run", "annocheck failed", f"{key}: annocheck failed with no test named\n{tail(result)}")
+
+
 def parse_baseline(text):
     entries = {}
     for number, line in enumerate(text.splitlines(), 1):
@@ -1465,16 +1551,39 @@ GATES = {
     "cpp-sanitize": gate_cpp_sanitize,
     "cpp-tidy": gate_cpp_tidy,
     "cpp-selftest": gate_cpp_selftest,
+    "rpm": gate_rpm,
 }
 
 
+def successor(text, candidates, lines):
+    """The candidate an edit made of a line with this text: the one most like it, when no other lines of the file are more like it."""
+    windows = sorted({normalised("\n".join(lines[i : i + n])) for n in range(1, 5) for i in range(len(lines) - n + 1)})
+
+    def likeness(other):
+        return difflib.SequenceMatcher(None, text, other, autojunk=False).ratio()
+
+    best = max(windows, key=likeness, default=None)
+    return best if best in candidates and likeness(best) >= SAME_LINE else None
+
+
 def judge(gate, found, baseline, args):
-    allowed = {key[1:]: count for key, (count, _text) in baseline.items() if key[0] == gate}
+    original = {key[1:]: count for key, (count, _text) in baseline.items() if key[0] == gate}
     texts = {**{key[1:]: text for key, (_count, text) in baseline.items() if key[0] == gate}, **found.texts}
-    failures, silent = 0, blocked(found)
+    allowed = dict(original)
+    # an edited line keeps its finding: what a baselined text no longer uses moves to the text its line became
+    for old in sorted(key for key in original if found.counts[key] < original[key] and key[0] in tracked()):
+        new = {texts[key]: key for key in found.counts if key[:2] == old[:2] and found.counts[key] > allowed.get(key, 0)}
+        text = successor(texts[old], new, source_lines(old[0])) if new else None
+        if text:
+            shift = min(allowed[old] - found.counts[old], found.counts[new[text]] - allowed.get(new[text], 0))
+            allowed[old] -= shift
+            allowed[new[text]] = allowed.get(new[text], 0) + shift
+    failures, grown, silent = 0, 0, blocked(found)
     for key in sorted(set(found.counts) | set(allowed)):
         recorded = gate not in UNBASELINED_GATES and key[1] not in UNBASELINED_RULES
         have, limit = found.counts[key], allowed.get(key, 0) if recorded else 0
+        if args.update and recorded and have == limit != original.get(key, 0):
+            baseline[gate, *key] = (have, texts[key])
         # what a gate that cannot see all the code no longer finds is not news; the line that says why it cannot see is
         if have == limit or (silent and have < limit):
             continue
@@ -1483,10 +1592,13 @@ def judge(gate, found, baseline, args):
             continue
         failures += 1
         if have > limit:
+            grown += recorded
             print("\n".join(found.details[key]))
             print(f"FAIL {gate}: {key[0]} {key[1]}: {have} found, the baseline allows {limit}: {texts[key]}")
         else:
             print(f"FAIL {gate}: {key[0]} {key[1]}: the baseline allows {limit} but only {have} remain; lower it with --update: {texts[key]}")
+    if grown:
+        print(f"     A new finding above: fix it, or record it with tests/gates/check.sh {gate} --update --allow-growth and give the reason on a line that starts with Gate-change: in a commit or the pull request body.")
     if not failures:
         print(f"ok   {gate}: nothing beyond the baseline ({sum(found.counts.values())} recorded)")
     return failures
@@ -1497,11 +1609,12 @@ def main():
     parser.add_argument("gates", nargs="+", choices=[*GATES, "all"])
     parser.add_argument("--update", action="store_true", help="lower the baseline to what is found now")
     parser.add_argument("--allow-growth", action="store_true", help="with --update, also record new findings, which the pull request must justify")
+    parser.add_argument("--rpms", nargs="*", default=[], help="for the rpm gate: the RPMs to audit, with their debuginfo")
     args = parser.parse_args()
     os.chdir(ROOT)
     baseline = parse_baseline(read(BASELINE)) if os.path.exists(BASELINE) else {}
     failures = 0
-    for gate in GATES if "all" in args.gates else args.gates:
+    for gate in [g for g in GATES if g != "rpm"] if "all" in args.gates else args.gates:
         found = Findings()
         GATES[gate](found, args)
         failures += judge(gate, found, baseline, args)

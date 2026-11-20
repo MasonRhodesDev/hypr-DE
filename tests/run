@@ -76,6 +76,16 @@ for d in /usr /etc /opt /bin /sbin /lib /lib32 /lib64 /libx32; do
     fi
 done
 
+# a compiler the caller names, such as the safety gates' recording wrappers, builds the tests too
+compilers=()
+named=()
+for var in CC CXX; do
+    if [[ -n "${!var-}" ]]; then
+        compilers+=(--setenv "$var" "${!var}")
+        named+=("$var=${!var}")
+    fi
+done
+
 log=$(mktemp -d) || exit 2
 trap 'rm -rf "$log"' EXIT
 
@@ -92,6 +102,7 @@ sandbox() {
         --setenv LANG C.UTF-8 \
         --setenv TERM "${TERM:-dumb}" \
         --setenv PYTHONPYCACHEPREFIX /tmp/pycache \
+        "${compilers[@]}" \
         --chdir "$root" \
         "$@"
 }
@@ -120,7 +131,7 @@ for t in "$@"; do
         mkdir -p "$log/home"
         (cd "$root" && env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
             HOME="$log/home" LANG=C.UTF-8 TERM="${TERM:-dumb}" \
-            PYTHONPYCACHEPREFIX="$log/pycache" HYPR_DE_SEALED=build-root "$t")
+            PYTHONPYCACHEPREFIX="$log/pycache" HYPR_DE_SEALED=build-root "${named[@]}" "$t")
     else
         sandbox "$t"
     fi

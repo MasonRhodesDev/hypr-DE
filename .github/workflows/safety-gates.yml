@@ -34,14 +34,22 @@ jobs:
       - name: Gates
         run: tests/gates/check.sh classify shell python lua
 
-      # What the gates allow only shrinks: a grown baseline row, a class no gate reads or a changed linter
-      # configuration needs a "Gate-change:" line with its reason in a commit or the pull request body.
+      # What the gates allow only shrinks: a grown baseline row, a class no gate reads, or a change to a linter
+      # configuration, the gates or the workflows needs a "Gate-change:" line with its reason in a commit or the
+      # pull request body. The base branch's ratchet judges, so a pull request cannot loosen the ratchet itself.
       - name: The baseline only shrinks
         if: github.event_name == 'pull_request'
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
           GATE_CHANGE_REASONS: ${{ github.event.pull_request.body }}
-        run: python3 -I tests/gates/ratchet.py "$BASE"
+        run: |
+          if git cat-file -e "$BASE:tests/gates/ratchet.py" 2>/dev/null; then
+            git show "$BASE:tests/gates/ratchet.py" >"$RUNNER_TEMP/ratchet.py"
+          else
+            echo "::warning::the base branch has no ratchet yet, so this pull request's own copy judges it"
+            cp tests/gates/ratchet.py "$RUNNER_TEMP/ratchet.py"
+          fi
+          python3 -I "$RUNNER_TEMP/ratchet.py" "$BASE"
 
   cpp:
     name: C++ packages, sanitizers and clang-tidy
@@ -64,12 +72,14 @@ jobs:
       - name: Trust the checkout (container runs as root)
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      - name: Install Hyprland's headers when a plugin is present
+      # the gates build every package with its check(), so each one's makedepends and checkdepends are installed
+      - name: Install what each package needs to build and test
         shell: bash
         run: |
-          if compgen -G 'plugins/*/CMakeLists.txt' >/dev/null; then
-            pacman -S --noconfirm --needed hyprland
-          fi
+          for pkgbuild in $(awk -F'\t' '$2 == "pkgbuild" { print $1 }' tests/gates/classified.tsv); do
+            setpriv --reuid=65534 --regid=65534 --clear-groups \
+              bash -c 'source "$1" && printf "%s\n" "${makedepends[@]}" "${checkdepends[@]}"' bash "./$pkgbuild"
+          done | sed 's/[<>=].*//' | sort -u | xargs -r pacman -S --noconfirm --needed
 
       - name: Install the pinned clang-tidy
         run: |

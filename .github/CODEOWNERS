@@ -1,5 +1,5 @@
 # The gates, the workflows that run them, the hardening flags and the linter configurations need the owner's review.
-# This binds only when branch protection on main requires a code owner's review.
+# This binds only when branch protection on main requires a code owner's review; the README's "Branch protection the gates need" lists the settings.
 /.github/ @MasonRhodesDev
 /tests/gates/ @MasonRhodesDev
 /plugins/cmake/ @MasonRhodesDev

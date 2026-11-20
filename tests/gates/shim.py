@@ -37,10 +37,13 @@ def fail(message):
 
 
 def planned_jobs():
+    """The jobs the driver plans, and its options after it has read every response file."""
     plan = subprocess.run([REAL, "-###", *ARGV], capture_output=True, text=True, check=False)
     if plan.returncode:
-        return None
-    return [shlex.split(line) for line in plan.stderr.splitlines() if line.startswith(" ")]
+        return None, None
+    jobs = [shlex.split(line) for line in plan.stderr.splitlines() if line.startswith(" ")]
+    options = [shlex.split(line.split("=", 1)[1]) for line in plan.stderr.splitlines() if line.startswith("COLLECT_GCC_OPTIONS=")]
+    return jobs, options[-1] if options else []
 
 
 def preprocessing_arguments():
@@ -85,21 +88,24 @@ def members(data):
     return found
 
 
-def code_digest(path):
-    """A digest of an ELF file's executable sections, which strip and an RPATH edit leave as they are."""
+def loaded_digest(path):
+    """A digest of every section an ELF file loads, code and data, which strip leaves as they are; not the dynamic
+    section and its strings, which CMake's install rewrites to drop the build tree's RPATH."""
     with open(path, "rb") as f:
         data = f.read()
     if data[:4] != b"\x7fELF" or data[4] != 2:
         return None
     order = "<" if data[5] == 1 else ">"
     (table,) = struct.unpack_from(order + "Q", data, 0x28)
-    size, count = struct.unpack_from(order + "HH", data, 0x3A)
-    code = hashlib.sha256()
-    for index in range(count):
-        _name, kind, flags, _address, offset, length = struct.unpack_from(order + "IIQQQQ", data, table + index * size)
-        if flags & 0x4 and kind != 8:
-            code.update(data[offset : offset + length])
-    return code.hexdigest()
+    size, count, names = struct.unpack_from(order + "HHH", data, 0x3A)
+    headers = [struct.unpack_from(order + "IIQQQQ", data, table + index * size) for index in range(count)]
+    strings = headers[names][4] if names < count else 0
+    loaded = hashlib.sha256()
+    for name, kind, flags, _address, offset, length in headers:
+        label = data[strings + name : data.find(b"\0", strings + name)]
+        if flags & 0x2 and kind != 8 and label not in (b".dynamic", b".dynstr"):
+            loaded.update(label + b"\0" + data[offset : offset + length])
+    return loaded.hexdigest()
 
 
 def defined_guards(path):
@@ -149,7 +155,7 @@ def send(record):
 
 
 def main():
-    jobs = planned_jobs()
+    jobs, options = planned_jobs()
     if jobs is None:
         sys.exit(subprocess.run([REAL, *ARGV], check=False).returncode)
     # cc1 with -E only preprocesses, as it does for assembly; that is not a compile the gate can judge
@@ -159,7 +165,7 @@ def main():
         sys.exit(subprocess.run([REAL, *ARGV], check=False).returncode)
     scratch = tempfile.mkdtemp(prefix="gate-shim-")
     try:
-        record = {"cwd": os.getcwd(), "compiler": REAL, "argv": ARGV, "jobs": jobs, "sources": len(compiles)}
+        record = {"cwd": os.getcwd(), "compiler": REAL, "argv": ARGV, "options": options, "jobs": jobs, "sources": len(compiles)}
         # several sources in one call get no preprocessed view, so an object from one of them is one the gate cannot attribute
         if len(compiles) == 1:
             preprocessed = os.path.join(scratch, "view.i")
@@ -187,7 +193,7 @@ def main():
             # a call such as --version plans a link and runs none, so only a linker that wrote its dependency file linked
             if links and os.path.exists(dependencies):
                 out = os.path.realpath(value_of(links[0], "-o") or "a.out")
-                record["link"] = {"output": out, "build_id": build_id(out), "code": code_digest(out), "inputs": linked_from(dependencies)}
+                record["link"] = {"output": out, "build_id": build_id(out), "code": loaded_digest(out), "inputs": linked_from(dependencies)}
         if compiles or "link" in record:
             send(record)
     finally:
@@ -195,7 +201,7 @@ def main():
     sys.exit(compiled.returncode)
 
 
-if sys.argv[1:2] == ["--code-digest"]:
-    print(code_digest(sys.argv[2]))
+if sys.argv[1:2] == ["--loaded-digest"]:
+    print(loaded_digest(sys.argv[2]))
 else:
     main()
