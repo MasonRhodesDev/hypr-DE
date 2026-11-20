@@ -456,7 +456,9 @@ printf 'print("ok   ratchet: nothing the gates allow has grown")\\n' >tests/gate
     # finding 2: without annobin's notes annocheck cannot see how a compile ran, so an RPM without them fails; a spec that turns them off fails classify
     "h2a": (["rpm"], TOY.format(**{**LIBTOY, "macros": "%undefine _annotated_build", "cflags": "-fno-stack-protector"}),
             [r"rpm: @gate-toy/usr/lib64/libtoy\.so annobin-missing"], RPM),
-    "h2b": (["rpm"], TOY.format(**{**LIBTOY, "macros": "%global _annotated_build 0"}), [r"rpm: @gate-toy/usr/lib64/libtoy\.so annobin-missing"], RPM),
+    # Fedora asks only whether _annotated_build is defined, so a 0 leaves the notes on and annocheck still sees the weakening
+    "h2b": (["rpm"], TOY.format(**{**LIBTOY, "macros": "%global _annotated_build 0", "cflags": "-fno-stack-protector"}),
+            [r"rpm: @gate-toy/usr/lib64/libtoy\.so annocheck:stack-prot"], RPM),
     "h2ctl": (["rpm"], TOY.format(**LIBTOY), [], {**RPM, "exact": True}),
     "h2c": (["classify"], f"""sed -i '1i %undefine _annotated_build' {SCENE_SPEC}""", [rf"classify: {SCENE_SPEC} spec-flags"]),
     "h2d": (["classify"], f"""sed -i '1i %global _annotated_build 0' {SCENE_SPEC}""", [rf"classify: {SCENE_SPEC} spec-flags"]),
