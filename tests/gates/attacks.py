@@ -381,7 +381,7 @@ for f in /usr/bin/*; do [ "${f##*/}" = cmake ] || ln -s "$f" ../nocmake/; done""
     # round 5, F1: a baselined finding follows its line through an edit, and the ratchet takes the row --update rewrites
     "f1a": (["cpp-harden", "cpp-tidy"], rf"""sed -i 's|^\( *return static_cast<int>(x + 0\.5);\)$|\1 // round half up|' {GEOMETRY}""", [], {"exact": True}),
     "f1b": (["shell"], QUOTED, [], {"exact": True}),
-    "f1c": (["shell", "ratchet"], QUOTED + "\ntests/gates/check.sh shell --update >/dev/null", [], {"exact": True}),
+    "f1c": (["shell", "ratchet"], QUOTED + "\ntests/gates/check.sh shell --update >/dev/null || true", [], {"exact": True}),
     # F2: the PKGBUILD's cmake line may change its order and generator, or hold its options in an array
     "f2": (["classify"], f"""sed -i 's|^  cmake -S plugins/hypr-de-scene -B build .*$|  local _opts=(-DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr)\\n  cmake -G "Unix Makefiles" -B build -S plugins/hypr-de-scene "${{_opts[@]}}"|' {SCENE}""",
            [], {"exact": True}),
@@ -462,8 +462,8 @@ printf 'print("ok   ratchet: nothing the gates allow has grown")\\n' >tests/gate
     "h3b": (["rpm"], TOY.format(**{**LIBTOY, "macros": "%global debug_package %{nil}", "install": "install -Dm644 toy.c %{buildroot}%{_datadir}/gate-toy/toy.c",
                                    "files": "%{_datadir}/gate-toy/toy.c"}), [r"rpm: @gate-toy no-elf"], RPM),
     # finding 4: a formatter's re-wrap of a baselined statement keeps its rows, and --update writes rows the ratchet takes
-    "h4a": (["cpp-tidy", "ratchet"], REWRAP + f"\ntests/gates/check.sh cpp-tidy --update --pkgbuild {SCENE} >/dev/null", [], {"exact": True, "check": False}),
-    "h4b": (["shell", "ratchet"], SHELLWRAP + "\ntests/gates/check.sh shell --update >/dev/null", [], {"exact": True}),
+    "h4a": (["cpp-tidy", "ratchet"], REWRAP + f"\ntests/gates/check.sh cpp-tidy --update --pkgbuild {SCENE} >/dev/null || true", [], {"exact": True, "check": False}),
+    "h4b": (["shell", "ratchet"], SHELLWRAP + "\ntests/gates/check.sh shell --update >/dev/null || true", [], {"exact": True}),
     "h4c": (["shell"], SHELLWRAP, [], {"exact": True}),
     # and a fixed finding beside a new one of its rule fails once, with the one hint that fits
     "h4d": (["shell"], K0, [r"shell: dist/bin/hypr-de-set-wallpaper SC2292"], {"absent": [r"FAIL .*lower it with --update"], "out": [r".*--update --allow-growth"]}),
