@@ -356,8 +356,8 @@ sed -i 's|^  cmake -S plugins/hypr-de-scene|  export GCC_EXEC_PREFIX="$PWD/{PLUG
     # and a change to its data after the link shows as well as one to its code
     "f6b": (CPP, PATCH.format(scene=SCENE, after="cmake --build build", section=".rodata"), [rf"cpp-harden: {IMPL} unattributed"]),
     # a check() that fails under the trace: the main package, which ships no ELF file, is judged from an untraced build,
-    # and the plugin keeps its failure
-    "f6c": (CPP, f"""sed -i 's|^  ./packaging/check-units.sh$|&\\n  grep -q "^TracerPid:[[:space:]]*0$" /proc/self/status|' packaging/PKGBUILD""", [],
+    # and the plugin keeps its failure. f6c's check() is only that probe, so the main package's own tests cannot decide it
+    "f6c": (CPP, """sed -i '/^check() {$/,/^}$/c check() {\\n  grep -q "^TracerPid:[[:space:]]*0$" /proc/self/status\\n}' packaging/PKGBUILD""", [],
             {"exact": True, "pkgbuild": "packaging/PKGBUILD", "out": [r"note cpp-harden: packaging/PKGBUILD: makepkg failed under the trace and passed without it"]}),
     "f6d": (CPP, f"""sed -i 's|^  ./tests/scene-plugin-build.sh$|&\\n  grep -q "^TracerPid:[[:space:]]*0$" /proc/self/status|' {SCENE}""",
             [rf"cpp-harden: {SCENE} build-failed"]),
