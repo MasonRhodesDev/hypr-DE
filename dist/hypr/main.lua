@@ -155,6 +155,9 @@ hl.config({
         focus_on_activate       = true,
         mouse_move_enables_dpms = true,
         key_press_enables_dpms  = true,
+        -- lock-cmd.sh respawns vigil-lock onto a crashed lock screen. Set false and a crash ends
+        -- the session instead (or warns, per /etc/hypr-de/lock.conf).
+        allow_session_lock_restore = true,
     },
 
     cursor = {
@@ -237,7 +240,8 @@ hl.bind(mainMod .. " + mouse_up",   hl.dsp.focus({ workspace = "e-1" }), { desc 
 hl.bind("Print",         hl.dsp.exec_cmd("@BINDIR@/hypr-de-snip"),   { desc = "Screenshots: Region screenshot + annotate" })
 hl.bind("SHIFT + Print", hl.dsp.exec_cmd("@BINDIR@/hypr-de-record"), { desc = "Screenshots: Screen recording" })
 
-hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("loginctl lock-session"), { desc = "System: Lock screen" })
+-- Locked, so a crashed lock screen can be recovered from the keyboard; with a live locker it starts nothing.
+hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("@LIBEXECDIR@/lock-cmd.sh"), { locked = true, desc = "System: Lock screen" })
 hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("@LIBEXECDIR@/power-menu.sh"), { desc = "System: Power menu" })
 hl.bind(mainMod .. " + T", hl.dsp.exec_cmd("lmtt switch"),                { desc = "System: Toggle light/dark theme" })
 hl.bind(mainMod .. " + N", hl.dsp.exec_cmd("swaync-client -t -sw"),       { desc = "System: Notification center" })

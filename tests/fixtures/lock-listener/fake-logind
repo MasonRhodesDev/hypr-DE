@@ -1,0 +1,145 @@
+#!/usr/bin/python3 -I
+import os
+import signal
+import sys
+
+from gi.repository import Gio, GLib
+
+try:
+    from gi.repository import GLibUnix
+    signal_add = GLibUnix.signal_add
+except ImportError:
+    signal_add = GLib.unix_signal_add
+
+SESSIONS = {
+    "7": "/org/freedesktop/login1/session/_37",
+    "8": "/org/freedesktop/login1/session/_38",
+    "9": "/org/freedesktop/login1/session/_39",
+}
+SESSION_DEFAULTS = {"7": "wayland yes seat0", "8": "wayland no seat0", "9": "tty yes seat0"}
+USER_PATH = "/org/freedesktop/login1/user/_1000"
+PID_SESSIONS = dict(
+    pair.split(":", 1) for pair in os.environ.get("FAKE_LOGIND_PID_SESSIONS", "").split(",") if pair
+)
+
+
+def display():
+    path = os.environ.get("FAKE_LOGIND_DISPLAY_FILE")
+    if path:
+        with open(path) as f:
+            return f.read().strip()
+    return os.environ.get("FAKE_LOGIND_DISPLAY", "7")
+
+
+def session_props(sid):
+    kind, active, seat = os.environ.get(f"FAKE_LOGIND_SESSION_{sid}", SESSION_DEFAULTS[sid]).split()
+    return {"Id": sid, "Type": kind, "Active": active == "yes", "Seat": seat}
+
+events = open(os.environ["FAKE_LOGIND_EVENTS"], "a", buffering=1)
+
+XML = """<node>
+<interface name="org.freedesktop.login1.Manager">
+  <method name="GetSession"><arg type="s" direction="in"/><arg type="o" direction="out"/></method>
+  <method name="GetUser"><arg type="u" direction="in"/><arg type="o" direction="out"/></method>
+  <method name="GetSessionByPID"><arg type="u" direction="in"/><arg type="o" direction="out"/></method>
+  <method name="Inhibit">
+    <arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="s" direction="in"/>
+    <arg type="h" direction="out"/>
+  </method>
+</interface>
+<interface name="org.freedesktop.login1.User">
+  <property name="Display" type="(so)" access="read"/>
+</interface>
+<interface name="org.freedesktop.login1.Session">
+  <property name="Id" type="s" access="read"/>
+  <property name="Type" type="s" access="read"/>
+  <property name="Active" type="b" access="read"/>
+  <property name="Seat" type="(so)" access="read"/>
+</interface>
+</node>"""
+info = Gio.DBusNodeInfo.new_for_xml(XML)
+
+
+def method(conn, sender, path, iface, name, params, invocation):
+    if name == "GetSession":
+        (sid,) = params.unpack()
+        if sid not in SESSIONS:
+            invocation.return_dbus_error("org.freedesktop.login1.NoSuchSession", f"No session '{sid}' known")
+            return
+        invocation.return_value(GLib.Variant("(o)", (SESSIONS[sid],)))
+    elif name == "GetSessionByPID":
+        (pid,) = params.unpack()
+        sid = PID_SESSIONS.get(str(pid))
+        if sid is None:
+            invocation.return_dbus_error("org.freedesktop.login1.NoSessionForPID", f"PID {pid} does not belong to any known session")
+            return
+        invocation.return_value(GLib.Variant("(o)", (SESSIONS[sid],)))
+    elif name == "GetUser":
+        invocation.return_value(GLib.Variant("(o)", (USER_PATH,)))
+    elif name == "Inhibit":
+        what, who, why, mode = params.unpack()
+        events.write(f"inhibit {what} {mode}\n")
+        held, given = os.pipe()
+        GLib.io_add_watch(held, GLib.PRIORITY_DEFAULT, GLib.IO_HUP, released)
+        fds = Gio.UnixFDList.new_from_array([given])
+        invocation.return_value_with_unix_fd_list(GLib.Variant("(h)", (0,)), fds)
+
+
+def released(fd, _condition):
+    events.write("released\n")
+    os.close(fd)
+    return GLib.SOURCE_REMOVE
+
+
+def prop(conn, sender, path, iface, name):
+    sid = display()
+    if not sid:
+        return GLib.Variant("(so)", ("", "/"))
+    return GLib.Variant("(so)", (sid, SESSIONS[sid]))
+
+
+SESSION_TYPES = {"Id": "s", "Type": "s", "Active": "b"}
+
+
+def session_prop(conn, sender, path, iface, name):
+    sid = next(k for k, v in SESSIONS.items() if v == path)
+    value = session_props(sid)[name]
+    if name == "Seat":
+        return GLib.Variant("(so)", (value, f"/org/freedesktop/login1/seat/{value}"))
+    return GLib.Variant(SESSION_TYPES[name], value)
+
+
+bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+bus.register_object("/org/freedesktop/login1", info.interfaces[0], method, None, None)
+bus.register_object(USER_PATH, info.interfaces[1], None, prop, None)
+for session_path in SESSIONS.values():
+    bus.register_object(session_path, info.interfaces[2], None, session_prop, None)
+
+
+def emit(sid):
+    bus.emit_signal(None, SESSIONS[sid], "org.freedesktop.login1.Session", "Lock", None)
+    bus.flush_sync(None)
+    return GLib.SOURCE_CONTINUE
+
+
+signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR1, emit, "7")
+signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR2, emit, "8")
+
+
+def sleep(going_down):
+    bus.emit_signal(None, "/org/freedesktop/login1", "org.freedesktop.login1.Manager",
+                    "PrepareForSleep", GLib.Variant("(b)", (going_down,)))
+    bus.flush_sync(None)
+    return GLib.SOURCE_CONTINUE
+
+
+signal_add(GLib.PRIORITY_DEFAULT, signal.SIGHUP, sleep, True)
+signal_add(GLib.PRIORITY_DEFAULT, signal.SIGWINCH, sleep, False)
+
+
+def owned(*_):
+    print("ready", flush=True)
+
+
+Gio.bus_own_name_on_connection(bus, "org.freedesktop.login1", Gio.BusNameOwnerFlags.NONE, owned, lambda *_: sys.exit(1))
+GLib.MainLoop().run()

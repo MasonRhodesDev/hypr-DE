@@ -1,4 +1,8 @@
 #!/bin/sh
+if [ "${LOCK_POLICY_NO_USER_MANAGER:-0}" = 1 ]; then
+    echo 'Failed to connect to user scope bus via local transport: No such file or directory' >&2
+    exit 1
+fi
 while [ $# -gt 0 ]; do
     case "$1" in
         --) shift; break ;;
@@ -6,8 +10,14 @@ while [ $# -gt 0 ]; do
         *) break ;;
     esac
 done
-case "${1:-}" in
-    vigil-lock)
+case " $* " in
+    *" --watch "*)
+        if [ "${LOCK_POLICY_WATCH_SCOPE_STATUS:-0}" -ne 0 ]; then
+            echo 'Failed to start transient scope unit: Unit already exists' >&2
+            exit "$LOCK_POLICY_WATCH_SCOPE_STATUS"
+        fi
+        ;;
+    *" vigil-lock "*)
         if [ "${LOCK_POLICY_SCOPE_STATUS:-0}" -ne 0 ]; then
             printf 'systemd-run:scope-failed\n' >> "$LOCK_POLICY_LOG"
             exit "$LOCK_POLICY_SCOPE_STATUS"
