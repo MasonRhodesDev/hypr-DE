@@ -150,6 +150,18 @@ assert line in text
 open(path, "w", encoding="utf-8").write(text.replace(line, '[ -r "$WP" ] || {\n    echo "hypr-de-set-wallpaper: cannot read $WP" >&2\n    exit 1\n}\n'))
 PY"""
 K0 = """sed -i 's/^\\[ \\$# -eq 1 \\] || usage$/[[ $# -eq 1 ]] || usage\\n[ -n "$1" ] || usage/' dist/bin/hypr-de-set-wallpaper"""
+# round 8: the formatters themselves, over the tree, each with the repo's own config or its default flags; the change fails
+# if the formatter changes nothing. shfmt cannot parse tests/run (an associative array key with a slash), so it is left out.
+CLANG_FORMAT = f"""clang-format -i {PLUGIN}/src/*
+if git diff --quiet; then echo "the formatter changed nothing" >&2; exit 1; fi"""
+SHFMT = """awk -F'\\t' '$1 == "shell" && $2 != "tests/run" { print $2 }' tests/gates/baseline.tsv | sort -u | xargs shfmt -w FLAGS
+if git diff --quiet; then echo "the formatter changed nothing" >&2; exit 1; fi"""
+# a new finding of a moved row's rule in its file, made in the same edit as the formatter's run
+NEW_ACCESS = f"""sed -i 's|^    g_pHyprRenderer->blend(true);$|&\\n    static_cast<void>(m_spec.background[1]);|' {PLUGIN}/src/Scene.cpp
+"""
+NEW_CHAIN = """sed -i '/sleep during a running lock joins it/a [[ -n "${probe:-}" ]] && ok "probe" || bad "probe"' tests/lock-listener.sh
+"""
+GROWN = {"exact": True, "absent": [r"FAIL .*lower it with --update"], "out": [r".*--update --allow-growth"]}
 
 # name: (gates, change made with bash in the clone, FAIL lines that must appear, and options); no lines means the gates pass by design
 CASES = {
@@ -472,6 +484,19 @@ printf 'print("ok   ratchet: nothing the gates allow has grown")\\n' >tests/gate
     "h4c": (["shell"], SHELLWRAP, [], {"exact": True}),
     # and a fixed finding beside a new one of its rule fails once, with the one hint that fits
     "h4d": (["shell"], K0, [r"shell: dist/bin/hypr-de-set-wallpaper SC2292"], {"absent": [r"FAIL .*lower it with --update"], "out": [r".*--update --allow-growth"]}),
+    # round 8: a whole formatter run over the tree keeps every row, in the gate CI runs and after --update in the ratchet, with no
+    # Gate-change: reason, and a new finding of a moved row's rule in the same file and the same edit still fails with the growth hint
+    "h4e": (["cpp-tidy"], CLANG_FORMAT, [], {"exact": True, "check": False, "needs": ["clang-format"]}),
+    "h4f": (["cpp-tidy", "ratchet"], CLANG_FORMAT + f"\ntests/gates/check.sh cpp-tidy --update --pkgbuild {SCENE} >/dev/null || true", [],
+            {"exact": True, "check": False, "needs": ["clang-format"]}),
+    "h4g": (["cpp-tidy"], NEW_ACCESS + CLANG_FORMAT, [rf"cpp-tidy: {PLUGIN}/src/Scene\.cpp cppcoreguidelines-pro-bounds-avoid-unchecked-container-access"],
+            {**GROWN, "check": False, "needs": ["clang-format"]}),
+    "h4h": (["shell"], SHFMT.replace("FLAGS", ""), [], {"exact": True, "needs": ["shfmt"]}),
+    "h4i": (["shell", "ratchet"], SHFMT.replace("FLAGS", "") + "\ntests/gates/check.sh shell --update >/dev/null || true", [], {"exact": True, "needs": ["shfmt"]}),
+    "h4j": (["shell"], NEW_CHAIN + SHFMT.replace("FLAGS", ""), [r"shell: tests/lock-listener\.sh SC2015"], {**GROWN, "needs": ["shfmt"]}),
+    "h4k": (["shell"], SHFMT.replace("FLAGS", "-bn -ci"), [], {"exact": True, "needs": ["shfmt"]}),
+    "h4l": (["shell", "ratchet"], SHFMT.replace("FLAGS", "-bn -ci") + "\ntests/gates/check.sh shell --update >/dev/null || true", [], {"exact": True, "needs": ["shfmt"]}),
+    "h4m": (["shell"], NEW_CHAIN + SHFMT.replace("FLAGS", "-bn -ci"), [r"shell: tests/lock-listener\.sh SC2015"], {**GROWN, "needs": ["shfmt"]}),
     # finding 7: -wrapper is not among the options GCC reports, but the wrapper the build wrote is a program the build user could have written
     "h7": (CPP, f"""mkdir -p {PLUGIN}/tools
 printf '#!/bin/sh\\nexec "$@"\\n' >{PLUGIN}/tools/wrap.sh

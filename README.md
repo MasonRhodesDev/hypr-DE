@@ -737,20 +737,31 @@ fails. A count may only fall. Finding more than the count fails, and so does
 finding fewer until the line is lowered with
 `tests/gates/check.sh <gate> --update`.
 
-A line that moves keeps its text, so its row still counts it. A line that is
-edited keeps its row too: when a baselined text is no longer found, and the
-lines of the file most like it now (by `difflib`, at least 0.6 alike) carry a
-new finding of the same rule, the row's count moves to that text. A fixed
-line and a new line of the same rule elsewhere in the file do not match this
-way, since the fixed line is still the one most like the old text. The
-match runs over one to four lines at a time, so a statement that a formatter
-wraps over several lines, or joins into one, keeps its rows: each new finding
-of the rule on the lines most like the old text takes its share of the
-count. `--update` then writes the new text, and the ratchet takes those
-rewritten rows by the same test, so a pure reformat needs no `Gate-change:`
-reason. When an edit both fixes a finding and adds one of the same rule
-elsewhere, the gate prints one FAIL, for the new finding, with the
-`--update --allow-growth` hint.
+A line that moves keeps its text, so its row still counts it. A reformatted
+statement keeps its rows too. When a baselined text is no longer found as a
+finding's text, but is still in the file once whitespace, line breaks, line
+continuations and semicolons are taken out of both, each new finding of the
+same rule whose text shares characters with it takes its share of the count.
+That holds however many lines a formatter wraps, joins or writes the
+statement out over: `clang-format` with `plugins/hypr-de-scene/.clang-format`
+over the plugin's sources, and `shfmt` with its default flags or with
+`-bn -ci` over the baselined scripts, need no change to the baseline. A line
+that is edited keeps its row as well: when the old text is gone from the
+file, and the one to four lines of the file most like it now (by `difflib`,
+at least 0.6 alike) carry a new finding of the same rule, the row's count
+moves to that text. A fixed line and a new line of the same rule elsewhere in
+the file match neither way, since the new line shares no text with the old
+one and the fixed line is still the one most like it. `--update` then writes
+the new text, and the ratchet takes those rewritten rows by the same test, so
+a pure reformat needs no `Gate-change:` reason. When an edit both fixes or
+moves a finding and adds one of the same rule elsewhere, the gate prints one
+FAIL, for the new finding, with the `--update --allow-growth` hint.
+
+The match is by text alone, as the ratchet has no line numbers, and it never
+moves more than a row lost. Its limit: when a finding goes away while its
+text stays in the file, such as by an edit to the lines around it, a new
+finding of the same rule in that file whose text is also part of the old text
+takes the row's count, wherever that new finding is.
 
 A new or higher line in the baseline is an ordinary edit
 (`--update --allow-growth` writes it). On a pull request,

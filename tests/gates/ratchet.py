@@ -7,7 +7,7 @@ the ratchet itself. It compares the base commit's baseline, file classes and
 configurations with the files git tracks in the working tree. These fail:
 
 * a baseline row that is new, or allows more than the base's row did, unless
-  it is a row whose line was edited or rewrapped: the base row's count fell by
+  it is a row whose line was edited or reformatted: the base row's count fell by
   as much, and its text became the new row's text (see successors);
 * a classified.tsv row whose class changed, unless it went from a class no gate
   reads to one a gate reads, and a new row with a class no gate reads, except
@@ -85,12 +85,44 @@ def spans(lines):
     return found
 
 
+def squeezed(text):
+    """The text without what a formatter adds, drops or moves: whitespace and so line breaks, line continuations, and the
+    semicolons shfmt drops when it writes a one-line block out over several lines."""
+    return re.sub(r"\\(?=\n|$)|[\s;]", "", text)
+
+
+@functools.cache
+def squeezed_file(lines):
+    return squeezed("\n".join(lines))
+
+
+def places(text, whole):
+    """Where the squeezed text runs in the squeezed file, as ranges of its characters."""
+    found, at = [], whole.find(text) if text else -1
+    while at >= 0:
+        found.append(range(at, at + len(text)))
+        at = whole.find(text, at + 1)
+    return found
+
+
 def successors(text, candidates, lines):
-    """The candidates an edit made of a line with this text, most alike first: those on the lines of the file most like the text
-    now, so an edited line, and a statement a formatter wrapped or joined, keep their finding."""
-    runs = spans(tuple(lines))
+    """The candidates an edit made of a line with this text, most alike first. When the text is still in the file, squeezed,
+    those are the candidates that share some of its characters, so a statement a formatter wrapped, joined or wrote out over
+    any number of lines keeps its finding. Otherwise they are those on the lines of the file most like the text now, so an
+    edited line keeps its finding."""
     matcher = difflib.SequenceMatcher(None, autojunk=False)
     matcher.set_seq2(text)
+
+    def likeness(other):
+        matcher.set_seq1(other)
+        return matcher.ratio()
+
+    whole = squeezed_file(tuple(lines))
+    old = places(squeezed(text), whole)
+    held = [c for c in candidates if any(a.start < b.stop and b.start < a.stop for a in old for b in places(squeezed(c), whole))]
+    if held:
+        return sorted(held, key=lambda c: (-likeness(c), c))
+    runs = spans(tuple(lines))
     best, score = (text, 1.0) if text in runs else (None, 0.0)
     for other in [] if best else sorted(runs):
         matcher.set_seq1(other)
@@ -100,11 +132,6 @@ def successors(text, candidates, lines):
     if best is None or score < SAME_LINE:
         return []
     held = [c for c in candidates if any(set(a) & set(b) for a in runs[best] for b in runs.get(c, ()))]
-
-    def likeness(other):
-        matcher.set_seq1(other)
-        return matcher.ratio()
-
     return sorted(held, key=lambda c: (-likeness(c), c))
 
 
