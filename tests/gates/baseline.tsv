@@ -52,6 +52,7 @@ python	dist/gaming/bp-game-focus.py	S607	c5406c78535176ac	1	p = subprocess.run([
 python	dist/gaming/bp-game-focus.py	S607	c7e3eed7d9ab55b1	1	["uwsm", "app", "--", "steam", "steam://open/bigpicture"],
 python	dist/gaming/bp-game-focus.py	SIM115	1a0eeaf5064b1639	1	_log_file = open(LOG_PATH, "w", buffering=1)
 python	dist/gaming/bp-game-focus.py	SIM115	b6eb89584d107bbb	1	f = open(CEF_LOG)
+python	dist/libexec/hypr-de-lock-listener	BLE001	8d8ee03581deca17	1	except Exception as error: # a retry that stopped on a surprise would leave Lock unanswered
 python	dist/libexec/waybar-mediaplayer.py	ARG001	27f2130b944a11d6	2	def stop(signum, frame):
 python	dist/libexec/waybar-mediaplayer.py	BLE001	cef6159c5a287f9e	1	except Exception as e: # noqa: BLE001 - a bug must not kill the module for the session
 python	dist/libexec/waybar-mediaplayer.py	PLW0603	bc171c54637f4001	1	global child
@@ -59,6 +60,11 @@ python	dist/libexec/waybar-mediaplayer.py	suppression	cef6159c5a287f9e	1	except 
 python	packaging/declared-units.py	E401	912cc3e69d9b7048	1	import sys, tomllib
 python	plugins/hypr-de-scene/tests/gen-fixtures.py	RUF005	c89dc924ea92c46a	1	OUTPUTS = ( ("3440x1440", 3440, 1440, 0, 1.0), ("3840x2160 rotated at 1.5", 3840, 2160, 1, 1.5), ("1920x1080", 1920, 1080, 0, 1.0), ) + tuple((f"1366x768 transform {t}", 1366, 768, t, 1.0) for t in range(8))
 python	plugins/hypr-de-scene/tests/readback-check.py	B905	7eac58c4834db988	1	for c, ground in zip((r, g, b), bg)
+python	tests/fixtures/lock-listener/fake-logind	ARG001	97b641fc92b194d0	5	def prop(conn, sender, path, iface, name):
+python	tests/fixtures/lock-listener/fake-logind	ARG001	9fb663fe34aefb3f	3	def session_prop(conn, sender, path, iface, name):
+python	tests/fixtures/lock-listener/fake-logind	ARG001	edaad707114f61bd	4	def method(conn, sender, path, iface, name, params, invocation):
+python	tests/fixtures/lock-listener/fake-logind	RUF059	fc46a0e9d5eab381	2	what, who, why, mode = params.unpack()
+python	tests/fixtures/lock-listener/fake-logind	SIM115	79637d1b7e57f4a9	1	events = open(os.environ["FAKE_LOGIND_EVENTS"], "a", buffering=1)
 shell	dist/bin/hypr-de-record	SC2154	48d6975b1d306356	1	echo "$PID" > "$PIDFILE"
 shell	dist/bin/hypr-de-record	SC2292	256e5bf419e6e670	1	if [ -f "$FILENAME" ]; then
 shell	dist/bin/hypr-de-record	SC2292	a891f315777c2119	1	if [ -n "$REGION" ]; then
@@ -197,12 +203,24 @@ shell	dist/libexec/hyprland-configreload-listener.sh	SC2249	db63ec40a3979e27	1	c
 shell	dist/libexec/hyprland-configreload-listener.sh	SC2312	794698f70307b7ad	2	echo "$(date '+%Y-%m-%d %H:%M:%S') - Monitor change: $line"
 shell	dist/libexec/hyprland-configreload-listener.sh	SC2312	a8843d2477fe920d	1	echo "$(date '+%Y-%m-%d %H:%M:%S') - Config reloaded, restarting waybar..."
 shell	dist/libexec/lock-cmd.sh	SC2015	2c0ef8e5a8ff88e7	2	[ "$#" -gt 0 ] && command -v "$1" >/dev/null 2>&1 || continue
-shell	dist/libexec/lock-cmd.sh	SC2086	3a05f326ddedf8a8	1	set -- ${entry%&}
+shell	dist/libexec/lock-cmd.sh	SC2086	2f44055a24d50531	1	printf '%s\n' $names | cut -c1-15 | sort -u | paste -sd'|'
+shell	dist/libexec/lock-cmd.sh	SC2086	3a05f326ddedf8a8	2	set -- ${entry%&}
 shell	dist/libexec/lock-cmd.sh	SC2086	53390eed4829f4ab	1	set -- $entry
+shell	dist/libexec/lock-cmd.sh	SC2181	2ddd01b893a72095	1	[ "$?" -eq 0 ] || exit 0
+shell	dist/libexec/lock-cmd.sh	SC2249	1e51eadc577cce3b	1	case $hypr_pid in ''|*[!0-9]*) return 0 ;; esac
+shell	dist/libexec/lock-cmd.sh	SC2249	3d1c6bf3bcef6916	1	case $(timeout 2 hyprctl locked 2>/dev/null) in true) return 0 ;; false) return 1 ;; esac
+shell	dist/libexec/lock-cmd.sh	SC2249	59cc72b1e869ea00	1	case $(sed -n 's/^State:[[:space:]]*\([A-Z]\).*/\1/p' "/proc/$1/status" 2>/dev/null) in Z|X) return 0 ;; esac
+shell	dist/libexec/lock-cmd.sh	SC2249	8e6d2afe7000df2f	1	case "$warn" in ''|*[!0-9]*) log "ignoring VIGIL_IDLE_WARNING_SECONDS='$warn': not a whole number of seconds" warn=10 ;; esac
+shell	dist/libexec/lock-cmd.sh	SC2249	af373a1370528612	1	case $(timeout 2 hyprctl getoption misc:allow_session_lock_restore 2>/dev/null | sed -n 1p) in 'int: 0'|'bool: false'|'bool: 0') return 0 ;; esac
+shell	dist/libexec/lock-cmd.sh	SC2249	d36f305d05e1b71a	1	case $at in ''|*[!0-9]*) continue ;; esac
 shell	dist/libexec/lock-cmd.sh	SC2249	e1069c63eda4b05d	1	case "$key" in ''|\#*) continue ;; failsafe) case "$value" in terminate|warn|none) FAILSAFE=$value ;; esac ;; fallbacks) FALLBACKS=$value ;; verify_tries) case "$value" in ''|*[!0-9]*) ;; *) VERIFY_TRIES=$value ;; esac ;; esac
 shell	dist/libexec/lock-cmd.sh	SC2249	ec1bec66a8ba08e6	1	failsafe) case "$value" in terminate|warn|none) FAILSAFE=$value ;; esac ;;
+shell	dist/libexec/lock-cmd.sh	SC2312	451d86bf8edb565a	2	pids=$(timeout 2 pgrep -u "$(id -u)" -x "$(locker_names)" 2>/dev/null)
 shell	dist/libexec/lock-cmd.sh	SC2312	9a08ddf20745f54b	1	loginctl terminate-user "$(id -u)"
-shell	dist/libexec/lock-cmd.sh	suppression	9e669f46bc5b169b	2	# shellcheck disable=SC2086 # deliberate: entry is a command line
+shell	dist/libexec/lock-cmd.sh	SC2312	e4767f3c509eaa25	1	while [ "$tries" -gt 0 ] && [ "$(now)" -lt "$give_up" ]; do
+shell	dist/libexec/lock-cmd.sh	SC2312	f0b7a97287860043	1	if journal_ok && [ "$(stat -L -c '%d:%i' "/proc/$$/fd/2" 2>/dev/null)" != "${JOURNAL_STREAM:-}" ]; then
+shell	dist/libexec/lock-cmd.sh	suppression	7dbaa227626428e9	1	# shellcheck disable=SC2086 # deliberate: one name per word
+shell	dist/libexec/lock-cmd.sh	suppression	9e669f46bc5b169b	3	# shellcheck disable=SC2086 # deliberate: entry is a command line
 shell	dist/libexec/no-keep-awake.sh	SC2292	0c505e2f2111ec76	1	[ -n "$holder" ] && { printf 'wayland:%s\n' "$holder"; exit 1; }
 shell	dist/libexec/no-keep-awake.sh	SC2292	435958c196a527bb	1	[ "$(timeout 2 logind-idle-control status 2>/dev/null)" = 1 ] && { echo toggle; exit 1; }
 shell	dist/libexec/no-keep-awake.sh	SC2312	05643e624805b79f	1	if timeout 2 systemd-inhibit --list --no-pager 2>/dev/null \
@@ -214,7 +232,7 @@ shell	dist/libexec/osd/media-osd.sh	SC2249	51363b8546fef776	1	case $1 in "play-p
 shell	dist/libexec/osd/volume-osd.sh	SC2086	4c3c742c90181456	1	vol_percent=$(echo $volume | awk '{print int($2*100)}')
 shell	dist/libexec/osd/volume-osd.sh	SC2086	b1d6f6dd61351119	1	notify-send -t 2000 -a "osd-volume" -h string:x-canonical-private-synchronous:volume -h int:value:$vol_percent "🔊 $vol_percent%" ""
 shell	dist/libexec/osd/volume-osd.sh	SC2249	af12dbe406501282	1	case $1 in "up") wpctl set-volume -l 1.5 @DEFAULT_AUDIO_SINK@ 1%+ ;; "down") wpctl set-volume -l 1.5 @DEFAULT_AUDIO_SINK@ 1%- ;; "mute") wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle ;; esac
-shell	dist/libexec/power-menu.sh	SC2249	c14283b2a598c4aa	1	case "$selection" in Logout) "$exit_cmd" ;; Reboot) "$exit_cmd" -p 'systemctl reboot' ;; Shutdown) "$exit_cmd" -p 'systemctl poweroff -i' ;; Lock) loginctl lock-session ;; esac
+shell	dist/libexec/power-menu.sh	SC2249	d0fcbf3147707319	1	case "$selection" in Logout) "$exit_cmd" ;; Reboot) "$exit_cmd" -p 'systemctl reboot' ;; Shutdown) "$exit_cmd" -p 'systemctl poweroff -i' ;; Lock) @LIBEXECDIR@/lock-cmd.sh ;; esac
 shell	dist/libexec/screen-recorder/modules/base.sh	SC2015	4027767a5b1937fa	1	mkdir -p "$RECORDER_STATE_DIR" && chmod 700 "$RECORDER_STATE_DIR" || {
 shell	dist/libexec/screen-recorder/modules/base.sh	SC2249	1cab0eaf9743d48a	1	case "$comm" in gpu-screen-reco*) return 0 ;; esac
 shell	dist/libexec/screen-recorder/modules/base.sh	SC2292	3ceea96834d614d9	1	if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
@@ -433,9 +451,13 @@ shell	tests/env-guard.sh	SC2312	a8f93705acb5700a	2	check "$(writes stale | grep 
 shell	tests/env-guard.sh	SC2312	e861c773c3e2a340	1	check "$(cat "$work/unreached/rc")" 1 "the guard exits 1" "the guard trusted an export the manager never got"
 shell	tests/fixtures/hypridle-override/hypridle	SC2154	7545a0c75847e8c9	1	cp "$2" "$HYPRIDLE_CONF_COPY"
 shell	tests/fixtures/hypridle-override/hypridle	SC2154	e7d4602a0b4a084b	1	printf '%s\n' "$*" >> "$HYPRIDLE_LOG"
-shell	tests/fixtures/lock-policy-fallback/swaylock	SC2154	9f58ec57e290fbcc	1	printf 'swaylock:%s\n' "$*" >> "$LOCK_POLICY_LOG"
+shell	tests/fixtures/lock-policy-fallback/swaylock	SC2154	030dbef62f3fdf89	1	printf 'swaylock:refused\n' >> "$LOCK_POLICY_LOG"
+shell	tests/fixtures/lock-policy-fallback/swaylock	SC2154	4f19ae7138bdc911	1	echo $! >> "$LOCK_POLICY_HOLDERS"
+shell	tests/fixtures/lock-policy-fallback/swaylock	SC2312	4ffa1f1cf217987e	1	while [ "$(wc -l < "$LOCK_POLICY_SWAYLOCK_BARRIER")" -lt 2 ] && [ "$i" -lt 15 ]; do
+shell	tests/fixtures/lock-policy/hyprctl	SC2154	4310c7566503fa3e	1	echo "Couldn't connect to $XDG_RUNTIME_DIR/hypr/${HYPRLAND_INSTANCE_SIGNATURE:-}/.socket.sock. (3)"
 shell	tests/fixtures/lock-policy/hyprctl	SC2154	a586164e4c91728f	1	printf 'hyprctl:%s\n' "$*" >> "$LOCK_POLICY_LOG"
-shell	tests/fixtures/lock-policy/hyprctl	SC2249	19b6018514242832	1	case "${1:-}" in -j) if [ "${2:-}" = clients ]; then [ "${LOCK_POLICY_COMPOSITOR_HANG:-0}" = 1 ] && sleep 30 if [ -n "${LOCK_POLICY_INHIBIT_CLIENT:-}" ]; then printf '[{"class":"%s","inhibitingIdle":true}]\n' "$LOCK_POLICY_INHIBIT_CLIENT" else printf '[]\n' fi exit 0 fi ;; locked) [ "${LOCK_POLICY_COMPOSITOR_HANG:-0}" = 1 ] && sleep 30 printf '%s\n' "${LOCK_POLICY_COMPOSITOR_LOCKED:-false}" exit 0 ;; esac
+shell	tests/fixtures/lock-policy/hyprctl	SC2249	79b06bcdf80dcc83	1	case "${1:-}" in locked|getoption) if [ -n "${LOCK_POLICY_HYPRCTL_GONE:-}" ] && [ -e "$LOCK_POLICY_HYPRCTL_GONE" ]; then echo "Couldn't connect to $XDG_RUNTIME_DIR/hypr/${HYPRLAND_INSTANCE_SIGNATURE:-}/.socket.sock. (3)" exit 1 fi [ -n "${LOCK_POLICY_HYPRCTL_SLOW:-}" ] && [ -e "$LOCK_POLICY_HYPRCTL_SLOW" ] && sleep 4 ;; esac
+shell	tests/fixtures/lock-policy/hyprctl	SC2249	f9ebf33d2effac5b	1	case "${1:-}" in -j) if [ "${2:-}" = clients ]; then [ "${LOCK_POLICY_COMPOSITOR_HANG:-0}" = 1 ] && sleep 30 if [ -n "${LOCK_POLICY_INHIBIT_CLIENT:-}" ]; then printf '[{"class":"%s","inhibitingIdle":true}]\n' "$LOCK_POLICY_INHIBIT_CLIENT" else printf '[]\n' fi exit 0 fi ;; locked) [ "${LOCK_POLICY_COMPOSITOR_HANG:-0}" = 1 ] && sleep 30 if [ -n "${LOCK_POLICY_LOCK_FILE:-}" ] && [ -e "$LOCK_POLICY_LOCK_FILE" ]; then echo true else printf '%s\n' "${LOCK_POLICY_COMPOSITOR_LOCKED:-false}" fi exit 0 ;; getoption) [ "${2:-}" = misc:allow_session_lock_restore ] || { echo "no such option"; exit 0; } printf 'bool: %s\nset: true\n' "${LOCK_POLICY_RESTORE:-false}" exit 0 ;; esac
 shell	tests/fixtures/lock-policy/hyprstate	SC2154	5abce0eab414adf8	1	printf 'hyprstate:%s\n' "$*" >> "$LOCK_POLICY_LOG"
 shell	tests/fixtures/lock-policy/loginctl	SC2154	fda97abe00d6c18f	1	printf 'loginctl:%s\n' "$*" >> "$LOCK_POLICY_LOG"
 shell	tests/fixtures/lock-policy/loginctl	SC2249	4a569ff5d20d26a9	1	case "${2:-}" in self) echo "Failed to get path for session 'self': Caller does not belong to any known session." >&2 exit 1 ;; esac
@@ -443,9 +465,13 @@ shell	tests/fixtures/lock-policy/loginctl	SC2249	e3a2e79ca56925d4	1	case "$*" in
 shell	tests/fixtures/lock-policy/loginctl	SC2249	f155d974ad15e36a	1	case "${1:-}" in show-session) case "${2:-}" in self) echo "Failed to get path for session 'self': Caller does not belong to any known session." >&2 exit 1 ;; esac case "$*" in *LockedHint*) printf '%s\n' "${LOCK_POLICY_LOCKED_HINT:-no}" ;; *Id*) printf '%s\n' "${LOCK_POLICY_SESSION_ID:-7}" ;; esac ;; terminate-session|terminate-user) printf 'loginctl:%s\n' "$*" >> "$LOCK_POLICY_LOG" ;; esac
 shell	tests/fixtures/lock-policy/logind-idle-control	SC2154	2c4871d400df3fcb	1	printf 'logind-idle-control:%s\n' "$*" >> "$LOCK_POLICY_LOG"
 shell	tests/fixtures/lock-policy/logind-idle-control	SC2249	a694c75093d2a1ec	1	case "${1:-}" in status) [ "${LOCK_POLICY_INHIBIT_HANG:-0}" = 1 ] && sleep 30 printf '%s\n' "${LOCK_POLICY_INHIBIT_ENABLED:-0}" exit 0 ;; esac
+shell	tests/fixtures/lock-policy/notify-send	SC2154	fd2def27c1760310	1	printf 'notify-send:%s\n' "$*" >> "$LOCK_POLICY_LOG"
+shell	tests/fixtures/lock-policy/pgrep	SC2154	bd6be75883d034bb	1	grep -qx "$pid" "$LOCK_POLICY_HOLDERS" 2>/dev/null || continue
 shell	tests/fixtures/lock-policy/pgrep	SC2249	39892d51f4e4fbb6	1	case "${2:-}" in gameoverlayui) [ "${LOCK_POLICY_GAME:-}" = steam ] && exit 0 ;; gamescope) [ "${LOCK_POLICY_GAME:-}" = gamescope ] && exit 0 ;; esac
+shell	tests/fixtures/lock-policy/systemd-cat	SC2154	dc2be619da8f759d	1	printf '%s: %s\n' "$ident" "$line" >> "$LOCK_POLICY_JOURNAL"
 shell	tests/fixtures/lock-policy/systemd-run	SC2154	240f965ac83ace51	1	printf 'systemd-run:scope-failed\n' >> "$LOCK_POLICY_LOG"
-shell	tests/fixtures/lock-policy/systemd-run	SC2249	0aad9e2e2e7154b3	1	case "${1:-}" in vigil-lock) if [ "${LOCK_POLICY_SCOPE_STATUS:-0}" -ne 0 ]; then printf 'systemd-run:scope-failed\n' >> "$LOCK_POLICY_LOG" exit "$LOCK_POLICY_SCOPE_STATUS" fi ;; esac
+shell	tests/fixtures/lock-policy/systemd-run	SC2249	7bd0bac930743114	1	case " $* " in *" --watch "*) if [ "${LOCK_POLICY_WATCH_SCOPE_STATUS:-0}" -ne 0 ]; then echo 'Failed to start transient scope unit: Unit already exists' >&2 exit "$LOCK_POLICY_WATCH_SCOPE_STATUS" fi ;; *" vigil-lock "*) if [ "${LOCK_POLICY_SCOPE_STATUS:-0}" -ne 0 ]; then printf 'systemd-run:scope-failed\n' >> "$LOCK_POLICY_LOG" exit "$LOCK_POLICY_SCOPE_STATUS" fi ;; esac
+shell	tests/fixtures/lock-policy/vigil-lock	SC2154	4f19ae7138bdc911	1	echo $! >> "$LOCK_POLICY_HOLDERS"
 shell	tests/fixtures/lock-policy/vigil-lock	SC2154	f62fcaed8c406438	1	printf 'vigil-lock:%s\n' "$*" >> "$LOCK_POLICY_LOG"
 shell	tests/fixtures/media-stream/playerctl	SC2154	95decabaa81fe20a	1	echo $$ > "$MEDIA_PIDFILE"
 shell	tests/fixtures/media-stream/playerctl	SC2154	fe34125ea68fdc88	1	printf '%s\n' "$*" >> "$MEDIA_ARGV_LOG"
@@ -548,33 +574,199 @@ shell	tests/installer-trust.sh	SC2312	54456abb02edd2d3	1	[ "$(cat "$work/rc")" !
 shell	tests/installer-trust.sh	SC2312	d7dba9c53c2e4e2a	1	[ "$(cat "$work/rc")" = 0 ] && ok "success exits 0" || bad "success exited non-zero"
 shell	tests/installer-trust.sh	SC2329	4174805299016d20	1	emit() { echo x >> "$attempts" printf '%s\n' "$2" return "$1" }
 shell	tests/installer-trust.sh	SC2329	bd107799afb6e32a	1	fetch() { cp "$fixture" "$2"; }
+shell	tests/lock-listener.sh	SC2015	05fe5b6b3cd21866	1	[ "$(locks)" = 4 ] && ok "sleep during a running lock joins it instead of starting another" || bad "sleep started a second lock-cmd.sh"
+shell	tests/lock-listener.sh	SC2015	0ec2c6db007aa1c1	1	wait_for '[ "$(locks)" = 6 ]' && ok "without XDG_SESSION_ID it follows the user's graphical session" || bad "no lock without XDG_SESSION_ID"
+shell	tests/lock-listener.sh	SC2015	1daaae8cf3c4f5e3	1	wait_for '[ "$(locks)" = 2 ]' && ok "a Lock after the first lock finished runs lock-cmd.sh again" || bad "a later Lock was dropped"
+shell	tests/lock-listener.sh	SC2015	24b8760e3dcb4b6c	1	&& ok "the start limit never gives up on the listener" || bad "systemd's default start limit can leave Lock unanswered"
+shell	tests/lock-listener.sh	SC2015	2a85ace4f7ee4403	1	wait_for '[ "$(locks)" = 9 ]' && ok "a Lock after a stuck lock-cmd.sh runs lock-cmd.sh again" || bad "a stuck lock-cmd.sh swallowed later Lock requests"
+shell	tests/lock-listener.sh	SC2015	30904afde3873b46	1	grep -q "waiting" "$work/listener.err" && ok "and says what it is waiting for" || bad "the wait is silent: $(cat "$work/listener.err")"
+shell	tests/lock-listener.sh	SC2015	334c237d868ec52e	1	[ "$(events)" = "inhibit sleep delay," ] && ok "sleep waits while lock-cmd.sh is still locking" || bad "the delay was released before the lock finished"
+shell	tests/lock-listener.sh	SC2015	39def8af102da692	1	[ "$(locks)" = 2 ] && ok "a Lock for another session is ignored" || bad "a Lock for another session locked this one"
+shell	tests/lock-listener.sh	SC2015	4168efc0bbb1738f	1	grep -qx 'KillMode=process' "$unit" && ok "restarting the unit leaves a bare locker running" || bad "a unit restart would kill a bare locker that holds the lock"
+shell	tests/lock-listener.sh	SC2015	4d87c1a51a8ba027	1	wait_for 'grep -q "locking session 7" "$work/listener.err"' && ok "the listener binds once the session appears" || bad "the listener never bound: $(cat "$work/listener.err")"
+shell	tests/lock-listener.sh	SC2015	51c6eafc46cf78d5	1	wait_for '! kill -0 "$stuck" 2>/dev/null' && ok "the stuck lock-cmd.sh is killed at the deadline" || bad "the stuck lock-cmd.sh is still running after the deadline"
+shell	tests/lock-listener.sh	SC2015	58e536b260488aee	1	&& ok "only the not-Hyprland exit stops the restarts" || bad "the not-Hyprland exit would restart every second"
+shell	tests/lock-listener.sh	SC2015	60aeb3c4b441ad77	1	wait_for '[ "$(events)" = "inhibit sleep delay,released," ]' && ok "the delay is released once lock-cmd.sh returns" || bad "the delay was never released: $(events)"
+shell	tests/lock-listener.sh	SC2015	62f13dd40ec7ba85	1	&& ok "every graphical session pulls the listener in, upgraded installs included" \
+shell	tests/lock-listener.sh	SC2015	690f3befed8a77ad	1	wait_for '[ "$(locks)" = 12 ]' && ok "and then answers Lock" || bad "no lock after a late bind"
+shell	tests/lock-listener.sh	SC2015	6ca1f237d8283393	1	[ "$(cat "$LOCKS")" = "lock-cmd.sh session=7 " ] && ok "lock-cmd.sh runs for our session id" || bad "unexpected run: $(cat "$LOCKS")"
+shell	tests/lock-listener.sh	SC2015	6dc71112d01cc991	1	wait_for '[ "$(locks)" = 1 ]' && ok "a logind Lock on our session runs lock-cmd.sh" || bad "no lock-cmd.sh run for a logind Lock"
+shell	tests/lock-listener.sh	SC2015	8081983e4d2dc258	1	&& ok "outside Hyprland the listener says so and exits 78, which the unit does not restart" \
+shell	tests/lock-listener.sh	SC2015	83be83ddf6b9e853	1	&& ok "a lock-cmd.sh that never returns still releases the sleep delay at the deadline" \
+shell	tests/lock-listener.sh	SC2015	8cddf81c6eb00739	1	[ -e "$NOTES.planted" ] && bad "the listener ran a notify-send from the session's PATH" || ok "notify-send runs from the pinned PATH, not the session's"
+shell	tests/lock-listener.sh	SC2015	8db69d8ed5a259fb	1	wait_for '[ "$(locks)" = 3 ]' && ok "PrepareForSleep runs lock-cmd.sh --sleep" || bad "no lock before sleep"
+shell	tests/lock-listener.sh	SC2015	9220ab24099bc16a	1	command -v dbus-daemon >/dev/null && python3 -I -c 'from gi.repository import Gio' 2>/dev/null || {
+shell	tests/lock-listener.sh	SC2015	92c9a771d0b7de88	1	wait_for '[ "$(events)" = "inhibit sleep delay,released,inhibit sleep delay," ]' && ok "after resume the listener takes a new delay" || bad "no new delay after resume: $(events)"
+shell	tests/lock-listener.sh	SC2015	9634e5de03220f9c	1	' "$root/deps.toml" && ok "the lock-idle group declares PyGObject" || bad "the lock-idle group does not declare PyGObject"
+shell	tests/lock-listener.sh	SC2015	a948ee723c906ec2	1	&& ok "a stale XDG_SESSION_ID loses to the session Hyprland itself runs in" \
+shell	tests/lock-listener.sh	SC2015	aaa20431e6ca9f70	1	&& ok "a lock that returns after resume still leaves a delay held for the next sleep" \
+shell	tests/lock-listener.sh	SC2015	c50f0cefee24ad66	1	grep -q '^ConditionEnvironment=' "$unit" && bad "a ConditionEnvironment skip is silent" || ok "no silent start condition"
+shell	tests/lock-listener.sh	SC2015	d095a46682ab2cc1	1	&& ok "an XDG_SESSION_ID naming a non-wayland session is passed over" \
+shell	tests/lock-listener.sh	SC2015	d4078a3b7c292176	1	wait_for 'grep -q . "$NOTES"' && ok "a stuck lock-cmd.sh posts a visible failure" || bad "no notification for a stuck lock-cmd.sh"
+shell	tests/lock-listener.sh	SC2015	da401208be6843cd	1	wait_for '[ "$(events)" = "inhibit sleep delay,released,inhibit sleep delay,released," ]' && ok "and releases the delay when that lock returns" || bad "the delay was not released after the joined lock: $(events)"
+shell	tests/lock-listener.sh	SC2015	da61cb72f0ca2777	1	&& ok "logind's own session for Hyprland's pid comes first" \
+shell	tests/lock-listener.sh	SC2015	db8be2d813946a37	1	grep -qx 'Restart=always' "$unit" && ok "any exit or signal restarts the listener" || bad "a SIGTERM or clean exit would leave the listener dead"
+shell	tests/lock-listener.sh	SC2015	eaab2c4707c27899	1	[ "$(locks)" = 2 ] && ok "a Lock not sent by logind is ignored" || bad "a Lock from a non-logind sender ran lock-cmd.sh"
+shell	tests/lock-listener.sh	SC2015	f09aa2bdbbc0831f	1	[ "$(locks)" = 1 ] && ok "a second Lock while the first lock is starting starts no second locker" || bad "a second Lock started another lock-cmd.sh"
+shell	tests/lock-listener.sh	SC2015	f6064325b2109339	1	[ "$(events)" = "inhibit sleep delay," ] && ok "the listener holds a sleep delay from the start" || bad "no sleep delay held: $(events)"
+shell	tests/lock-listener.sh	SC2015	f68bcaa6f6daea6b	1	[ -s "$NOTES" ] && bad "a failure notification for locks that returned in time: $(cat "$NOTES")" || ok "locks that return in time post no failure"
+shell	tests/lock-listener.sh	SC2015	f70e84ade75b3389	1	&& ok "at the deadline the listener runs lock-cmd.sh's failsafe" \
+shell	tests/lock-listener.sh	SC2015	fd2b39a4ee18748c	1	grep -qx 'ExecStart=@LIBEXECDIR@/hypr-de-lock-listener' "$unit" && ok "the unit runs the listener" || bad "the unit does not run the listener"
+shell	tests/lock-listener.sh	SC2016	0278b0d01309f128	1	wait_for 'grep -q "locking session" "$work/listener.err"'
+shell	tests/lock-listener.sh	SC2016	0ec2c6db007aa1c1	1	wait_for '[ "$(locks)" = 6 ]' && ok "without XDG_SESSION_ID it follows the user's graphical session" || bad "no lock without XDG_SESSION_ID"
+shell	tests/lock-listener.sh	SC2016	1da76cedd52bcc07	1	wait_for '[ "$(events)" = "inhibit sleep delay,released,inhibit sleep delay,released,inhibit sleep delay," ]' || bad "no delay after the second resume: $(events)"
+shell	tests/lock-listener.sh	SC2016	1daaae8cf3c4f5e3	1	wait_for '[ "$(locks)" = 2 ]' && ok "a Lock after the first lock finished runs lock-cmd.sh again" || bad "a later Lock was dropped"
+shell	tests/lock-listener.sh	SC2016	2a85ace4f7ee4403	1	wait_for '[ "$(locks)" = 9 ]' && ok "a Lock after a stuck lock-cmd.sh runs lock-cmd.sh again" || bad "a stuck lock-cmd.sh swallowed later Lock requests"
+shell	tests/lock-listener.sh	SC2016	4d87c1a51a8ba027	1	wait_for 'grep -q "locking session 7" "$work/listener.err"' && ok "the listener binds once the session appears" || bad "the listener never bound: $(cat "$work/listener.err")"
+shell	tests/lock-listener.sh	SC2016	51c6eafc46cf78d5	1	wait_for '! kill -0 "$stuck" 2>/dev/null' && ok "the stuck lock-cmd.sh is killed at the deadline" || bad "the stuck lock-cmd.sh is still running after the deadline"
+shell	tests/lock-listener.sh	SC2016	60aeb3c4b441ad77	1	wait_for '[ "$(events)" = "inhibit sleep delay,released," ]' && ok "the delay is released once lock-cmd.sh returns" || bad "the delay was never released: $(events)"
+shell	tests/lock-listener.sh	SC2016	6247bae890d1dc48	1	wait_for '[ "$(events)" = "inhibit sleep delay,released,inhibit sleep delay,released,inhibit sleep delay,released,inhibit sleep delay," ]' \
+shell	tests/lock-listener.sh	SC2016	68078bd7975535f7	1	wait_for '[ "$(locks)" = 5 ]' || bad "no lock before the third sleep"
+shell	tests/lock-listener.sh	SC2016	690f3befed8a77ad	1	wait_for '[ "$(locks)" = 12 ]' && ok "and then answers Lock" || bad "no lock after a late bind"
+shell	tests/lock-listener.sh	SC2016	6dc71112d01cc991	1	wait_for '[ "$(locks)" = 1 ]' && ok "a logind Lock on our session runs lock-cmd.sh" || bad "no lock-cmd.sh run for a logind Lock"
+shell	tests/lock-listener.sh	SC2016	6f44d9b1c4176add	1	wait_for '[ "$(locks)" = 8 ]' || bad "no lock-cmd.sh run for a logind Lock"
+shell	tests/lock-listener.sh	SC2016	7a6800704b521d8f	1	wait_for '[ "$(locks)" = 4 ]' || bad "no lock-cmd.sh run for a logind Lock"
+shell	tests/lock-listener.sh	SC2016	85d89324ee33d6aa	1	wait_for '[ "$(locks)" = 7 ]' && [ "$(tail -n1 "$LOCKS")" = "lock-cmd.sh session=7 " ] \
+shell	tests/lock-listener.sh	SC2016	8db69d8ed5a259fb	1	wait_for '[ "$(locks)" = 3 ]' && ok "PrepareForSleep runs lock-cmd.sh --sleep" || bad "no lock before sleep"
+shell	tests/lock-listener.sh	SC2016	92c9a771d0b7de88	1	wait_for '[ "$(events)" = "inhibit sleep delay,released,inhibit sleep delay," ]' && ok "after resume the listener takes a new delay" || bad "no new delay after resume: $(events)"
+shell	tests/lock-listener.sh	SC2016	b54e3023a7869ee6	1	wait_for '[ "$(locks)" = 10 ]' && [ "$(tail -n1 "$LOCKS")" = "lock-cmd.sh session=7 " ] \
+shell	tests/lock-listener.sh	SC2016	b60b9a0ec7313662	1	wait_for '[ "$(locks)" = 11 ]' && [ "$(tail -n1 "$LOCKS")" = "lock-cmd.sh session=7 " ] \
+shell	tests/lock-listener.sh	SC2016	bc002553b0fb946b	1	if wait_for '! kill -0 "$listener" 2>/dev/null'; then
+shell	tests/lock-listener.sh	SC2016	d4078a3b7c292176	1	wait_for 'grep -q . "$NOTES"' && ok "a stuck lock-cmd.sh posts a visible failure" || bad "no notification for a stuck lock-cmd.sh"
+shell	tests/lock-listener.sh	SC2016	da401208be6843cd	1	wait_for '[ "$(events)" = "inhibit sleep delay,released,inhibit sleep delay,released," ]' && ok "and releases the delay when that lock returns" || bad "the delay was not released after the joined lock: $(events)"
+shell	tests/lock-listener.sh	SC2016	ee55280b724e9f75	1	wait_for 'grep -q ready "$work/logind.out"' || { echo "fake logind did not start" >&2; exit 1; }
+shell	tests/lock-listener.sh	SC2016	f9822a89fe23767a	1	wait_for '[ "$(released)" = $((before + 1)) ]' \
+shell	tests/lock-listener.sh	SC2016	fcfe454886659a76	1	wait_for 'grep -qx "lock-cmd.sh session=7 --failsafe" "$LOCKS"' \
+shell	tests/lock-listener.sh	SC2034	a3169bf36160a55a	1	stuck=$(tail -n1 "$STUB_PIDS")
+shell	tests/lock-listener.sh	SC2034	b6dc66113e38949a	1	before=$(released)
+shell	tests/lock-listener.sh	SC2292	05fe5b6b3cd21866	1	[ "$(locks)" = 4 ] && ok "sleep during a running lock joins it instead of starting another" || bad "sleep started a second lock-cmd.sh"
+shell	tests/lock-listener.sh	SC2292	2afe5234f6935a35	1	[ "$rc" = 78 ] && grep -q "not a Hyprland session" "$work/listener.err" \
+shell	tests/lock-listener.sh	SC2292	334c237d868ec52e	1	[ "$(events)" = "inhibit sleep delay," ] && ok "sleep waits while lock-cmd.sh is still locking" || bad "the delay was released before the lock finished"
+shell	tests/lock-listener.sh	SC2292	39def8af102da692	1	[ "$(locks)" = 2 ] && ok "a Lock for another session is ignored" || bad "a Lock for another session locked this one"
+shell	tests/lock-listener.sh	SC2292	3dedcab340050e37	1	[ "$(sed -n '/^\[Unit\]/,/^\[/{/^StartLimitIntervalSec=/p}' "$unit")" = StartLimitIntervalSec=0 ] \
+shell	tests/lock-listener.sh	SC2292	6ca1f237d8283393	1	[ "$(cat "$LOCKS")" = "lock-cmd.sh session=7 " ] && ok "lock-cmd.sh runs for our session id" || bad "unexpected run: $(cat "$LOCKS")"
+shell	tests/lock-listener.sh	SC2292	85d89324ee33d6aa	1	wait_for '[ "$(locks)" = 7 ]' && [ "$(tail -n1 "$LOCKS")" = "lock-cmd.sh session=7 " ] \
+shell	tests/lock-listener.sh	SC2292	8cddf81c6eb00739	1	[ -e "$NOTES.planted" ] && bad "the listener ran a notify-send from the session's PATH" || ok "notify-send runs from the pinned PATH, not the session's"
+shell	tests/lock-listener.sh	SC2292	9a7940a546af1472	1	for _ in $(seq 50); do [ -S "$work/bus" ] && break; sleep 0.1; done
+shell	tests/lock-listener.sh	SC2292	b2faeb59a61c751c	1	[ "$(tail -n1 "$LOCKS")" = "lock-cmd.sh session=7 --sleep" ] || bad "unexpected sleep lock: $(tail -n1 "$LOCKS")"
+shell	tests/lock-listener.sh	SC2292	b54e3023a7869ee6	1	wait_for '[ "$(locks)" = 10 ]' && [ "$(tail -n1 "$LOCKS")" = "lock-cmd.sh session=7 " ] \
+shell	tests/lock-listener.sh	SC2292	b60b9a0ec7313662	1	wait_for '[ "$(locks)" = 11 ]' && [ "$(tail -n1 "$LOCKS")" = "lock-cmd.sh session=7 " ] \
+shell	tests/lock-listener.sh	SC2292	c825131a023e12e6	3	[ -e /run/tripwire/hits ] || { [ "${HYPR_DE_SEALED-}" = build-root ] && [ ! -e /run/systemd/private ]; } || exec "$(dirname -- "$0")/run" "$0"
+shell	tests/lock-listener.sh	SC2292	eaab2c4707c27899	1	[ "$(locks)" = 2 ] && ok "a Lock not sent by logind is ignored" || bad "a Lock from a non-logind sender ran lock-cmd.sh"
+shell	tests/lock-listener.sh	SC2292	f09aa2bdbbc0831f	1	[ "$(locks)" = 1 ] && ok "a second Lock while the first lock is starting starts no second locker" || bad "a second Lock started another lock-cmd.sh"
+shell	tests/lock-listener.sh	SC2292	f6064325b2109339	1	[ "$(events)" = "inhibit sleep delay," ] && ok "the listener holds a sleep delay from the start" || bad "no sleep delay held: $(events)"
+shell	tests/lock-listener.sh	SC2292	f68bcaa6f6daea6b	1	[ -s "$NOTES" ] && bad "a failure notification for locks that returned in time: $(cat "$NOTES")" || ok "locks that return in time post no failure"
+shell	tests/lock-listener.sh	SC2312	05fe5b6b3cd21866	1	[ "$(locks)" = 4 ] && ok "sleep during a running lock joins it instead of starting another" || bad "sleep started a second lock-cmd.sh"
+shell	tests/lock-listener.sh	SC2312	0950ebbaf1fd937e	1	|| bad "the deadline skipped the failsafe: $(cat "$LOCKS")"
+shell	tests/lock-listener.sh	SC2312	133e935400d2b5e3	2	|| bad "the listener followed a stale XDG_SESSION_ID: $(tail -n2 "$LOCKS" | tr '\n' ' ')"
+shell	tests/lock-listener.sh	SC2312	1da76cedd52bcc07	1	wait_for '[ "$(events)" = "inhibit sleep delay,released,inhibit sleep delay,released,inhibit sleep delay," ]' || bad "no delay after the second resume: $(events)"
+shell	tests/lock-listener.sh	SC2312	25d5a4aa3c8bb829	1	|| bad "a stuck lock-cmd.sh kept the sleep delay: $(events)"
+shell	tests/lock-listener.sh	SC2312	2f004649d2e0c05c	1	|| bad "the listener bound to a tty session: $(tail -n1 "$LOCKS")"
+shell	tests/lock-listener.sh	SC2312	30904afde3873b46	1	grep -q "waiting" "$work/listener.err" && ok "and says what it is waiting for" || bad "the wait is silent: $(cat "$work/listener.err")"
+shell	tests/lock-listener.sh	SC2312	334c237d868ec52e	1	[ "$(events)" = "inhibit sleep delay," ] && ok "sleep waits while lock-cmd.sh is still locking" || bad "the delay was released before the lock finished"
+shell	tests/lock-listener.sh	SC2312	39def8af102da692	1	[ "$(locks)" = 2 ] && ok "a Lock for another session is ignored" || bad "a Lock for another session locked this one"
+shell	tests/lock-listener.sh	SC2312	3dedcab340050e37	1	[ "$(sed -n '/^\[Unit\]/,/^\[/{/^StartLimitIntervalSec=/p}' "$unit")" = StartLimitIntervalSec=0 ] \
+shell	tests/lock-listener.sh	SC2312	4a7f3671ea7ed6e8	1	|| bad "GetSessionByPID on Hyprland was not preferred: $(tail -n1 "$LOCKS")"
+shell	tests/lock-listener.sh	SC2312	4d87c1a51a8ba027	1	wait_for 'grep -q "locking session 7" "$work/listener.err"' && ok "the listener binds once the session appears" || bad "the listener never bound: $(cat "$work/listener.err")"
+shell	tests/lock-listener.sh	SC2312	60aeb3c4b441ad77	1	wait_for '[ "$(events)" = "inhibit sleep delay,released," ]' && ok "the delay is released once lock-cmd.sh returns" || bad "the delay was never released: $(events)"
+shell	tests/lock-listener.sh	SC2312	6ca1f237d8283393	2	[ "$(cat "$LOCKS")" = "lock-cmd.sh session=7 " ] && ok "lock-cmd.sh runs for our session id" || bad "unexpected run: $(cat "$LOCKS")"
+shell	tests/lock-listener.sh	SC2312	78fb280aebe61111	1	|| bad "a late lock left no delay held: $(events)"
+shell	tests/lock-listener.sh	SC2312	85d89324ee33d6aa	1	wait_for '[ "$(locks)" = 7 ]' && [ "$(tail -n1 "$LOCKS")" = "lock-cmd.sh session=7 " ] \
+shell	tests/lock-listener.sh	SC2312	92c9a771d0b7de88	1	wait_for '[ "$(events)" = "inhibit sleep delay,released,inhibit sleep delay," ]' && ok "after resume the listener takes a new delay" || bad "no new delay after resume: $(events)"
+shell	tests/lock-listener.sh	SC2312	b2faeb59a61c751c	2	[ "$(tail -n1 "$LOCKS")" = "lock-cmd.sh session=7 --sleep" ] || bad "unexpected sleep lock: $(tail -n1 "$LOCKS")"
+shell	tests/lock-listener.sh	SC2312	b54e3023a7869ee6	1	wait_for '[ "$(locks)" = 10 ]' && [ "$(tail -n1 "$LOCKS")" = "lock-cmd.sh session=7 " ] \
+shell	tests/lock-listener.sh	SC2312	b60b9a0ec7313662	1	wait_for '[ "$(locks)" = 11 ]' && [ "$(tail -n1 "$LOCKS")" = "lock-cmd.sh session=7 " ] \
+shell	tests/lock-listener.sh	SC2312	ce87a9f816a08abd	1	|| bad "outside Hyprland: exit $rc, $(cat "$work/listener.err")"
+shell	tests/lock-listener.sh	SC2312	da401208be6843cd	1	wait_for '[ "$(events)" = "inhibit sleep delay,released,inhibit sleep delay,released," ]' && ok "and releases the delay when that lock returns" || bad "the delay was not released after the joined lock: $(events)"
+shell	tests/lock-listener.sh	SC2312	eaab2c4707c27899	1	[ "$(locks)" = 2 ] && ok "a Lock not sent by logind is ignored" || bad "a Lock from a non-logind sender ran lock-cmd.sh"
+shell	tests/lock-listener.sh	SC2312	f09aa2bdbbc0831f	1	[ "$(locks)" = 1 ] && ok "a second Lock while the first lock is starting starts no second locker" || bad "a second Lock started another lock-cmd.sh"
+shell	tests/lock-listener.sh	SC2312	f6064325b2109339	2	[ "$(events)" = "inhibit sleep delay," ] && ok "the listener holds a sleep delay from the start" || bad "no sleep delay held: $(events)"
+shell	tests/lock-listener.sh	SC2312	f68bcaa6f6daea6b	1	[ -s "$NOTES" ] && bad "a failure notification for locks that returned in time: $(cat "$NOTES")" || ok "locks that return in time post no failure"
+shell	tests/lock-listener.sh	SC2329	a7535206f59469e7	1	cleanup() { kill "${pids[@]}" 2>/dev/null; wait 2>/dev/null; rm -rf "$work"; }
+shell	tests/lock-policy.sh	SC2015	7418a506d920d013	1	[ -n "$second" ] && ! gone "$second" || { echo "no respawned locker is alive" >&2; exit 1; }
 shell	tests/lock-policy.sh	SC2016	218a19328c6ae8d8	1	for want in 'timeout=$suspend_timeout' 'ignore_inhibit=true' \
 shell	tests/lock-policy.sh	SC2016	ba46031b151d916c	1	for want in 'timeout=$lock_timeout' 'condition_cmd=@LIBEXECDIR@/no-keep-awake.sh' 'condition_retry='; do
 shell	tests/lock-policy.sh	SC2016	cdcc6c00423549eb	1	for want in 'timeout=$blank_timeout' 'condition_cmd=@LIBEXECDIR@/session-locked.sh' 'condition_retry=' \
+shell	tests/lock-policy.sh	SC2086	6fae1933ba883a5b	1	env -u XDG_SESSION_ID WAYLAND_DISPLAY="$display" LOCK_POLICY_LOCK_FILE=$lockfile \
+shell	tests/lock-policy.sh	SC2086	b7c14520be2af3fe	1	env -u XDG_SESSION_ID WAYLAND_DISPLAY="$display" $lock_shell "$work/lock-cmd.sh" "$@" 2>>"$work/stderr" || status=$?
 shell	tests/lock-policy.sh	SC2086	c5c817b4d9fb48a4	1	set -- $case
+shell	tests/lock-policy.sh	SC2248	d270b80cd8fb3fd4	1	LOCK_POLICY_COMPOSITOR_LOCKED=true run_lock $mode
+shell	tests/lock-policy.sh	SC2249	649822f167589da0	1	case $(sed -n 's/^State:[[:space:]]*\([A-Z]\).*/\1/p' "/proc/$1/status" 2>/dev/null) in ''|Z|X) return 0 ;; esac
 shell	tests/lock-policy.sh	SC2310	08810140919f41ed	1	[ "$(knob blank_timeout)" = 30 ] || {
+shell	tests/lock-policy.sh	SC2310	08d478478240638c	3	while ! gone "$pid" && [ "$i" -lt 50 ]; do sleep 0.1; i=$((i + 1)); done
 shell	tests/lock-policy.sh	SC2310	0c90552776f773b0	1	out=$(run_restarter FIXTURE_LOCKED=false || true)
+shell	tests/lock-policy.sh	SC2310	0ef82862de6fb009	2	[ "$(watchers)" = 0 ] || { echo "the watcher outlived an unlocked session" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2310	1508ec8c6fd436e0	1	[ "$(watchers)" = 1 ] || { echo "a second watcher for the same display kept running" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2310	27d0187a6cfc81df	2	until [ -s "$work/zombie" ] && gone "$(cat "$work/zombie")" || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2310	2cc0ae0dc5f764f1	1	[ "$(watchers)" = 0 ] || { echo "a watcher outlived an unlocked session" >&2; exit 1; }
 shell	tests/lock-policy.sh	SC2310	3e4a4f92544c077b	1	run_restarter FIXTURE_LOCKED=false FIXTURE_HYPRCTL_BROKEN=1 >/dev/null || true
 shell	tests/lock-policy.sh	SC2310	3f6142fa31806856	1	[ "$(knob lock_timeout)" = 180 ] || {
 shell	tests/lock-policy.sh	SC2310	48154e6d00a6f43b	1	[ "$(knob suspend_timeout)" = 900 ] || {
+shell	tests/lock-policy.sh	SC2310	4abb9b3a07b755d8	1	[ "$(watchers)" = 1 ] || { echo "expected exactly one watcher after the respawn, got $(watchers)" >&2; exit 1; }
 shell	tests/lock-policy.sh	SC2310	4da773e72022a653	1	has_line "$sblock" "$want" || {
+shell	tests/lock-policy.sh	SC2310	500e9af616dd1ccf	1	[ "$(watchers)" = 0 ] || { echo "the plain-process watcher outlived an unlocked session" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2310	54288a7fa7d66519	6	until [ "$(watchers)" = 0 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2310	562df410bb4f5ade	2	until [ "$(watchers)" = 2 ] || [ "$i" -ge 100 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2310	71be34d10c2f6973	1	[ "$(watchers)" = 2 ] || { echo "a second session on another display got no watcher of its own" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2310	7418a506d920d013	2	[ -n "$second" ] && ! gone "$second" || { echo "no respawned locker is alive" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2310	7a1d7371bd483769	1	[ "$(watchers)" = 1 ] || { echo "a request on a locked session did not restart a lost watcher" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2310	8546a31ec0fc9aa7	4	until [ "$(watchers)" = 1 ] || [ "$i" -ge 100 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2310	8603a6a480ce54c4	16	until [ "$(watchers)" = 1 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2310	8851ccf8a9f514d3	14	until [ "$(watchers)" = 0 ] || [ "$i" -ge 100 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2310	a7e2f6b09aba22a2	1	[ "$(watchers)" = 0 ] || { echo "the watcher kept running after Hyprland exited" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2310	aaf1d25e7e2c324a	1	[ "$(watchers)" = 1 ] || { echo "expected exactly one plain-process watcher, got $(watchers)" >&2; exit 1; }
 shell	tests/lock-policy.sh	SC2310	b95763faeb3f1bae	2	if ! run_restarter FIXTURE_LOCKED=true >/dev/null 2>&1; then
 shell	tests/lock-policy.sh	SC2310	c1f0cc44d5ea975e	1	run_restarter FIXTURE_LOCKED=false >/dev/null || true
+shell	tests/lock-policy.sh	SC2310	c36199b16e5ca6bd	1	[ "$(watchers)" = 1 ] || { echo "with no user manager a lock started no watcher for its locker" >&2; exit 1; }
 shell	tests/lock-policy.sh	SC2310	cd4ff3d5fbaf125b	1	out=$(run_restarter FIXTURE_LOCKED=false FIXTURE_ACTIVE=1 FIXTURE_FAILED=0 || true)
 shell	tests/lock-policy.sh	SC2310	e29bd14e15183297	1	has_line "$block" "$want" || {
+shell	tests/lock-policy.sh	SC2310	e3bd778c0055fd3a	1	[ "$(watchers)" = 1 ] || { echo "a scoped watcher launch that failed left no watcher" >&2; exit 1; }
 shell	tests/lock-policy.sh	SC2310	f1fb0c1c83856359	1	run_restarter FIXTURE_LOCKED=true >/dev/null || true
 shell	tests/lock-policy.sh	SC2310	fe6efc0391813334	1	has_line "$lblock" "$want" || {
+shell	tests/lock-policy.sh	SC2310	fee859973281562e	3	[ "$(watchers)" = 1 ] || { echo "a lock started no watcher for its locker" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2312	05f885f67423fbfa	1	JOURNAL_STREAM=$(stat -L -c '%d:%i' "$work/stderr") LOCK_POLICY_SCOPE_STATUS=1 run_lock
 shell	tests/lock-policy.sh	SC2312	08810140919f41ed	1	[ "$(knob blank_timeout)" = 30 ] || {
+shell	tests/lock-policy.sh	SC2312	0ef82862de6fb009	2	[ "$(watchers)" = 0 ] || { echo "the watcher outlived an unlocked session" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2312	1508ec8c6fd436e0	1	[ "$(watchers)" = 1 ] || { echo "a second watcher for the same display kept running" >&2; exit 1; }
 shell	tests/lock-policy.sh	SC2312	2383f865a9a25b6f	1	[ "$(grep -cE '^[[:space:]]*ignore_inhibit=true$' "$conf")" = 2 ] || {
+shell	tests/lock-policy.sh	SC2312	27d0187a6cfc81df	1	until [ -s "$work/zombie" ] && gone "$(cat "$work/zombie")" || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2312	28c5368fdcbb7788	6	[ "$(grep -c '^vigil-lock:' "$LOCK_POLICY_LOG")" = 2 ] || {
+shell	tests/lock-policy.sh	SC2312	2cc0ae0dc5f764f1	1	[ "$(watchers)" = 0 ] || { echo "a watcher outlived an unlocked session" >&2; exit 1; }
 shell	tests/lock-policy.sh	SC2312	38f6e8d39b49ecf5	1	printf '%s' "$1" | grep -q "^ $(printf '%s' "$2" | sed 's/[$]/\\$/g')"
 shell	tests/lock-policy.sh	SC2312	3f6142fa31806856	1	[ "$(knob lock_timeout)" = 180 ] || {
+shell	tests/lock-policy.sh	SC2312	442c6fcfdf83567c	1	until [ "$(grep -cvx "$first" "$LOCK_POLICY_HOLDERS")" -ge 1 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
 shell	tests/lock-policy.sh	SC2312	48154e6d00a6f43b	1	[ "$(knob suspend_timeout)" = 900 ] || {
+shell	tests/lock-policy.sh	SC2312	4abb9b3a07b755d8	2	[ "$(watchers)" = 1 ] || { echo "expected exactly one watcher after the respawn, got $(watchers)" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2312	500e9af616dd1ccf	1	[ "$(watchers)" = 0 ] || { echo "the plain-process watcher outlived an unlocked session" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2312	50e88c09ac4dcda0	2	echo "both requests must succeed, got $(cat "$work/race.a") $(cat "$work/race.b")" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2312	54288a7fa7d66519	3	until [ "$(watchers)" = 0 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2312	562df410bb4f5ade	1	until [ "$(watchers)" = 2 ] || [ "$i" -ge 100 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2312	5b62320e57c38fa7	3	until [ "$(grep -c '^vigil-lock:' "$LOCK_POLICY_LOG")" = 2 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
 shell	tests/lock-policy.sh	SC2312	5eedfad7fe297c5e	1	ln -s "$(command -v timeout)" "$work/system/timeout"
 shell	tests/lock-policy.sh	SC2312	66f7241ec9ca781c	1	if [ "$(stat -c '%u' "$lock_conf")" != 0 ]; then
+shell	tests/lock-policy.sh	SC2312	681bbe39f7f1c6ba	5	kill -9 "$(head -n1 "$LOCK_POLICY_HOLDERS")"
+shell	tests/lock-policy.sh	SC2312	6c9a32cbbfa22959	1	[ "$(grep -c '^swaylock:locked$' "$LOCK_POLICY_LOG")" = 1 ] || {
+shell	tests/lock-policy.sh	SC2312	71be34d10c2f6973	1	[ "$(watchers)" = 2 ] || { echo "a second session on another display got no watcher of its own" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2312	7a1d7371bd483769	1	[ "$(watchers)" = 1 ] || { echo "a request on a locked session did not restart a lost watcher" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2312	8546a31ec0fc9aa7	2	until [ "$(watchers)" = 1 ] || [ "$i" -ge 100 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2312	8603a6a480ce54c4	8	until [ "$(watchers)" = 1 ] || [ "$i" -ge 50 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2312	8851ccf8a9f514d3	7	until [ "$(watchers)" = 0 ] || [ "$i" -ge 100 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2312	90bfc6286d1fa470	2	echo "both racing runs must succeed, got $(cat "$work/race.a") $(cat "$work/race.b")" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2312	a7e2f6b09aba22a2	1	[ "$(watchers)" = 0 ] || { echo "the watcher kept running after Hyprland exited" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2312	aaf1d25e7e2c324a	2	[ "$(watchers)" = 1 ] || { echo "expected exactly one plain-process watcher, got $(watchers)" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2312	c36199b16e5ca6bd	1	[ "$(watchers)" = 1 ] || { echo "with no user manager a lock started no watcher for its locker" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2312	c834144997806b3a	1	until [ "$(grep -c '^vigil-lock:' "$LOCK_POLICY_LOG")" = 2 ] || [ "$i" -ge 250 ]; do sleep 0.1; i=$((i + 1)); done
 shell	tests/lock-policy.sh	SC2312	c9efab1ff4da6a4c	1	if [ "$(id -u)" -eq 0 ]; then chown 0:0 "$lock_conf"; else sudo -n chown 0:0 "$lock_conf"; fi
 shell	tests/lock-policy.sh	SC2312	d685394410ca69e1	1	if [ "$(id -u)" -eq 0 ] || sudo -n true 2>/dev/null; then
 shell	tests/lock-policy.sh	SC2312	dc84b2bbd5ad74a3	1	if [ "$(id -u)" -eq 0 ]; then
+shell	tests/lock-policy.sh	SC2312	e16f6fb096b571fc	4	[ "$(cat "$work/race.a") $(cat "$work/race.b")" = "0 0" ] || {
 shell	tests/lock-policy.sh	SC2312	e33c053a02444bdf	1	cp "$(command -v timeout)" "$work/no-toggle/timeout"
+shell	tests/lock-policy.sh	SC2312	e3bd778c0055fd3a	1	[ "$(watchers)" = 1 ] || { echo "a scoped watcher launch that failed left no watcher" >&2; exit 1; }
+shell	tests/lock-policy.sh	SC2312	e9544ed312ecdd4b	4	[ "$(grep -c '^vigil-lock:' "$LOCK_POLICY_LOG")" = 1 ] || {
+shell	tests/lock-policy.sh	SC2312	ef6a7533dd76841e	1	until [ "$(grep -c '^vigil-lock:' "$LOCK_POLICY_LOG")" = 2 ] || [ "$i" -ge 150 ]; do sleep 0.1; i=$((i + 1)); done
+shell	tests/lock-policy.sh	SC2312	f1892a04dbf9010c	1	[ "$(grep -c 'cannot list screen lockers' "$LOCK_POLICY_JOURNAL")" = 1 ] || {
+shell	tests/lock-policy.sh	SC2312	fee859973281562e	3	[ "$(watchers)" = 1 ] || { echo "a lock started no watcher for its locker" >&2; exit 1; }
+shell	tests/lock-policy.sh	suppression	128b87bfb50ff992	1	# shellcheck disable=SC2086 # deliberate: lock_shell may carry an option
 shell	tests/media-stream.sh	SC2015	1ecbddfc1cc2da6f	1	[ "$elapsed" -lt 2000 ] && ok "returned promptly (${elapsed} ms)" || bad "hung for ${elapsed} ms"
 shell	tests/media-stream.sh	SC2015	3dc583bdc7efe283	1	[ "$(j 0 .class)" = playing ] && ok "playing: class playing" || bad "class: $(j 0 .class)"
 shell	tests/media-stream.sh	SC2015	43ad1d719769253f	1	python3 -m py_compile "$script" && ok "py_compile" || bad "py_compile failed"
@@ -664,18 +856,28 @@ shell	tests/pam-rewrite.sh	SC2312	d2895e38ac493466	1	[ "$(cat "$pam")" = "$befor
 shell	tests/pam-rewrite.sh	SC2312	f115a9915b2d5cc8	2	[ "$(ls "$pam".hypr-de-backup.* | wc -l)" -eq 1 ] && ok "no second backup" || bad "backed up again on a no-op"
 shell	tests/pam-rewrite.sh	SC2312	f72acf70b95adb0e	1	[ "$(md5sum < "$pam")" = "$sum" ] && ok "idempotent" || bad "second run modified the file"
 shell	tests/power-menu-exit.sh	SC2015	3f3b7fb2eb513e77	1	[ "$(run with Logout)" = "desktop-boot-exit " ] && ok "logout uses desktop-boot-exit" || bad "logout with desktop-boot-exit"
+shell	tests/power-menu-exit.sh	SC2015	4cf673629d5fdae0	1	[ "$(run without Lock)" = "lock-cmd.sh " ] && ok "the menu's Lock runs lock-cmd.sh itself" || bad "the menu's Lock does not reach lock-cmd.sh"
 shell	tests/power-menu-exit.sh	SC2015	7a3eca8307a7dadc	1	[ "$(run with Reboot)" = "desktop-boot-exit -p systemctl reboot" ] && ok "reboot uses desktop-boot-exit" || bad "reboot with desktop-boot-exit"
 shell	tests/power-menu-exit.sh	SC2015	81430b66bb185d54	1	[ "$(run without Shutdown)" = "hyprshutdown -p systemctl poweroff -i" ] && ok "shutdown falls back to hyprshutdown" || bad "shutdown fallback"
+shell	tests/power-menu-exit.sh	SC2015	9914341a57652389	1	[ "$(cat "$work/log")" = "lock-cmd.sh " ] && ok "Super+L runs lock-cmd.sh itself" || bad "Super+L does not reach lock-cmd.sh: '$bind'"
+shell	tests/power-menu-exit.sh	SC2015	d6eb7ab07a333065	1	&& ok "Super+L also works on a locked screen, so a crashed lock screen can be recovered from the keyboard" \
 shell	tests/power-menu-exit.sh	SC2016	06c74937b5e013f1	1	printf '#!/bin/sh\necho "desktop-boot-exit $*" >>"$LOG"\n' >"$work/with/desktop-boot-exit"
 shell	tests/power-menu-exit.sh	SC2016	9fdcbd2b459cec5b	1	printf '#!/bin/sh\necho "hyprshutdown $*" >>"$LOG"\n' >"$work/$d/hyprshutdown"
 shell	tests/power-menu-exit.sh	SC2016	d999ea2d9c2f7f5a	1	printf '#!/bin/sh\ncat >/dev/null; printf "%%s\\n" "$PICK"\n' >"$work/$d/fuzzel"
+shell	tests/power-menu-exit.sh	SC2016	f95b043245dc4b60	1	printf '#!/bin/sh\necho "lock-cmd.sh $*" >>"$LOG"\n' >"$work/libexec/lock-cmd.sh"
 shell	tests/power-menu-exit.sh	SC2292	3f3b7fb2eb513e77	1	[ "$(run with Logout)" = "desktop-boot-exit " ] && ok "logout uses desktop-boot-exit" || bad "logout with desktop-boot-exit"
+shell	tests/power-menu-exit.sh	SC2292	4cf673629d5fdae0	1	[ "$(run without Lock)" = "lock-cmd.sh " ] && ok "the menu's Lock runs lock-cmd.sh itself" || bad "the menu's Lock does not reach lock-cmd.sh"
 shell	tests/power-menu-exit.sh	SC2292	7a3eca8307a7dadc	1	[ "$(run with Reboot)" = "desktop-boot-exit -p systemctl reboot" ] && ok "reboot uses desktop-boot-exit" || bad "reboot with desktop-boot-exit"
 shell	tests/power-menu-exit.sh	SC2292	81430b66bb185d54	1	[ "$(run without Shutdown)" = "hyprshutdown -p systemctl poweroff -i" ] && ok "shutdown falls back to hyprshutdown" || bad "shutdown fallback"
+shell	tests/power-menu-exit.sh	SC2292	9914341a57652389	1	[ "$(cat "$work/log")" = "lock-cmd.sh " ] && ok "Super+L runs lock-cmd.sh itself" || bad "Super+L does not reach lock-cmd.sh: '$bind'"
+shell	tests/power-menu-exit.sh	SC2292	a38be61ffb771950	1	if [ -n "$bind" ]; then
 shell	tests/power-menu-exit.sh	SC2292	c825131a023e12e6	3	[ -e /run/tripwire/hits ] || { [ "${HYPR_DE_SEALED-}" = build-root ] && [ ! -e /run/systemd/private ]; } || exec "$(dirname -- "$0")/run" "$0"
 shell	tests/power-menu-exit.sh	SC2312	3f3b7fb2eb513e77	1	[ "$(run with Logout)" = "desktop-boot-exit " ] && ok "logout uses desktop-boot-exit" || bad "logout with desktop-boot-exit"
+shell	tests/power-menu-exit.sh	SC2312	4cf673629d5fdae0	1	[ "$(run without Lock)" = "lock-cmd.sh " ] && ok "the menu's Lock runs lock-cmd.sh itself" || bad "the menu's Lock does not reach lock-cmd.sh"
 shell	tests/power-menu-exit.sh	SC2312	7a3eca8307a7dadc	1	[ "$(run with Reboot)" = "desktop-boot-exit -p systemctl reboot" ] && ok "reboot uses desktop-boot-exit" || bad "reboot with desktop-boot-exit"
 shell	tests/power-menu-exit.sh	SC2312	81430b66bb185d54	1	[ "$(run without Shutdown)" = "hyprshutdown -p systemctl poweroff -i" ] && ok "shutdown falls back to hyprshutdown" || bad "shutdown fallback"
+shell	tests/power-menu-exit.sh	SC2312	883443a64eb12536	1	LOG="$work/log" PATH="$work/sys" /bin/sh -c "$(printf '%s' "$bind" | sed "s|@LIBEXECDIR@|$work/libexec|g")"
+shell	tests/power-menu-exit.sh	SC2312	9914341a57652389	1	[ "$(cat "$work/log")" = "lock-cmd.sh " ] && ok "Super+L runs lock-cmd.sh itself" || bad "Super+L does not reach lock-cmd.sh: '$bind'"
 shell	tests/power-menu-exit.sh	SC2312	bf195885840126a8	1	ln -s "$(command -v cat)" "$work/sys/cat"
 shell	tests/privacy-privilege.sh	SC1090	b05586a212e5cb87	1	source <(sed -n '/^resolve_terminal()/,/^}/p' "$root/dist/libexec/waybar-updates-check")
 shell	tests/privacy-privilege.sh	SC2015	06ddc43439d1826e	1	&& ok "ownership is checked before acting" || bad "no ownership check"

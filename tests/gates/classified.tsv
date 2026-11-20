@@ -11,6 +11,7 @@ dist/gaming/steam-set-launch-options	bash
 dist/hypr/local.lua.example	lua
 dist/libexec/hypr-de-bt-power	bash
 dist/libexec/hypr-de-cheatsheet	bash
+dist/libexec/hypr-de-lock-listener	python
 dist/libexec/hypr-de-prime-theme	bash
 dist/libexec/hypr-de-reload-sessions	bash
 dist/libexec/hypr-de-restart-session-units	bash
@@ -44,12 +45,16 @@ tests/fixtures/hypridle-override/hypridle	sh
 tests/fixtures/installer/bin/install	sh
 tests/fixtures/installer/bin/rpm	sh
 tests/fixtures/installer/copr-solaris765-hypr-de.pubkey.asc	blob	the COPR repository's public signing key, which the installer test imports
+tests/fixtures/lock-listener/fake-logind	python
+tests/fixtures/lock-listener/impostor	python
 tests/fixtures/lock-policy-fallback/swaylock	sh
 tests/fixtures/lock-policy/hyprctl	sh
 tests/fixtures/lock-policy/hyprstate	sh
 tests/fixtures/lock-policy/loginctl	sh
 tests/fixtures/lock-policy/logind-idle-control	sh
+tests/fixtures/lock-policy/notify-send	sh
 tests/fixtures/lock-policy/pgrep	sh
+tests/fixtures/lock-policy/systemd-cat	sh
 tests/fixtures/lock-policy/systemd-inhibit	sh
 tests/fixtures/lock-policy/systemd-run	sh
 tests/fixtures/lock-policy/vigil-lock	sh
