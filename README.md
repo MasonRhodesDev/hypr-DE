@@ -592,9 +592,10 @@ Compiler warnings are read from what each compile wrote, as the shim saw it,
 so a `build()` that discards its output keeps every count. A call that only
 assembles or preprocesses is not a compile the gate can judge, so what it
 makes is unattributed. A C or C++ file in a
-plugin directory that no compile read, and that `classified.tsv` does not
-list, fails as `not-built`. `cpp-tidy` runs on the compiles the shim recorded,
-so it sees what GCC compiled, unity files and generated sources included.
+plugin directory that no compile behind a shipped file read, and that
+`classified.tsv` does not list, fails as `not-built`. `cpp-tidy` runs on the
+compiles `cpp-harden` judges, so it sees what GCC compiled, unity files and
+generated sources included.
 `cpp-sanitize` builds each plugin with `HYPR_DE_SANITIZE=ON` through the same
 shim and runs its tests.
 
