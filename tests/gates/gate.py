@@ -1304,10 +1304,12 @@ def analyse(found, built):
     # records come sorted, and every record that matches an object or a build ID is judged, so no order decides which one counts
     units, units_by_object, links = [], collections.defaultdict(list), collections.defaultdict(list)
     for record in built.records:
-        for option in (o for o in record["options"] if OVERRIDE.fullmatch(o)):
-            # GCC reads -Bsymbolic or -Bstatic given to the driver as -B and a directory; the linker gets it only through -Wl,
-            fix = f"; a linker option goes through the driver as -Wl,{option}" if option.startswith("-B") else ""
-            found.add(built.pkgbuild, "driver-override", option, f"{built.pkgbuild}: a compile ran with {option}, which changes the programs GCC runs or what it tells them{fix}")
+        options = record["options"]
+        for at, option in ((at, o) for at, o in enumerate(options) if OVERRIDE.fullmatch(o)):
+            # GCC reads -Bsymbolic-functions given to the driver as -B and a directory, and lists the two apart; the linker gets it only through -Wl,
+            named = option + options[at + 1] if option == "-B" and at + 1 < len(options) else option
+            fix = f"; if it is meant for the linker, give it as -Wl,{named}" if named.startswith("-B") else ""
+            found.add(built.pkgbuild, "driver-override", option, f"{built.pkgbuild}: a compile ran with {named}, which changes the programs GCC runs or what it tells them{fix}")
     for record in built.records:
         unit = Unit(record, built) if "preprocessed" in record else None
         if unit:
