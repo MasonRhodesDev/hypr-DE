@@ -284,6 +284,8 @@ hl.window_rule({ name = "hyprpwcenter",     match = { class = "^(hyprpwcenter)$"
 hl.window_rule({ name = "overskride",       match = { class = "^(io\\.github\\.kaii_lb\\.Overskride)$" }, float = true, center = true, stay_focused = true })
 hl.window_rule({ name = "hypr-de-help",     match = { class = "^(dev\\.mason\\.hypr-de-help)$" }, float = true, center = true, size = "860 600", stay_focused = true })
 hl.window_rule({ name = "satty",            match = { class = "^(com.gabm.satty)$" }, float = true, pin = true, center = true, stay_focused = true })
+-- Steam draws its friends list at a fixed width; tiled on a wide output it leaves the rest of the screen black.
+hl.window_rule({ name = "steam-friends",    match = { class = "^(steam)$", title = "^(Friends List)$" }, float = true, size = "420 1100" })
 
 hl.on("hyprland.start", function()
     hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE XDG_SESSION_TYPE XDG_SESSION_ID XDG_SESSION_DESKTOP")
