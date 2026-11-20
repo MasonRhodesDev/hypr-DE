@@ -459,7 +459,7 @@ or the ones named on its command line:
 
 | Gate | What it refuses |
 |------|-----------------|
-| `classify` | A file the other gates cannot place that `tests/gates/classified.tsv` does not list: a file with no suffix or a suffix outside the gate's known list, a `CMakeLists.txt` other than a plugin's own, a C or C++ file outside a plugin directory. A `PKGBUILD` not classified `pkgbuild` and a spec not classified `spec`. A committed object file, archive or ELF binary. Opaque data (over 7 bits of entropy per byte in 1 KiB or more, or a long run of base64, hex or escaped bytes) not classified `blob` with a reason. A listed class that a shebang or the executable bit contradicts, and a `cpp-test` row on a file that is not C or C++. A spec that compiles (it asks for a compiler or a C or C++ build system in `BuildRequires`, or names one in its build sections, macros included) and runs anything in `%prep`, `%conf`, `%build` or `%install` but `%autosetup`, `%cmake -S <directory>`, `%cmake_build` and `%cmake_install`, so it can pass no option or flag of its own. A spec that redefines a flags macro. Never baselined. |
+| `classify` | A file the other gates cannot place that `tests/gates/classified.tsv` does not list: a file with no suffix or a suffix outside the gate's known list, a `CMakeLists.txt` other than a plugin's own, a C or C++ file outside a plugin directory. A `PKGBUILD` not classified `pkgbuild` and a spec not classified `spec`. A committed object file, archive or ELF binary. Opaque data (over 7 bits of entropy per byte in 1 KiB or more, or a long run of base64, hex or escaped bytes) not classified `blob` with a reason. A listed class that a shebang or the executable bit contradicts, and a `cpp-test` row on a file that is not C or C++. A spec that compiles (it asks for a compiler or a C or C++ build system in `BuildRequires`, or names one in its build sections, macros included) and runs anything in `%prep`, `%conf`, `%build` or `%install` but `%autosetup`, `%cmake -S <directory>`, `%cmake_build` and `%cmake_install`, so it can pass no option or flag of its own. A spec that redefines a flags macro, or turns off the annobin notes (`_annotated_build`) the `rpm` gate reads. Never baselined. |
 | `shell` | Anything `shellcheck` reports with every optional check on, in every shell script, `PKGBUILD`, `.install` file and RPM scriptlet (`%post` and the rest), and a `shellcheck disable` directive. An RPM scriptlet that writes into a program or library directory. A script is found by its suffix (`.sh`, `.bash`), by a shebang that names a shell, or by its class in `classified.tsv`. A shebang or scriptlet interpreter that `shellcheck` cannot read, such as `zsh`, fails and is never baselined. |
 | `python` | `ruff` with the bandit, bugbear and pylint rules in `ruff.toml`, and a `noqa` or `ruff:` comment. |
 | `lua` | `luacheck` findings (`.luacheckrc`) and inline `luacheck:` comments. |
@@ -467,7 +467,7 @@ or the ones named on its command line:
 | `cpp-sanitize` | A plugin whose tests fail under AddressSanitizer and UndefinedBehaviorSanitizer, that registers no test with `add_test`, or that compiles a source of its own with a sanitizer off. |
 | `cpp-tidy` | `clang-tidy` findings from `plugins/.clang-tidy` in every compile `cpp-harden` checks, in every header of this repository they include and in every file their build writes. |
 | `cpp-selftest` | The C++ gates themselves, if they stop catching a known-bad case of `tests/gates/cpp-fixture` or report anything in its clean build. Never baselined. |
-| `rpm` | Each binary RPM named with `--rpms`, read as it installs: no setuid, setgid, world-writable or non-root file; every ELF file passes the same ELF checks as `cpp-harden`'s; and `annocheck` passes it, reading the notes Fedora's GCC records for each compile from the debuginfo package, so it sees optimisation, the stack protector, stack clash protection, fortify, `_GLIBCXX_ASSERTIONS` and CET per compile. `all` does not run it. The `rpm` job in `.github/workflows/scene-plugin.yml` runs it on the RPM it builds. |
+| `rpm` | Each binary RPM named with `--rpms`, read as it installs: no setuid, setgid, world-writable or non-root file; every ELF file passes the same ELF checks as `cpp-harden`'s; and `annocheck` passes it, reading the notes Fedora's GCC records for each compile from the debuginfo package, so it sees optimisation, the stack protector, stack clash protection, fortify, `_GLIBCXX_ASSERTIONS` and CET per compile. Every ELF file must carry those notes, in it or in its debuginfo, or it fails as `annobin-missing`, since without them `annocheck` has little to read. A run given no binary RPM fails, and so does a package built for an architecture (not `noarch`) that holds no ELF file, since nothing in it was audited. `all` does not run it. The `rpm` job in `.github/workflows/scene-plugin.yml` runs it on the RPM it builds. |
 
 A suppression comment does not change a result. `ruff` runs with
 `--config ruff.toml --ignore-noqa`. `shellcheck` runs with
@@ -519,9 +519,14 @@ the driver, `cc1plus`, `as`, `collect2`, `ld` and the rest, must be owned by
 root and sit in directories only root can change, outside the gate's work
 directory; anything else fails as `untrusted-tool`. A compile whose driver
 options, after GCC has read every response file, hold `-B`, `-specs`,
-`-wrapper`, `-fplugin` or `-iplugindir` fails as `driver-override`, since
-each one changes which programs run or what they are told past what `-###`
-and `-E` show. The wrappers drop `COMPILER_PATH`, `GCC_EXEC_PREFIX`,
+`-fplugin` or `-iplugindir` fails as `driver-override`, since each one
+changes which programs run or what they are told past what `-###` and `-E`
+show. GCC reads a linker option such as `-Bsymbolic-functions` given to the
+driver as `-B` and a directory, so the FAIL names `-Wl,-Bsymbolic-functions`,
+the way to hand it to the linker. GCC does not list `-wrapper` among those
+options, so `driver-override` never names it; the program it runs is
+`untrusted-tool` if the build user could have written it, and what a wrapper
+makes is unattributed if it ships. The wrappers drop `COMPILER_PATH`, `GCC_EXEC_PREFIX`,
 `LIBRARY_PATH`, `GCC_COMPARE_DEBUG` and every `LD_*` variable before the shim
 starts. `CC` and `CXX` name the wrappers, so `tests/run`, which clears the
 environment for each test, keeps them, and a test's compiles in `check()` go
@@ -553,8 +558,9 @@ non-root file, read from the archive as it installs. Its install scriptlet
 (`install=`) names a program or library directory, or a directory the package
 ships an ELF file in, only as the command it runs, never as a place it writes.
 
-For every compile behind a shipped file, and every compile of a tracked
-source:
+For every compile behind a shipped ELF file (a test's own compile in
+`check()`, or a library the package builds and never installs, ships
+nothing, so it is not held to this set):
 
 * `_FORTIFY_SOURCE` and glibc's `__USE_FORTIFY_LEVEL` are 3,
   `_GLIBCXX_ASSERTIONS` is defined and `NDEBUG` is not, at every `#include`
@@ -619,8 +625,6 @@ mechanisms on the fixture in every CI run.
   that file is unattributed if it ships.
 * The install scriptlet check reads paths as written. A scriptlet that builds
   a path at run time, such as `"/usr/l""ib"`, is not caught.
-* A compile that ships nothing and whose source is not tracked, such as a
-  CMake probe, is not judged.
 * Inline assembly, `.incbin` and linker script data are judged only as part of
   the compile that holds them.
 * Fortify is proven per compile, not per call. A call fortify cannot size
@@ -628,6 +632,32 @@ mechanisms on the fixture in every CI run.
   anything but the printf family goes unseen.
 * The build may reach the network. Code it downloads and links is
   unattributed, but a downloaded script or data file is not judged.
+* Only the compiles behind a shipped ELF file are held to the shipping set,
+  so a CMake probe or a test's own build is not judged. Code the build compiles and ships in another form, such as a compressed
+  or encoded file a program unpacks later, is not judged; `classify` sees
+  it only if it is committed opaque data.
+* A `check()` that fails only under the trace makes the gate judge the
+  untraced build, which counts only if the package ships no ELF file. That
+  build has no trace, so a compile outside the shim (`unshimmed`) and a
+  forged record go unseen there. What it can hide is compiled code shipped
+  in another form, as above. A probe of `TracerPid` in `check()` stands out
+  in review.
+* `-Wl,--wrap=__stack_chk_fail` with a `__wrap___stack_chk_fail` of the
+  package's own is not reported. The guard check looks for the exact names,
+  and with the wrap the library no longer imports `__stack_chk_fail`, so a
+  smashed stack returns instead of aborting. The link option and the
+  function both stand out in review.
+* `-wrapper` is not among the options GCC reports, so `driver-override`
+  never names it. A wrapper the build wrote fails as `untrusted-tool`, and
+  what it makes as unattributed if it ships, but the gate does not say
+  `-wrapper` was the cause.
+* `packaging/` is outside CODEOWNERS and the ratchet's configuration list,
+  since every release bumps the versions there. A spec's build sections,
+  its flag macros and its annobin switch are checked by `classify`, which
+  is under both, and the `rpm` gate requires the notes.
+* The `rpm` cases in `tests/gates/attacks.py` need Fedora's `rpmbuild` and
+  `annocheck`, so a run where the C++ gates run reports them as not run;
+  they run in a container like the `rpm` job's.
 * The gates build with GCC. A compile by another compiler bypasses the shim
   and shows as unattributed, so it fails rather than passes.
 * The `rpm` gate judges what `annocheck` reads from the compiler's notes and
@@ -710,9 +740,15 @@ edited keeps its row too: when a baselined text is no longer found, and the
 lines of the file most like it now (by `difflib`, at least 0.6 alike) carry a
 new finding of the same rule, the row's count moves to that text. A fixed
 line and a new line of the same rule elsewhere in the file do not match this
-way, since the fixed line is still the one most like the old text.
-`--update` then writes the new text, and the ratchet takes that rewritten
-row by the same test.
+way, since the fixed line is still the one most like the old text. The
+match runs over one to four lines at a time, so a statement that a formatter
+wraps over several lines, or joins into one, keeps its rows: each new finding
+of the rule on the lines most like the old text takes its share of the
+count. `--update` then writes the new text, and the ratchet takes those
+rewritten rows by the same test, so a pure reformat needs no `Gate-change:`
+reason. When an edit both fixes a finding and adds one of the same rule
+elsewhere, the gate prints one FAIL, for the new finding, with the
+`--update --allow-growth` hint.
 
 A new or higher line in the baseline is an ordinary edit
 (`--update --allow-growth` writes it). On a pull request,

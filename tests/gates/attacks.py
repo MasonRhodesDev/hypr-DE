@@ -5,7 +5,9 @@ the gates print the expected FAIL line. A case with no expected line is one the
 gates pass by design, with the reason beside it. A case's options can set the
 environment ({work} is the case's scratch directory), leave its change out of
 git ("add": False), fail on any FAIL line it does not expect ("exact"), name
-other lines the output must hold ("out"), or drop the plugin's check()
+other lines the output must hold ("out") or must not ("absent"), give the
+rpm gate the RPMs the change built ("rpms"), name the tools it needs and is
+not run without ("needs"), or drop the plugin's check()
 ("check": False), or name the one package the C++ gates build ("pkgbuild",
 the plugin's by default). A case drops check() when its change breaks the plugin's own
 tests, so check() would stop the build, as build-failed, before the line the
@@ -17,11 +19,17 @@ changes; CI builds every package. Run it where the C++ gates run:
 
     python3 -I tests/gates/attacks.py [case ...]
 
+The rpm cases (h2a, h2b, h2ctl, h3a, h3b) need rpmbuild and annocheck, so
+they print as not run there, apart from the tally; run them where the rpm job
+in .github/workflows/scene-plugin.yml runs, with git, gcc, python3, rpm-build,
+annobin-annocheck, binutils and cpio installed.
+
 The cases come from the reviews of the gates. Nothing here runs in CI; the
 self-test (cpp-selftest) covers the same mechanisms on the gates' own fixture.
 """
 
 import concurrent.futures
+import glob
 import os
 import re
 import shutil
@@ -81,11 +89,71 @@ cp ../patch.py packaging/hypr-de-scene/patch.py
 sed -i 's|^source=(|source=(patch.py |; s|^sha256sums=(|sha256sums=(SKIP |' {scene}
 sed -i 's|^  {after}$|&\\n  python3 "$srcdir/patch.py" build/hypr-de-scene-impl.so {section}|' {scene}"""
 
+# round 6: a toy shared library built with Fedora's flags, for the rpm gate
+TOY = """mkdir -p ../toy ../rpms
+cat >../toy/toy.spec <<'SPEC'
+%undefine _debugsource_packages
+{macros}
+Name: gate-toy
+Version: 1
+Release: 1
+Summary: A shared library the rpm gate audits
+License: MIT
+BuildRequires: gcc
+
+%description
+A shared library the rpm gate audits.
+
+%build
+printf 'int gate_toy(int v) {{ return v * 2; }}\\n' >toy.c
+%{{__cc}} %{{optflags}} {cflags} -fPIC -shared %{{build_ldflags}} -o libtoy.so toy.c
+
+%install
+{install}
+
+%files
+{files}
+SPEC
+rpmbuild -bb --quiet --define "_topdir $PWD/../rpmbuild" ../toy/toy.spec >../rpmbuild.log 2>&1 || {{ cat ../rpmbuild.log >&2; exit 1; }}
+cp ../rpmbuild/RPMS/*/{pick} ../rpms/"""
+LIBTOY = {"install": "install -Dm755 libtoy.so %{buildroot}%{_libdir}/libtoy.so", "files": "%{_libdir}/libtoy.so", "cflags": "", "macros": "", "pick": "*.rpm"}
+RPM = {"rpms": "../rpms/*.rpm", "needs": ["rpmbuild", "annocheck"]}
+SCENE_SPEC = "packaging/hypr-de-scene.spec"
+# a test of the plugin's own, compiled alone by one line of a test script in check()
+CLAMP = f"""printf '#include <algorithm>\\n\\nint main() {{ return std::clamp(3, 0, 2) == 2 ? 0 : 1; }}\\n' >{PLUGIN}/tests/clamp.cpp
+printf '{PLUGIN}/tests/clamp.cpp\\tcpp-test\\n' >>tests/gates/classified.tsv
+LC_ALL=C sort -o tests/gates/classified.tsv tests/gates/classified.tsv
+cat >../clamp.sh <<'SH'
+"$cxx" -std=c++23 -Wall -Wextra -Werror -o "$work/clamp" "$src/tests/clamp.cpp" || {{ echo "FAIL the clamp test does not compile"; exit 1; }}
+"$work/clamp" || exit 1
+SH
+sed -i '/^"$work\\/geometry" || exit 1$/r ../clamp.sh' tests/scene-geometry.sh
+grep -q clamp tests/scene-geometry.sh"""
+# clang-format's wrap of a baselined statement
+REWRAP = f"""python3 - <<'PY'
+path = "{PLUGIN}/src/Scene.cpp"
+text = open(path, encoding="utf-8").read()
+line = "    const auto GROUND = CHyprColor(m_spec.background[0] / 255.F, m_spec.background[1] / 255.F, m_spec.background[2] / 255.F, ALPHA);"
+assert line in text
+wrapped = "    const auto GROUND = CHyprColor(m_spec.background[0] / 255.F, m_spec.background[1] / 255.F,\\n" + " " * 35 + "m_spec.background[2] / 255.F, ALPHA);"
+open(path, "w", encoding="utf-8").write(text.replace(line, wrapped))
+PY"""
+# a one-line guard written out as a block, as a reviewer or shfmt would
+SHELLWRAP = r"""python3 - <<'PY'
+path = "dist/bin/hypr-de-set-wallpaper"
+text = open(path, encoding="utf-8").read()
+line = '[ -r "$WP" ] || { echo "hypr-de-set-wallpaper: cannot read $WP" >&2; exit 1; }\n'
+assert line in text
+open(path, "w", encoding="utf-8").write(text.replace(line, '[ -r "$WP" ] || {\n    echo "hypr-de-set-wallpaper: cannot read $WP" >&2\n    exit 1\n}\n'))
+PY"""
+K0 = """sed -i 's/^\\[ \\$# -eq 1 \\] || usage$/[[ $# -eq 1 ]] || usage\\n[ -n "$1" ] || usage/' dist/bin/hypr-de-set-wallpaper"""
+
 # name: (gates, change made with bash in the clone, FAIL lines that must appear, and options); no lines means the gates pass by design
 CASES = {
     "a1": (CPP, f"""printf '\\nset_source_files_properties(src/Spec.cpp PROPERTIES COMPILE_OPTIONS "-O0;-U_FORTIFY_SOURCE")\\n' >>{CM}""",
            [rf"cpp-harden: {PLUGIN}/src/Spec\.cpp unoptimized", rf"cpp-harden: {PLUGIN}/src/Spec\.cpp fortify-off"]),
-    "a2": (CPP, f"""sed -i 's|^include(../cmake/Safety.cmake)$|add_library(second SHARED src/Log.cpp)\\n&|' {CM}""",
+    "a2": (CPP, f"""sed -i 's|^include(../cmake/Safety.cmake)$|add_library(second SHARED src/Log.cpp)\\n&|' {CM}
+printf '\\ninstall(TARGETS second LIBRARY DESTINATION lib/hypr-de)\\n' >>{CM}""",
            [rf"cpp-harden: {PLUGIN}/src/Log\.cpp fortify-off"], {"check": False}),
     "a3": (CPP, f"""sed -i 's|^include(../cmake/Safety.cmake)$|&\\nadd_compile_options(-fno-stack-protector -U_FORTIFY_SOURCE)|' {CM}""",
            [rf"cpp-harden: {UNIT} stack-protector-off"]),
@@ -134,13 +202,14 @@ CASES = {
     "t2": (CPP, f"""printf '\\ntarget_compile_options(hypr-de-scene-impl PRIVATE "$<$<CONFIG:Release>:-fno-stack-protector>" "$<$<COMPILE_LANGUAGE:CXX>:-U_FORTIFY_SOURCE>")\\n' >>{CM}""",
            [rf"cpp-harden: {UNIT} stack-protector-off"]),
     "t3": (CPP, f"""printf '\\nset_property(TARGET hypr-de-scene-impl PROPERTY LINK_OPTIONS "")\\n' >>{CM}""", [rf"cpp-harden: {IMPL} elf-lazy-binding"]),
+    # a library the package builds and never installs ships nothing, so its compiles are not held to the shipping set; d1b installs it
     "d1": (CPP, f"""mkdir -p tools/probe
 printf 'cmake_minimum_required(VERSION 3.27)\\nproject(probe LANGUAGES CXX)\\nadd_library(probe SHARED main.cpp)\\ntarget_compile_options(probe PRIVATE -fno-stack-protector -O0)\\n' >tools/probe/CMakeLists.txt
 printf 'extern "C" int probe(long v) {{ int small = v; return small; }}\\n' >tools/probe/main.cpp
 printf 'tools/probe/CMakeLists.txt\\tmake\\ntools/probe/main.cpp\\tcpp-test\\n' >>tests/gates/classified.tsv
 sort -o tests/gates/classified.tsv tests/gates/classified.tsv
 sed -i 's|^  cmake --build build$|&\\n  cmake -S tools/probe -B build-probe -DCMAKE_BUILD_TYPE=Release\\n  cmake --build build-probe|' {SCENE}""",
-           [r"cpp-harden: tools/probe/main\.cpp unoptimized", r"cpp-harden: tools/probe/main\.cpp fortify-off"]),
+           [], {"exact": True}),
     "d1b": (CPP, f"""mkdir -p tools/probe
 printf 'cmake_minimum_required(VERSION 3.27)\\nproject(probe LANGUAGES CXX)\\nadd_library(probe SHARED main.cpp)\\ntarget_compile_options(probe PRIVATE -fno-stack-protector -O0)\\ninstall(TARGETS probe LIBRARY DESTINATION lib/hypr-de)\\n' >tools/probe/CMakeLists.txt
 printf 'extern "C" int probe(long v) {{ int small = v; return small; }}\\n' >tools/probe/main.cpp
@@ -379,12 +448,37 @@ printf 'print("ok   ratchet: nothing the gates allow has grown")\\n' >tests/gate
              [r"classify: packaging/hypr-de-scene\.spec spec-build-step"]),
     "f10c": (["classify"], """sed -i 's|^%build$|%conf\\n%cmake -S plugins/hypr-de-scene -DCMAKE_BUILD_TYPE=Debug\\n\\n%build|; /^%cmake -S plugins\\/hypr-de-scene$/d' packaging/hypr-de-scene.spec""",
              [r"classify: packaging/hypr-de-scene\.spec spec-build-step"]),
+    # round 6, finding 1: a new test source compiled alone in check() is a test's compile, not one the package ships
+    "h1": (["classify", "shell", "cpp-harden", "cpp-tidy", "ratchet"], CLAMP, [], {"exact": True}),
+    # finding 2: without annobin's notes annocheck cannot see how a compile ran, so an RPM without them fails; a spec that turns them off fails classify
+    "h2a": (["rpm"], TOY.format(**{**LIBTOY, "macros": "%undefine _annotated_build", "cflags": "-fno-stack-protector"}),
+            [r"rpm: @gate-toy/usr/lib64/libtoy\.so annobin-missing"], RPM),
+    "h2b": (["rpm"], TOY.format(**{**LIBTOY, "macros": "%global _annotated_build 0"}), [r"rpm: @gate-toy/usr/lib64/libtoy\.so annobin-missing"], RPM),
+    "h2ctl": (["rpm"], TOY.format(**LIBTOY), [], {**RPM, "exact": True}),
+    "h2c": (["classify"], f"""sed -i '1i %undefine _annotated_build' {SCENE_SPEC}""", [rf"classify: {SCENE_SPEC} spec-flags"]),
+    "h2d": (["classify"], f"""sed -i '1i %global _annotated_build 0' {SCENE_SPEC}""", [rf"classify: {SCENE_SPEC} spec-flags"]),
+    # finding 3: an audit of no ELF file is no audit: the debuginfo alone, or an architecture's RPM that ships none
+    "h3a": (["rpm"], TOY.format(**{**LIBTOY, "pick": "*-debuginfo-*.rpm"}), [r"rpm: rpm cannot-run"], RPM),
+    "h3b": (["rpm"], TOY.format(**{**LIBTOY, "macros": "%global debug_package %{nil}", "install": "install -Dm644 toy.c %{buildroot}%{_datadir}/gate-toy/toy.c",
+                                   "files": "%{_datadir}/gate-toy/toy.c"}), [r"rpm: @gate-toy no-elf"], RPM),
+    # finding 4: a formatter's re-wrap of a baselined statement keeps its rows, and --update writes rows the ratchet takes
+    "h4a": (["cpp-tidy", "ratchet"], REWRAP + f"\ntests/gates/check.sh cpp-tidy --update --pkgbuild {SCENE} >/dev/null", [], {"exact": True, "check": False}),
+    "h4b": (["shell", "ratchet"], SHELLWRAP + "\ntests/gates/check.sh shell --update >/dev/null", [], {"exact": True}),
+    "h4c": (["shell"], SHELLWRAP, [], {"exact": True}),
+    # and a fixed finding beside a new one of its rule fails once, with the one hint that fits
+    "h4d": (["shell"], K0, [r"shell: dist/bin/hypr-de-set-wallpaper SC2292"], {"absent": [r"FAIL .*lower it with --update"], "out": [r".*--update --allow-growth"]}),
+    # finding 8: -Bsymbolic-functions given to the driver is -B and a directory to GCC, and the FAIL says how to give it to the linker
+    "h8": (CPP, f"""printf '\\ntarget_link_options(hypr-de-scene-impl PRIVATE -Bsymbolic-functions)\\n' >>{CM}""",
+           [rf"cpp-harden: {SCENE} driver-override"], {"out": [r".*-Wl,-Bsymbolic-functions"], "check": False}),
 }
 
 
 def attempt(name, root):
     gates, change, expected, *rest = CASES[name]
     options = rest[0] if rest else {}
+    absent = [tool for tool in options.get("needs", []) if not shutil.which(tool)]
+    if absent:
+        return None, f"skip {name}\n     not run here: needs {' '.join(absent)}"
     work = tempfile.mkdtemp(prefix=f"gate-attack-{name}-")
     try:
         clone = os.path.join(work, "clone")
@@ -397,7 +491,7 @@ def attempt(name, root):
             subprocess.run(["git", "add", "-A"], cwd=clone, check=True)
         env = {**os.environ, **{key: value.format(work=work) for key, value in options.get("env", {}).items()}}
         others = [gate for gate in gates if gate != "ratchet"]
-        results = [*([ratchet(clone, work, env)] if "ratchet" in gates else []), *([gate_run(others, clone, env, options.get("pkgbuild", SCENE))] if others else [])]
+        results = [*([ratchet(clone, work, env)] if "ratchet" in gates else []), *([gate_run(others, clone, env, options.get("pkgbuild", SCENE), options.get("rpms"))] if others else [])]
         stdout, stderr = "".join(r.stdout for r in results), "".join(r.stderr for r in results)
         failed = any(r.returncode for r in results)
         lines = [line for line in stdout.splitlines() if line.startswith(("FAIL ", "gate:"))] + stderr.splitlines()[-3:]
@@ -405,10 +499,11 @@ def attempt(name, root):
         shown = [line for line in lines if any(re.match(rf"FAIL {pattern}:", line) for pattern in expected)]
         extra = [line for line in lines if line.startswith("FAIL ") and line not in shown] if options.get("exact") else []
         unseen = [pattern for pattern in options.get("out", []) if not any(re.match(pattern, line) for line in stdout.splitlines())]
-        ok = not missing and not extra and not unseen and failed == bool(expected)
+        unwanted = [line for line in stdout.splitlines() if any(re.match(pattern, line) for pattern in options.get("absent", []))]
+        ok = not missing and not extra and not unseen and not unwanted and failed == bool(expected)
         report = [f"{'ok  ' if ok else 'MISS'} {name}", *(f"     {line}" for line in (shown if ok else lines))]
         report += [f"     expected, not seen: {pattern}" for pattern in [*missing, *unseen]]
-        report += [f"     not expected: {line}" for line in extra]
+        report += [f"     not expected: {line}" for line in [*extra, *unwanted]]
         return ok, "\n".join(report)
     finally:
         shutil.rmtree(work, ignore_errors=True)
@@ -422,10 +517,11 @@ def ratchet(clone, work, env):
     return subprocess.run(["python3", "-I", script, "HEAD"], cwd=clone, capture_output=True, text=True, check=False, env=env)
 
 
-def gate_run(gates, clone, env, pkgbuild):
+def gate_run(gates, clone, env, pkgbuild, rpms):
     # the C++ gates build only the package a case changes, the plugin's unless it says otherwise, three cases at a time
     only = ["--pkgbuild", pkgbuild] if {"cpp-harden", "cpp-tidy"} & set(gates) else []
-    return subprocess.run(["tests/gates/check.sh", *gates, *only], cwd=clone, capture_output=True, text=True, check=False, env=env)
+    given = ["--rpms", *sorted(glob.glob(os.path.join(clone, rpms)))] if rpms else []
+    return subprocess.run(["tests/gates/check.sh", *gates, *only, *given], cwd=clone, capture_output=True, text=True, check=False, env=env)
 
 
 def main():
@@ -438,8 +534,10 @@ def main():
         results = list(pool.map(lambda name: attempt(name, root), names))
     for _ok, report in results:
         print(report, flush=True)
-    failed = sum(not ok for ok, _report in results)
-    print(f"{len(results) - failed}/{len(results)} cases as expected")
+    failed, skipped = sum(ok is False for ok, _report in results), sum(ok is None for ok, _report in results)
+    print(f"{len(results) - failed - skipped}/{len(results) - skipped} cases as expected", end="")
+    # the rpm cases need Fedora's rpmbuild and annocheck, which the C++ gates' container has not; they are a separate run, never a pass
+    print(f", and {skipped} not run here: run them where rpmbuild and annocheck are, as the rpm job in scene-plugin.yml" if skipped else "")
     sys.exit(1 if failed else 0)
 
 

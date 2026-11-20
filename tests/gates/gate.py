@@ -39,6 +39,7 @@ UNBASELINED_GATES = {"cpp-selftest", "classify"}
 UNBASELINED_RULES = {
     "build-failed", "tidy-failed", "not-built", "unattributed", "unlintable-shell", "pkgbuild-source",
     "cannot-run", "forged-record", "malformed-record", "unshimmed", "not-judged", "untrusted-tool", "driver-override",
+    "annobin-missing", "no-elf",
 }
 # a gate that cannot see the code it judges says so once, and stays silent about what it therefore cannot count
 BLOCKING_RULES = {"build-failed", "unattributed", "cannot-run", "forged-record", "malformed-record", "unshimmed", "not-judged", "untrusted-tool", "driver-override"}
@@ -78,7 +79,8 @@ SPEC_BUILD_LINE = re.compile(r"%autosetup(?: -n \S+)?(?: -p\d+)?|%cmake -S [\w./
 # a spec that asks for a compiler or a C or C++ build system, or names one in its build sections, macros included, compiles;
 # a clean Fedora build root has no compiler a spec did not ask for
 SPEC_COMPILES = re.compile(r"(?<![\w.+-])(?:gcc|gcc-c\+\+|g\+\+|c\+\+|cc|cxx|clang(?:\+\+)?|cmake\w*|meson\w*|ninja(?:-build)?|make\w*|ld|as)(?![\w.+-])")
-SPEC_FLAGS_MACRO = re.compile(r"^%(?:global|define|undefine)\s+(\S*(?:flags|hardened|fortify|lto|annobin|cmake|_build_type)\S*)", re.MULTILINE)
+# _annotated_build turns off the annobin notes the rpm gate reads each compile's flags from
+SPEC_FLAGS_MACRO = re.compile(r"^%(?:global|define|undefine)\s+(\S*(?:flags|hardened|fortify|lto|annobin|annotated|cmake|_build_type)\S*)", re.MULTILINE)
 # how alike, from 0 to 1, a baselined line and the line an edit made of it are; a fixed line and a new one are rarely this close
 SAME_LINE = 0.6
 
@@ -1303,7 +1305,9 @@ def analyse(found, built):
     units, units_by_object, links = [], collections.defaultdict(list), collections.defaultdict(list)
     for record in built.records:
         for option in (o for o in record["options"] if OVERRIDE.fullmatch(o)):
-            found.add(built.pkgbuild, "driver-override", option, f"{built.pkgbuild}: a compile ran with {option}, which changes the programs GCC runs or what it tells them")
+            # GCC reads -Bsymbolic or -Bstatic given to the driver as -B and a directory; the linker gets it only through -Wl,
+            fix = f"; a linker option goes through the driver as -Wl,{option}" if option.startswith("-B") else ""
+            found.add(built.pkgbuild, "driver-override", option, f"{built.pkgbuild}: a compile ran with {option}, which changes the programs GCC runs or what it tells them{fix}")
     for record in built.records:
         unit = Unit(record, built) if "preprocessed" in record else None
         if unit:
@@ -1509,9 +1513,10 @@ ANNOCHECK_LINE = re.compile(r"^Hardened: \S+: (?:FAIL|MAYB): (?:test: (?P<maybe>
 def gate_rpm(found, args):
     """Every binary RPM given: its modes as it installs, the ELF checks cpp-harden makes, and annocheck's per-compile notes."""
     rpms = sorted(p for p in args.rpms if not p.endswith(".src.rpm"))
+    binaries = [p for p in rpms if not re.search(r"-debug(?:info|source)-", os.path.basename(p))]
     missing = [tool for tool in ("rpm", "rpm2cpio", "cpio", "readelf", "annocheck") if not shutil.which(tool)]
-    if missing or not rpms:
-        found.add("rpm", "cannot-run", "cannot run", f"rpm: {', '.join(missing) + ' missing' if missing else 'no RPM given with --rpms'}, so no RPM is audited")
+    if missing or not binaries:
+        found.add("rpm", "cannot-run", "cannot run", f"rpm: {', '.join(missing) + ' missing' if missing else 'no binary RPM given with --rpms'}, so no RPM is audited")
         return
     root = scratch()
     for path in rpms:
@@ -1519,9 +1524,10 @@ def gate_rpm(found, args):
         unpack = subprocess.run(["cpio", "-idm", "--quiet"], input=payload.stdout, cwd=root, capture_output=True, check=False)
         if payload.returncode or unpack.returncode:
             found.add(path, "cannot-run", "cannot unpack", f"{path}: cannot unpack: {(payload.stderr + unpack.stderr).decode(errors='replace').strip()}")
-    for path in (p for p in rpms if not re.search(r"-debug(?:info|source)-", os.path.basename(p))):
-        name = run(["rpm", "-qp", "--qf", "%{NAME}", path]).stdout
+    for path in binaries:
+        name, arch = run(["rpm", "-qp", "--qf", "%{NAME}\t%{ARCH}", path]).stdout.split("\t")
         files = run(["rpm", "-qp", "--qf", "[%{FILENAMES}\t%{FILEMODES}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\n]", path]).stdout
+        audited = 0
         for line in files.splitlines():
             installed, mode, user, group = line.split("\t")
             key, mode = f"@{name}{installed}", int(mode)
@@ -1534,12 +1540,30 @@ def gate_rpm(found, args):
                 found.add(key, rule, rule, f"{key}: {rule} (mode {mode:o}, owner {user}:{group})")
             unpacked = os.path.join(root, installed.lstrip("/"))
             if stat.S_ISREG(mode) and head_of(unpacked).startswith(b"\x7fELF"):
+                audited += 1
                 check_elf(found, key, unpacked)
                 annocheck(found, key, unpacked, os.path.join(root, "usr/lib/debug"))
+        # only a noarch package may ship no compiled code; one built for an architecture that ships none was audited for nothing
+        if not audited and arch != "noarch":
+            found.add(f"@{name}", "no-elf", arch, f"@{name}: an {arch} package with no ELF file in it, so the rpm gate audited none of its code")
+
+
+def annobin_notes(path, debug):
+    """Whether annobin's per-compile notes are in the file or in its debuginfo, found by build ID."""
+    build_id = re.search(r"Build ID:\s*(\w+)", run(["readelf", "-nW", path]).stdout)
+    places = [path, *([os.path.join(debug, ".build-id", build_id[1][:2], build_id[1][2:] + ".debug")] if build_id else [])]
+    for place in (p for p in places if os.path.exists(p)):
+        for line in run(["readelf", "-SW", place]).stdout.splitlines():
+            if re.search(r"\]\s+(?:\.gnu\.build\.attributes|\.annobin\.notes)\S*\s+(?!NOBITS)\w+", line):
+                return True
+    return False
 
 
 def annocheck(found, key, path, debug):
-    """Fedora's GCC records how each compile ran in annobin notes, which rpmbuild moves into the debuginfo package."""
+    """Fedora's GCC records how each compile ran in annobin notes, which rpmbuild moves into the debuginfo package. Without them
+    annocheck has little to read, so a library built with the notes turned off fails rather than passes unseen."""
+    if not annobin_notes(path, debug):
+        found.add(key, "annobin-missing", "no annobin notes", f"{key}: has no annobin notes, here or in its debuginfo, so annocheck cannot see how its compiles ran")
     result = run(["annocheck", f"--debug-dir={debug}", path])
     tests = [match for match in map(ANNOCHECK_LINE.match, result.stdout.splitlines()) if match]
     for match in tests:
@@ -1573,15 +1597,37 @@ GATES = {
 }
 
 
-def successor(text, candidates, lines):
-    """The candidate an edit made of a line with this text: the one most like it, when no other lines of the file are more like it."""
-    windows = sorted({normalised("\n".join(lines[i : i + n])) for n in range(1, 5) for i in range(len(lines) - n + 1)})
+@functools.cache
+def spans(lines):
+    """Each run of one to four lines, as a finding's text is joined, and where in the file it runs."""
+    found = collections.defaultdict(list)
+    for n in range(1, 5):
+        for i in range(len(lines) - n + 1):
+            found[normalised("\n".join(lines[i : i + n]))].append(range(i, i + n))
+    return found
+
+
+def successors(text, candidates, lines):
+    """The candidates an edit made of a line with this text, most alike first: those on the lines of the file most like the text
+    now, so an edited line, and a statement a formatter wrapped or joined, keep their finding."""
+    runs = spans(tuple(lines))
+    matcher = difflib.SequenceMatcher(None, autojunk=False)
+    matcher.set_seq2(text)
+    best, score = (text, 1.0) if text in runs else (None, 0.0)
+    for other in [] if best else sorted(runs):
+        matcher.set_seq1(other)
+        # the cheap upper bounds first, so a long file costs little once a close run is found
+        if matcher.real_quick_ratio() > score and matcher.quick_ratio() > score and matcher.ratio() > score:
+            best, score = other, matcher.ratio()
+    if best is None or score < SAME_LINE:
+        return []
+    held = [c for c in candidates if any(set(a) & set(b) for a in runs[best] for b in runs.get(c, ()))]
 
     def likeness(other):
-        return difflib.SequenceMatcher(None, text, other, autojunk=False).ratio()
+        matcher.set_seq1(other)
+        return matcher.ratio()
 
-    best = max(windows, key=likeness, default=None)
-    return best if best in candidates and likeness(best) >= SAME_LINE else None
+    return sorted(held, key=lambda c: (-likeness(c), c))
 
 
 def judge(gate, found, baseline, args):
@@ -1591,11 +1637,12 @@ def judge(gate, found, baseline, args):
     # an edited line keeps its finding: what a baselined text no longer uses moves to the text its line became
     for old in sorted(key for key in original if found.counts[key] < original[key] and key[0] in tracked()):
         new = {texts[key]: key for key in found.counts if key[:2] == old[:2] and found.counts[key] > allowed.get(key, 0)}
-        text = successor(texts[old], new, source_lines(old[0])) if new else None
-        if text:
+        for text in successors(texts[old], new, source_lines(old[0])) if new else []:
             shift = min(allowed[old] - found.counts[old], found.counts[new[text]] - allowed.get(new[text], 0))
             allowed[old] -= shift
             allowed[new[text]] = allowed.get(new[text], 0) + shift
+    # a row that lost what a new finding of its rule in its file gained is one change, and the FAIL for the new finding says what to do
+    growing = {key[:2] for key in found.counts if found.counts[key] > allowed.get(key, 0)}
     # a run that builds only some packages cannot tell that a finding is gone, any more than a gate that cannot see all the code
     failures, grown, silent = 0, 0, blocked(found) or bool(args.pkgbuild)
     for key in sorted(set(found.counts) | set(allowed)):
@@ -1604,7 +1651,7 @@ def judge(gate, found, baseline, args):
         if args.update and recorded and have == limit != original.get(key, 0):
             baseline[gate, *key] = (have, texts[key])
         # what a gate that cannot see all the code no longer finds is not news; the line that says why it cannot see is
-        if have == limit or (silent and have < limit):
+        if have == limit or (silent and have < limit) or (have < limit and key[:2] in growing and not args.update):
             continue
         if args.update and recorded and (have < limit or args.allow_growth):
             baseline[gate, *key] = (have, texts[key])

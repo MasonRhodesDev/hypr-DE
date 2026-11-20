@@ -7,8 +7,8 @@ the ratchet itself. It compares the base commit's baseline, file classes and
 configurations with the files git tracks in the working tree. These fail:
 
 * a baseline row that is new, or allows more than the base's row did, unless
-  it is a row whose line was edited: the base row's count fell by as much, and
-  its text became the new row's text (see successor);
+  it is a row whose line was edited or rewrapped: the base row's count fell by
+  as much, and its text became the new row's text (see successors);
 * a classified.tsv row whose class changed, unless it went from a class no gate
   reads to one a gate reads, and a new row with a class no gate reads, except
   a C or C++ test source (cpp-test), which ships nothing;
@@ -23,7 +23,9 @@ sees each one beside its reason, and on GitHub they are also warnings on the
 run and lines in its summary.
 """
 
+import collections
 import difflib
+import functools
 import os
 import re
 import subprocess
@@ -73,15 +75,37 @@ def normalised(text):
     return " ".join(text.replace("\\\n", "").split())
 
 
-def successor(text, candidates, lines):
-    """The candidate an edit made of a line with this text: the one most like it, when no other lines of the file are more like it."""
-    windows = sorted({normalised("\n".join(lines[i : i + n])) for n in range(1, 5) for i in range(len(lines) - n + 1)})
+@functools.cache
+def spans(lines):
+    """Each run of one to four lines, as a finding's text is joined, and where in the file it runs."""
+    found = collections.defaultdict(list)
+    for n in range(1, 5):
+        for i in range(len(lines) - n + 1):
+            found[normalised("\n".join(lines[i : i + n]))].append(range(i, i + n))
+    return found
+
+
+def successors(text, candidates, lines):
+    """The candidates an edit made of a line with this text, most alike first: those on the lines of the file most like the text
+    now, so an edited line, and a statement a formatter wrapped or joined, keep their finding."""
+    runs = spans(tuple(lines))
+    matcher = difflib.SequenceMatcher(None, autojunk=False)
+    matcher.set_seq2(text)
+    best, score = (text, 1.0) if text in runs else (None, 0.0)
+    for other in [] if best else sorted(runs):
+        matcher.set_seq1(other)
+        # the cheap upper bounds first, so a long file costs little once a close run is found
+        if matcher.real_quick_ratio() > score and matcher.quick_ratio() > score and matcher.ratio() > score:
+            best, score = other, matcher.ratio()
+    if best is None or score < SAME_LINE:
+        return []
+    held = [c for c in candidates if any(set(a) & set(b) for a in runs[best] for b in runs.get(c, ()))]
 
     def likeness(other):
-        return difflib.SequenceMatcher(None, text, other, autojunk=False).ratio()
+        matcher.set_seq1(other)
+        return matcher.ratio()
 
-    best = max(windows, key=likeness, default=None)
-    return best if best in candidates and likeness(best) >= SAME_LINE else None
+    return sorted(held, key=lambda c: (-likeness(c), c))
 
 
 def count(table, key):
@@ -95,9 +119,10 @@ def grown_rows(base):
         spare = count(before, old) - count(after, old)
         new = {after[key][5]: key for key in grown if key[:3] == old[:3] and grown[key] > 0}
         text = in_tree(old[1]) if new else None
-        moved = successor(before[old][5], new, text.splitlines()) if text else None
-        if moved:
-            grown[new[moved]] -= min(spare, grown[new[moved]])
+        for moved in successors(before[old][5], new, text.splitlines()) if text else []:
+            shift = min(spare, grown[new[moved]])
+            grown[new[moved]] -= shift
+            spare -= shift
     return [f"baseline {' '.join(key[:3])}: {count(before, key)} -> {after[key][4]}: {after[key][5]}" for key, more in sorted(grown.items()) if more > 0]
 
 
