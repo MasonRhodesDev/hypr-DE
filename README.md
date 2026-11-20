@@ -490,7 +490,8 @@ changes in the build is audited too. The CI job installs each package's
 `makedepends` and `checkdepends` for it. Some tests fail under the trace
 described below, as the main package's lock tests do. A package whose build
 fails under it is built again untraced, and that build counts only if it
-ships no ELF file; its compiles are judged as usual. A package that ships an
+ships no ELF file, so none of its compiles is held to the shipping set and
+only its archive, scriptlet and file checks apply. A package that ships an
 ELF file keeps the traced build's `build-failed`. As root it builds as an unprivileged
 user. The tarball stands in for the `PKGBUILD`'s remote source, unpacked as
 `<last part of url>-<pkgver>`, the way a forge's release archive unpacks.
