@@ -104,6 +104,9 @@ BuildRequires: gcc
 %description
 A shared library the rpm gate audits.
 
+%prep
+%setup -q -c -T
+
 %build
 printf 'int gate_toy(int v) {{ return v * 2; }}\\n' >toy.c
 %{{__cc}} %{{optflags}} {cflags} -fPIC -shared %{{build_ldflags}} -o libtoy.so toy.c

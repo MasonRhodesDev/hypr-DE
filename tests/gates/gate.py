@@ -1554,7 +1554,8 @@ def annobin_notes(path, debug):
     places = [path, *([os.path.join(debug, ".build-id", build_id[1][:2], build_id[1][2:] + ".debug")] if build_id else [])]
     for place in (p for p in places if os.path.exists(p)):
         for line in run(["readelf", "-SW", place]).stdout.splitlines():
-            if re.search(r"\]\s+(?:\.gnu\.build\.attributes|\.annobin\.notes)\S*\s+(?!NOBITS)\w+", line):
+            # .gnu.build.attributes comes in with glibc's start files whether or not the package's own compiles ran annobin
+            if re.search(r"\]\s+\.annobin\.notes\s+(?!NOBITS)\w+", line):
                 return True
     return False
 
