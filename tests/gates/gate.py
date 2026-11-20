@@ -1293,7 +1293,7 @@ def check_elf(found, key, path):
 
 
 def analyse(found, built):
-    """Shipped ELFs, the compiles behind them, and every compile of a tracked source."""
+    """Shipped ELFs and the compiles behind them."""
     for rule, detail in built.problems:
         found.add(built.pkgbuild, rule, rule, f"{built.pkgbuild}: {detail}")
     if built.result.returncode != 0:
@@ -1318,7 +1318,8 @@ def analyse(found, built):
             links[record["link"]["build_id"]].append({**record, "unit": unit})
     shipped = audit(found, built, units_by_object, links)
     archives(found, built)
-    checked = [u for u in units if id(u) in shipped or u.name in tracked()]
+    # only what ships is held to the shipping set: a test's own compile in check(), or a library the package never installs, is not
+    checked = [u for u in units if id(u) in shipped]
     seen, read_by = set(), set()
     for unit in checked:
         read_by |= view(found, unit, seen)
@@ -1367,7 +1368,7 @@ def gate_cpp_harden(found, args):
         for directory in sorted(gated_dirs(tracked())):
             for path in sorted(p for p in tracked() if p.startswith(directory + "/") and p.lower().endswith(CPP_SUFFIXES)):
                 if path not in read_by and path not in classes:
-                    found.add(path, "not-built", "not built", f"{path}: no package's build reads it; build it there, or list it in {MANIFEST}")
+                    found.add(path, "not-built", "not built", f"{path}: nothing a package ships is built from it; build it there, or list it in {MANIFEST}")
 
 
 def blocked(found):
