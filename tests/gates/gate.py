@@ -787,13 +787,17 @@ def probe(args):
     return True
 
 
-def recorded_build(work, reals, argv, **kwargs):
-    """Run a build as the build user under strace; keep the records from processes that ran the shim, and a finding for anything else."""
+def recorded_build(work, reals, argv, traced=True, **kwargs):
+    """Run a build as the build user under strace; keep the records from processes that ran the shim, and a finding for anything else.
+    Untraced, every record is kept, which is sound only for a build that ships no ELF file."""
     recorder = Recorder(work)
     log = os.path.join(work, "trace.log")
     trace = ["strace", "-f", "-qq", "--seccomp-bpf", "-e", "trace=execve,execveat,fork,vfork,clone,clone3", "-e", "signal=none", "-s", "4096", "-o", log]
-    result = run([*trace, "--", *as_builder(argv)], **kwargs)
+    result = run([*trace, "--", *as_builder(argv)] if traced else as_builder(argv), **kwargs)
     messages = recorder.close()
+    if not traced:
+        records, bad = parsed_records(messages, None)
+        return result, records, bad
     parents, runs = programs(log) if os.path.exists(log) else ({}, [])
     if not runs:
         return result, [], [("cannot-run", f"strace could not trace the build: {result.stderr.strip()[-400:]}")]
@@ -855,6 +859,19 @@ def exported(top):
 
 @functools.cache
 def package(pkgbuild, case):
+    """The package built under the trace, check() included. Some tests fail under ptrace, as the main package's lock tests do,
+    so a package whose build fails is built again untraced, and that build counts only if it ships no ELF file."""
+    built = build_package(pkgbuild, case, traced=True)
+    if built.result.returncode == 0:
+        return built
+    untraced = build_package(pkgbuild, case, traced=False)
+    if untraced.result.returncode != 0 or any(next(elf_files(d), None) for d in untraced.pkgdirs.values()):
+        return built
+    print(f"note cpp-harden: {pkgbuild}: makepkg failed under the trace and passed without it, and the package ships no ELF file, so the untraced build is judged")
+    return untraced
+
+
+def build_package(pkgbuild, case, traced):
     work = scratch()
     start = os.path.join(work, "start")
     os.makedirs(start)
@@ -875,7 +892,7 @@ def package(pkgbuild, case):
     handed_to_builder(work)
     env = builder_env(os.path.join(work, "home"), wrappers, BUILDDIR=os.path.join(work, "build"), PKGDEST=os.path.join(work, "out"), SRCDEST=start, **({"FIXTURE_BAD": case} if case else {}))
     command = ["makepkg", "--config", makepkg_conf(work), "--nodeps", "--skipinteg", "--noconfirm", "--noprogressbar"]
-    result, records, problems = recorded_build(work, reals, command, cwd=start, env=env)
+    result, records, problems = recorded_build(work, reals, command, traced, cwd=start, env=env)
     return Package(pkgbuild, work, info, result, records, problems)
 
 
@@ -1578,7 +1595,8 @@ def judge(gate, found, baseline, args):
             shift = min(allowed[old] - found.counts[old], found.counts[new[text]] - allowed.get(new[text], 0))
             allowed[old] -= shift
             allowed[new[text]] = allowed.get(new[text], 0) + shift
-    failures, grown, silent = 0, 0, blocked(found)
+    # a run that builds only some packages cannot tell that a finding is gone, any more than a gate that cannot see all the code
+    failures, grown, silent = 0, 0, blocked(found) or bool(args.pkgbuild)
     for key in sorted(set(found.counts) | set(allowed)):
         recorded = gate not in UNBASELINED_GATES and key[1] not in UNBASELINED_RULES
         have, limit = found.counts[key], allowed.get(key, 0) if recorded else 0

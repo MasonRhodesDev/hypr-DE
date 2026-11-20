@@ -6,7 +6,8 @@ gates pass by design, with the reason beside it. A case's options can set the
 environment ({work} is the case's scratch directory), leave its change out of
 git ("add": False), fail on any FAIL line it does not expect ("exact"), name
 other lines the output must hold ("out"), or drop the plugin's check()
-("check": False). A case drops it when its change breaks the plugin's own
+("check": False), or name the one package the C++ gates build ("pkgbuild",
+the plugin's by default). A case drops check() when its change breaks the plugin's own
 tests, so check() would stop the build, as build-failed, before the line the
 case is about; or, for r4, when check()'s test build would make the shipped
 library's exact bytes through the shim and so attribute it. The gate "ratchet" runs HEAD's copy
@@ -354,6 +355,12 @@ sed -i 's|^  cmake -S plugins/hypr-de-scene|  export GCC_EXEC_PREFIX="$PWD/{PLUG
     "f6a": (CPP, PATCH.format(scene=SCENE, after="./tests/scene-plugin-build.sh", section=".text"), [rf"cpp-harden: {IMPL} unattributed"]),
     # and a change to its data after the link shows as well as one to its code
     "f6b": (CPP, PATCH.format(scene=SCENE, after="cmake --build build", section=".rodata"), [rf"cpp-harden: {IMPL} unattributed"]),
+    # a check() that fails under the trace: the main package, which ships no ELF file, is judged from an untraced build,
+    # and the plugin keeps its failure
+    "f6c": (CPP, f"""sed -i 's|^  ./packaging/check-units.sh$|&\\n  grep -q "^TracerPid:[[:space:]]*0$" /proc/self/status|' packaging/PKGBUILD""", [],
+            {"exact": True, "pkgbuild": "packaging/PKGBUILD", "out": [r"note cpp-harden: packaging/PKGBUILD: makepkg failed under the trace and passed without it"]}),
+    "f6d": (CPP, f"""sed -i 's|^  ./tests/scene-plugin-build.sh$|&\\n  grep -q "^TracerPid:[[:space:]]*0$" /proc/self/status|' {SCENE}""",
+            [rf"cpp-harden: {SCENE} build-failed"]),
     # F7: the gates, the workflows and CODEOWNERS are configuration, and the base's ratchet judges a pull request that rewrites it
     "f7a": (["ratchet"], """sed -i 's/"cannot-run", "forged-record"/"cannot-run"/' tests/gates/gate.py
 sed -i '/^\\/tests\\/gates\\//d' .github/CODEOWNERS
@@ -390,7 +397,7 @@ def attempt(name, root):
             subprocess.run(["git", "add", "-A"], cwd=clone, check=True)
         env = {**os.environ, **{key: value.format(work=work) for key, value in options.get("env", {}).items()}}
         others = [gate for gate in gates if gate != "ratchet"]
-        results = [*([ratchet(clone, work, env)] if "ratchet" in gates else []), *([gate_run(others, clone, env)] if others else [])]
+        results = [*([ratchet(clone, work, env)] if "ratchet" in gates else []), *([gate_run(others, clone, env, options.get("pkgbuild", SCENE))] if others else [])]
         stdout, stderr = "".join(r.stdout for r in results), "".join(r.stderr for r in results)
         failed = any(r.returncode for r in results)
         lines = [line for line in stdout.splitlines() if line.startswith(("FAIL ", "gate:"))] + stderr.splitlines()[-3:]
@@ -415,9 +422,9 @@ def ratchet(clone, work, env):
     return subprocess.run(["python3", "-I", script, "HEAD"], cwd=clone, capture_output=True, text=True, check=False, env=env)
 
 
-def gate_run(gates, clone, env):
-    # every case changes the plugin's package, so the C++ gates build only that one, three cases at a time
-    only = ["--pkgbuild", SCENE] if {"cpp-harden", "cpp-tidy"} & set(gates) else []
+def gate_run(gates, clone, env, pkgbuild):
+    # the C++ gates build only the package a case changes, the plugin's unless it says otherwise, three cases at a time
+    only = ["--pkgbuild", pkgbuild] if {"cpp-harden", "cpp-tidy"} & set(gates) else []
     return subprocess.run(["tests/gates/check.sh", *gates, *only], cwd=clone, capture_output=True, text=True, check=False, env=env)
 
 

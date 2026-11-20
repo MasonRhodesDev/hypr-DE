@@ -487,7 +487,11 @@ with an empty environment, and with the distribution's compiler flags emptied
 so that only what this repository asks for counts. `check()` runs between
 `build()` and `package()`, as it does when the package ships, so what it
 changes in the build is audited too. The CI job installs each package's
-`makedepends` and `checkdepends` for it. As root it builds as an unprivileged
+`makedepends` and `checkdepends` for it. Some tests fail under the trace
+described below, as the main package's lock tests do. A package whose build
+fails under it is built again untraced, and that build counts only if it
+ships no ELF file; its compiles are judged as usual. A package that ships an
+ELF file keeps the traced build's `build-failed`. As root it builds as an unprivileged
 user. The tarball stands in for the `PKGBUILD`'s remote source, unpacked as
 `<last part of url>-<pkgver>`, the way a forge's release archive unpacks.
 
@@ -590,7 +594,9 @@ shim and runs its tests.
 
 Every reviewed attack on these gates is a case in `tests/gates/attacks.py`,
 which makes each change on a fresh clone of `HEAD`, runs the gates and checks
-for the exact FAIL line. A gate that cannot see all the code, because a build
+for the exact FAIL line. Its C++ cases build only the plugin's package
+(`--pkgbuild`), the one each case changes; CI builds every package. A gate
+that cannot see all the code, because a build
 failed, a tool ran outside the shim or an ELF is unattributed, prints that and
 stays silent about the counts it can no longer check. Run it where the C++ gates run:
 `python3 -I tests/gates/attacks.py [case ...]`. The self-test covers the same
