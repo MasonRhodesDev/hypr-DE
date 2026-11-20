@@ -758,10 +758,13 @@ moves a finding and adds one of the same rule elsewhere, the gate prints one
 FAIL, for the new finding, with the `--update --allow-growth` hint.
 
 The match is by text alone, as the ratchet has no line numbers, and it never
-moves more than a row lost. Its limit: when a finding goes away while its
-text stays in the file, such as by an edit to the lines around it, a new
-finding of the same rule in that file whose text is also part of the old text
-takes the row's count, wherever that new finding is.
+moves more than a row lost, so a file's count for a rule cannot grow
+unreported. Its limit: when a finding goes away, a new finding of the same
+rule in that file whose text overlaps the old text, in either direction,
+takes the row's count. For example, fixing `[ $# -eq 1 ] || usage` to
+`[[ $# -eq 1 ]] || usage` and adding the line `[ $# -eq 1 ] || usage "$0"`
+passes, since the new line holds the old text as a statement a formatter
+joined onto its neighbour would. The file's SC2292 count stays at one.
 
 A new or higher line in the baseline is an ordinary edit
 (`--update --allow-growth` writes it). On a pull request,

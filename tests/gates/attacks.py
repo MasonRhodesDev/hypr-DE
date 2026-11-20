@@ -24,6 +24,10 @@ they print as not run there, apart from the tally; run them where the rpm job
 in .github/workflows/scene-plugin.yml runs, with git, gcc, python3, rpm-build,
 annobin-annocheck, binutils and cpio installed.
 
+The formatter cases (h4e to h4m) need clang-format and shfmt, which CI's
+container does not install; install clang and shfmt there from the same Arch
+Linux Archive day as the workflow's ARCH_SNAPSHOT before running them.
+
 The cases come from the reviews of the gates. Nothing here runs in CI; the
 self-test (cpp-selftest) covers the same mechanisms on the gates' own fixture.
 """
@@ -574,8 +578,8 @@ def main():
         print(report, flush=True)
     failed, skipped = sum(ok is False for ok, _report in results), sum(ok is None for ok, _report in results)
     print(f"{len(results) - failed - skipped}/{len(results) - skipped} cases as expected", end="")
-    # the rpm cases need Fedora's rpmbuild and annocheck, which the C++ gates' container has not; they are a separate run, never a pass
-    print(f", and {skipped} not run here: run them where rpmbuild and annocheck are, as the rpm job in scene-plugin.yml" if skipped else "")
+    # a case whose tools are not here (rpmbuild and annocheck, clang-format, shfmt) is a separate run, never a pass
+    print(f", and {skipped} not run here, each for the tools named above it" if skipped else "")
     sys.exit(1 if failed else 0)
 
 
